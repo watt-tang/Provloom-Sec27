@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import argparse
-from wsgiref.simple_server import make_server
+from socketserver import ThreadingMixIn
+from wsgiref.simple_server import WSGIServer, make_server
 
 from app.backend.api import application
+
+
+class ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
+    daemon_threads = True
 
 
 def main() -> None:
@@ -12,7 +17,7 @@ def main() -> None:
     parser.add_argument("--port", default=8000, type=int)
     args = parser.parse_args()
 
-    with make_server(args.host, args.port, application) as server:
+    with make_server(args.host, args.port, application, server_class=ThreadingWSGIServer) as server:
         print(f"Serving Skill Dynamic Sandbox MVP on http://{args.host}:{args.port}")
         server.serve_forever()
 

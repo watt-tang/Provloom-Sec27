@@ -1,211 +1,583 @@
-# Skill Dynamic Sandbox MVP
+# Skill Runtime Security Sandbox
 
-一个最小可行版的 headless 后端系统：通过 Docker 隔离执行不受信任的 Skill，使用 `strace` 采集运行时行为，并输出结构化 JSON 安全报告。
+一个完整的、headless 的 Skill 动态安全沙箱系统，用于检测以 `SKILL.md` 为核心载体的 Skill 在真实执行过程中的安全风险。
 
-## 先回答两个关键问题
+系统不是普通脚本执行器，也不是只看文本的静态分析器，而是一个以 `SKILL.md` 为入口、在隔离环境中真实加载并执行 Skill 的 `Skill Runtime Security Sandbox`。
 
-### 1. 执行 Skill 的时候需要提供 API 吗？
+## 核心定位
 
-不需要。
+系统输入对象默认是：
 
-这个 MVP 里的 `POST /analyze-skill` 是沙箱系统自己的分析 API，不是被分析 Skill 必须实现的 API。
+- 单个 `SKILL.md` 文件
+- 包含 `SKILL.md` 的 Skill 目录
+- Skill 目录中的附带脚本、配置、资源文件
 
-也就是说：
+典型输入形态：
 
-- 你调用本系统的 API：`POST /analyze-skill`
-- 你把一个本地 Skill 目录路径和启动命令传给它
-- 系统会把这个 Skill 丢进 Docker 里执行
-- 系统自己采集运行时行为并生成报告
-
-被分析的 Skill 本身只要是一个“可执行目录”就行，不需要额外暴露 HTTP API，不需要实现回调接口，也不需要接入 SDK。
-
-### 2. 这个系统里 Skill 的载体是什么？
-
-当前 MVP 中，Skill 的载体就是“一个本地目录 + 一个入口命令”。
-
-最小约定如下：
-
-- `skill_path`：指向一个本地目录
-- `command`：在这个目录里执行的命令
-
-例如：
-
-```json
-{
-  "skill_path": "./examples/skills/network_file_probe",
-  "command": ["python", "skill.py"],
-  "timeout_seconds": 20
-}
+```text
+skill_bundle/
+├── SKILL.md
+├── tools/
+│   └── helper.py
+├── config.json
+└── assets/
 ```
 
-这表示：
+执行流程是：
 
-- Skill 载体目录是 `./examples/skills/network_file_probe`
-- 入口程序是该目录下的 `skill.py`
-- 在 Docker 容器中执行 `python skill.py`
+1. 加载 `SKILL.md`
+2. 在隔离 runtime 中执行 Skill
+3. 触发工具调用、文件访问、网络请求、进程行为
+4. 采集行为
+5. 规则分析与评分
+6. 返回结构化安全报告
+7. 销毁沙箱
 
-所以这个 MVP 里的 Skill 不是某种特殊的协议对象，也不是数据库记录，更不是必须有 `manifest.json` 的插件格式。它本质上就是一个待执行的代码目录。
+## TinyClaw 集成方案
 
-### 当前支持的 Skill 形态
+系统使用 TinyClaw 作为运行基础。
 
-理论上只要容器里能执行，都可以作为 Skill：
+当前方案是：
 
-- Python 脚本目录
-- Shell 脚本目录
-- Node.js 项目目录
-- 二进制程序目录
+- 每个 sandbox 基于独立 Docker 容器运行
+- sandbox 镜像在构建时按照 TinyClaw README 的方式安装 TinyClaw：
+  - `curl -fsSL https://tinyclaw.net/install.sh | sh`
+- 容器内 TinyClaw 二进制会安装到 `/usr/local/bin/tinyclaw`
+- Runtime 启动时会记录 TinyClaw 是否可用，以及其路径
 
-但这个 MVP 的默认沙箱镜像当前只内置了：
+说明：
 
-- `python`
-- `sh`
-- `strace`
-- `curl`
+- 当前公开仓库只有 TinyClaw README 和安装方式，没有开源完整 runtime 内核代码可供直接链接调用
+- 因此本项目实现的是一个 `TinyClaw-compatible Skill Runtime`
+- 它以 TinyClaw 为运行基础，并围绕 `SKILL.md` 执行模型构建受控执行器
 
-所以现阶段最稳妥的是：
-
-- Python Skill
-- Shell Skill
-
-如果你想跑 Node.js Skill，可以后续扩展沙箱镜像，在 [docker/sandbox/Dockerfile](/root/projects/clawguard-skill-sandbox/docker/sandbox/Dockerfile:1) 里安装 Node.js。
-
-## 功能范围
-
-- `POST /analyze-skill`
-- Docker 隔离执行 Skill
-- 采集文件访问、网络连接、进程执行、stdout、stderr
-- 输出 `risk_score`、`detected_behaviors`、`evidence_timeline`
-
-## 项目结构
+## 系统结构
 
 ```text
 .
 ├── app
 │   ├── analyzer
+│   │   ├── __init__.py
 │   │   └── rules.py
 │   ├── backend
+│   │   ├── __init__.py
 │   │   ├── api.py
-│   │   └── schemas.py
+│   │   ├── log_writer.py
+│   │   ├── schemas.py
+│   │   └── task_store.py
 │   ├── runner
+│   │   ├── __init__.py
 │   │   ├── docker_runner.py
 │   │   ├── models.py
 │   │   └── trace_parser.py
+│   ├── runtime
+│   │   ├── __init__.py
+│   │   ├── container_runtime.py
+│   │   └── skill_parser.py
+│   ├── telemetry
+│   │   ├── __init__.py
+│   │   └── collector.py
+│   ├── reporting
+│   │   ├── __init__.py
+│   │   └── risk_mapper.py
+│   ├── __init__.py
 │   └── main.py
 ├── docker
 │   └── sandbox
 │       └── Dockerfile
 ├── examples
 │   └── skills
-│       └── network_file_probe
-│           └── skill.py
-└── requirements.txt
+│       ├── deepseek_skill_demo
+│       │   ├── SKILL.md
+│       │   └── tools
+│       │       └── helper.py
+│       └── skill_bundle_demo
+│           ├── SKILL.md
+│           └── tools
+│               └── helper.py
+├── Log                         # 运行期生成，默认不纳入 Git
+├── scripts
+│   ├── backfill_log_risks.py
+│   ├── rename_log_files.py
+│   ├── render_log_resources.py
+│   ├── render_log_risks.py
+│   └── run_deepseek_suite.py
+├── tinyclaw
+│   └── README.md
+├── test
+│   └── SKILL.md
+└── README.md
 ```
 
-## 系统工作方式
+## 六层模块说明
 
-一次分析请求的完整流程如下：
+### 1. backend
 
-1. 客户端调用 `POST /analyze-skill`
-2. backend 接收请求并校验 `skill_path`、`command`、`timeout_seconds`
-3. runner 将 Skill 目录复制到临时目录
-4. runner 调用 `docker run` 启动隔离容器
-5. 容器内执行 `strace -ff -tt -e trace=file,process,network <command>`
-6. runner 收集：
-   - `stdout`
-   - `stderr`
-   - 文件访问行为
-   - 网络连接行为
-   - 进程执行行为
-7. analyzer 根据规则引擎打标签和评分
-8. backend 返回结构化 JSON 报告
+负责：
 
-## Skill 目录约定
+- REST API
+- 请求校验
+- task 状态查询
+- 响应格式化
 
-这个项目当前没有强制的 Skill 标准格式，但推荐遵循下面这个最小目录规范：
+核心文件：
+
+- [app/backend/api.py](/root/projects/clawguard-skill-sandbox/app/backend/api.py:1)
+- [app/backend/schemas.py](/root/projects/clawguard-skill-sandbox/app/backend/schemas.py:1)
+- [app/backend/task_store.py](/root/projects/clawguard-skill-sandbox/app/backend/task_store.py:1)
+
+### 2. runner
+
+负责：
+
+- sandbox 生命周期管理
+- Docker 镜像构建
+- 容器启动与销毁
+- 超时终止与强制清理
+- 每任务独立容器，不复用容器
+
+核心文件：
+
+- [app/runner/docker_runner.py](/root/projects/clawguard-skill-sandbox/app/runner/docker_runner.py:1)
+- [app/runner/models.py](/root/projects/clawguard-skill-sandbox/app/runner/models.py:1)
+- [app/runner/trace_parser.py](/root/projects/clawguard-skill-sandbox/app/runner/trace_parser.py:1)
+
+### 3. runtime
+
+负责：
+
+- 发现 `SKILL.md`
+- 解析 Skill frontmatter
+- 解析 `skill-actions` fenced JSON
+- 在容器中真实执行 Skill 行为
+- 支持本地受控执行模式
+- 支持真实 LLM API 驱动执行模式
+- 发出可观测的工具调用链 telemetry
+
+核心文件：
+
+- [app/runtime/skill_parser.py](/root/projects/clawguard-skill-sandbox/app/runtime/skill_parser.py:1)
+- [app/runtime/container_runtime.py](/root/projects/clawguard-skill-sandbox/app/runtime/container_runtime.py:1)
+- [app/runtime/llm_client.py](/root/projects/clawguard-skill-sandbox/app/runtime/llm_client.py:1)
+
+### 4. telemetry
+
+负责：
+
+- 收集 runtime 工具调用事件
+- 组织 file/network/process/tool-call 结果
+- 预留 source -> sink 数据流提示结构
+
+核心文件：
+
+- [app/telemetry/collector.py](/root/projects/clawguard-skill-sandbox/app/telemetry/collector.py:1)
+
+### 5. analyzer
+
+负责：
+
+- 规则分析
+- 风险评分
+- 证据时间线生成
+- 组合行为识别
+
+核心文件：
+
+- [app/analyzer/rules.py](/root/projects/clawguard-skill-sandbox/app/analyzer/rules.py:1)
+
+### 6. reporting
+
+负责：
+
+- 风险标签中文化
+- 日志中的可读风险摘要
+- 风险等级和主风险项映射
+
+核心文件：
+
+- [app/reporting/risk_mapper.py](/root/projects/clawguard-skill-sandbox/app/reporting/risk_mapper.py:1)
+
+## 支持的输入对象
+
+### 1. 单个 `SKILL.md`
+
+```json
+{
+  "skill_path": "./test/SKILL.md"
+}
+```
+
+### 2. Skill 目录
+
+```json
+{
+  "skill_path": "./examples/skills/skill_bundle_demo"
+}
+```
+
+### 3. Skill 目录 + 输入载荷
+
+```json
+{
+  "skill_path": "./examples/skills/skill_bundle_demo",
+  "input_payload": {
+    "message": "sandbox-demo"
+  },
+  "timeout_seconds": 60,
+  "network_policy": "default"
+}
+```
+
+## Skill Runtime 约定
+
+Skill 本身不是天然可执行程序，所以这里实现了受控的 Skill Runtime。
+
+当前 Runtime 约定：
+
+- 解析 `SKILL.md`
+- 从 `skill-actions` fenced JSON 读取动作定义
+- 如果 `SKILL.md` 没有声明 `skill-actions`，也可以在启用 `llm_config.enabled=true` 时作为真实 Skill 交给 LLM Runtime 执行
+- 支持两种执行方式：
+  - 顺序受控执行
+  - LLM 决策执行
+- 将动作结果写入 context
+- 后续动作可引用前面动作输出
+
+支持的动作类型：
+
+- `read_file`
+- `write_file`
+- `run_command`
+- `http_request`
+
+### 真实 LLM API 模式
+
+现在系统已经支持真实 LLM API 驱动的 Skill Runtime。
+
+默认优先支持：
+
+- `DeepSeek API`
+
+实现方式：
+
+- Runtime 使用 OpenAI-compatible Chat Completions 协议
+- 可以直接连接 DeepSeek
+- LLM 根据 `SKILL.md`、输入载荷和可用工具列表，逐步决定下一步调用哪个工具
+- 每次模型请求与响应都会写入 telemetry
+
+当前支持的 LLM Runtime 模式：
+
+- `tinyclaw-embedded`
+  - 不依赖外部模型
+  - 按 `skill-actions` 顺序执行
+- `deepseek-agent`
+  - 通过真实 DeepSeek API 驱动
+  - 由模型决定工具调用顺序
+- `llm-enabled generic skill`
+  - 即使 `SKILL.md` 只有说明文本、没有显式 action
+  - 只要请求里启用了 `llm_config.enabled=true`
+  - Runtime 仍会把该 Skill 当成真实技能说明来执行，并给模型暴露内建工具：
+    - `read_file`
+    - `write_file`
+    - `run_command`
+    - `http_request`
+
+### DeepSeek 接入参数
+
+调用 `/analyze-skill` 时，可传入：
+
+```json
+{
+  "llm_config": {
+    "enabled": true,
+    "provider": "deepseek",
+    "base_url": "https://api.deepseek.com",
+    "api_key": "sk-xxxx",
+    "model": "deepseek-chat",
+    "temperature": 0.0,
+    "max_steps": 8
+  }
+}
+```
+
+说明：
+
+- `provider`
+  - 当前建议填 `deepseek`
+- `base_url`
+  - DeepSeek 默认是 `https://api.deepseek.com`
+- `api_key`
+  - 你的 DeepSeek API Key
+- `model`
+  - 常用可填 `deepseek-chat`
+- `max_steps`
+  - 最多允许模型做多少轮工具决策
+
+模板引用示例：
 
 ```text
-my-skill/
-├── skill.py
-└── skill.sh
+{{ input_payload.message }}
+{{ actions.read_sensitive_hosts.stdout }}
+{{ skill.name }}
 ```
 
-或者：
+## 示例 Skill
 
-```text
-my-skill/
-├── package.json
-├── index.js
-└── scripts/
+示例 Skill 位于：
+
+- [examples/skills/skill_bundle_demo/SKILL.md](/root/projects/clawguard-skill-sandbox/examples/skills/skill_bundle_demo/SKILL.md:1)
+- [examples/skills/skill_bundle_demo/tools/helper.py](/root/projects/clawguard-skill-sandbox/examples/skills/skill_bundle_demo/tools/helper.py:1)
+
+这个 Skill 会：
+
+- 读取 `/etc/hosts`
+- 写入 `runtime_output/skill-note.txt`
+- 执行附带脚本 `tools/helper.py`
+- 发送 HTTP 请求到 `https://httpbin.org/post`
+
+因此它非常适合触发：
+
+- `sensitive_file_read`
+- `file_write`
+- `process_spawn`
+- `shell_execution`
+- `network_access`
+- `read_then_exfiltration`
+
+### DeepSeek 驱动示例 Skill
+
+额外提供了一个真实 LLM Runtime 示例：
+
+- [examples/skills/deepseek_skill_demo/SKILL.md](/root/projects/clawguard-skill-sandbox/examples/skills/deepseek_skill_demo/SKILL.md:1)
+- [examples/skills/deepseek_skill_demo/tools/helper.py](/root/projects/clawguard-skill-sandbox/examples/skills/deepseek_skill_demo/tools/helper.py:1)
+
+这个 Skill 的 `runtime` 设置为：
+
+```yaml
+runtime: deepseek-agent
 ```
 
-沙箱系统并不会自动识别入口文件，而是由调用方显式传入 `command`。
+它会让模型自行决定：
+
+- 先读文件
+- 再跑脚本
+- 再写文件
+- 最后发请求
+
+## 行为采集能力
+
+### 文件访问
+
+通过 `strace -e trace=file` 采集：
+
+- 读取了哪些文件
+- 写入了哪些文件
+- 创建 / 删除 / rename 行为
+
+### 网络行为
+
+通过 `strace -e trace=network` 采集：
+
+- DNS 连接
+- TCP 连接
+- 目标 IP / 端口
+
+### 进程执行
+
+通过 `strace -e trace=process` 采集：
+
+- `execve`
+- `fork`
+- `vfork`
+- shell 启动
+- 子进程行为
+
+### stdout / stderr
+
+容器内执行输出分别落盘：
+
+- `/artifacts/stdout.log`
+- `/artifacts/stderr.log`
+
+### 工具调用链
+
+Runtime 通过 `/artifacts/runtime-events.jsonl` 写入：
+
+- tool call start
+- tool call finish
+- tool type
+- tool status
+
+### LLM 调用事件
+
+如果启用了 `llm_config`，还会记录：
+
+- LLM request
+- LLM response
+- step 编号
+- provider / model
+- response preview
+
+## Log 落盘机制
+
+每次通过 API 提交的分析任务，都会自动把结果写入项目根目录下的 `Log/`：
+
+- `Log/<skill_or_case>__<execution_id前12位>.json`
 
 例如：
 
-- Python Skill：`["python", "skill.py"]`
-- Shell Skill：`["sh", "skill.sh"]`
-- Node Skill：`["node", "index.js"]`
+- `Log/skill_bundle_demo__1f9ad42ca02a.json`
+- `Log/deepseek_demo__e89060d26aeb.json`
 
-## 设计说明
+日志内容包含：
 
-### backend
+- 原始请求参数
+- 当前任务状态
+- 完整分析结果
+- 失败错误信息
 
-标准库 WSGI 服务提供 HTTP 接口，接收分析请求并返回结构化 JSON。
-
-### runner
-
-`DockerRunner` 负责：
-
-1. 构建沙箱镜像
-2. 把目标 Skill 目录复制到临时目录
-3. 通过 `docker run` 在容器内执行命令
-4. 用 `strace -ff -tt -e trace=file,process,network` 采集系统调用
-5. 回收 `stdout`、`stderr`、trace 日志和执行元数据
-
-### analyzer
-
-最小规则引擎根据采集结果打标签和评分：
-
-- 有网络活动：加分
-- 有 shell 或子进程：加分
-- 有写文件：加分
-- 访问敏感路径：加分
-- 超时：加分
-
-## 项目启动文档
-
-### 环境要求
-
-- Linux 或 WSL2
-- Python 3.10+
-- Docker Engine
-
-### 1. 确认 Python 可用
+如果你直接跑测试脚本：
 
 ```bash
-python3 --version
+python3 scripts/run_deepseek_suite.py --api-key YOUR_DEEPSEEK_API_KEY
 ```
 
-### 2. 确认 Docker 可用
+脚本也会把每个测试用例的结果分别写入 `Log/`。
+
+### 数据流预留结构
+
+Telemetry 会根据：
+
+- 敏感文件读取
+- 网络连接
+
+生成基础的 source -> sink 提示结构，用于后续更细粒度的数据流分析。
+
+## 规则引擎
+
+当前 analyzer 已实现以下规则：
+
+- `file_write`
+- `network_access`
+- `process_spawn`
+- `shell_execution`
+- `sensitive_file_read`
+- `read_then_exfiltration`
+- `execution_timeout`
+
+输出包括：
+
+- `risk_score`
+- `detected_behaviors`
+- `evidence_timeline`
+
+## 接口设计
+
+### `GET /health`
+
+返回：
+
+```json
+{
+  "status": "ok"
+}
+```
+
+### `POST /analyze-skill`
+
+请求体：
+
+```json
+{
+  "skill_path": "./examples/skills/skill_bundle_demo",
+  "input_payload": {
+    "message": "sandbox-demo"
+  },
+  "timeout_seconds": 60,
+  "network_policy": "default"
+}
+```
+
+字段说明：
+
+- `skill_path`
+  - Skill 文件路径或 Skill 目录路径
+  - 支持单个 `SKILL.md` 或包含 `SKILL.md` 的目录
+- `input_payload`
+  - 传入 Skill Runtime 的输入对象
+- `timeout_seconds`
+  - 执行超时
+- `network_policy`
+  - 当前支持：
+    - `default`
+    - `disabled`
+- `llm_config`
+  - 可选
+  - 用于开启真实 LLM API 模式
+  - 当前优先支持 DeepSeek
+
+返回至少包含：
+
+- `execution_id`
+- `risk_score`
+- `detected_behaviors`
+- `evidence_timeline`
+- `file_events`
+- `network_events`
+- `process_events`
+- `tool_calls`
+- `llm_events`
+- `data_flows`
+- `resource_usage`
+
+### `GET /task/{id}`
+
+根据任务 id 查询任务执行状态与结果。
+
+## Sandbox 创建与自动销毁逻辑
+
+Runner 的实现位于 [app/runner/docker_runner.py](/root/projects/clawguard-skill-sandbox/app/runner/docker_runner.py:1)。
+
+关键策略：
+
+- 每次分析请求都创建唯一容器名
+- 使用 `docker run --rm`
+- 不复用容器
+- 单次任务独立挂载：
+  - `/workspace/skill`
+  - `/artifacts`
+- 如果执行超时：
+  - 先由 `timeout` 终止容器内命令
+  - 若主进程超出硬超时，runner 会调用 `docker rm -f`
+
+因此满足：
+
+- 每任务独立 sandbox
+- 任务结束自动销毁
+- 支持超时终止和强制清理
+- 不复用容器
+
+## 本地启动步骤
+
+### 1. 环境要求
+
+- Linux / WSL2
+- Python 3.10+
+- Docker Engine
+- 可访问 TinyClaw 下载地址
+
+### 2. 启动 Docker
 
 ```bash
 docker --version
 docker info
 ```
 
-如果 `docker info` 失败，先确保 Docker daemon 已启动。
-
-### 3. 启动分析服务
+### 3. 启动服务
 
 ```bash
 cd /root/projects/clawguard-skill-sandbox
 python3 -m app.main --host 0.0.0.0 --port 8000
-```
-
-启动成功后会看到：
-
-```text
-Serving Skill Dynamic Sandbox MVP on http://0.0.0.0:8000
 ```
 
 ### 4. 健康检查
@@ -214,225 +586,207 @@ Serving Skill Dynamic Sandbox MVP on http://0.0.0.0:8000
 curl --noproxy '*' http://127.0.0.1:8000/health
 ```
 
-期望返回：
+## curl 测试示例
 
-```json
-{
-  "status": "ok"
-}
-```
-
-### 5. 分析一个示例 Skill
+### 分析 Skill 目录
 
 ```bash
 curl --noproxy '*' -X POST http://127.0.0.1:8000/analyze-skill \
   -H 'Content-Type: application/json' \
   -d '{
-    "skill_path": "./examples/skills/network_file_probe",
-    "command": ["python", "skill.py"],
-    "timeout_seconds": 20
+    "skill_path": "./examples/skills/skill_bundle_demo",
+    "input_payload": {
+      "message": "sandbox-demo"
+    },
+    "timeout_seconds": 60,
+    "network_policy": "default"
   }'
 ```
 
-## 接口说明
-
-### `POST /analyze-skill`
-
-请求体：
-
-```json
-{
-  "skill_path": "./examples/skills/network_file_probe",
-  "command": ["python", "skill.py"],
-  "timeout_seconds": 20
-}
-```
-
-字段说明：
-
-- `skill_path`
-  - 本地 Skill 目录路径
-  - 必填
-- `command`
-  - 容器内执行命令
-  - 必填
-  - 例如 `["python", "skill.py"]`
-- `timeout_seconds`
-  - 执行超时时间
-  - 可选，默认 `20`
-
-返回字段说明：
-
-- `exit_code`
-  - Skill 执行退出码
-- `timed_out`
-  - 是否超时
-- `stdout`
-  - 标准输出
-- `stderr`
-  - 标准错误
-- `trace_summary`
-  - 行为摘要计数
-- `risk_score`
-  - 风险分数，范围 `0-100`
-- `detected_behaviors`
-  - 检测出的行为标签
-- `evidence_timeline`
-  - 时间排序证据列表
-
-## 示例 Skill 说明
-
-[examples/skills/network_file_probe/skill.py](/root/projects/clawguard-skill-sandbox/examples/skills/network_file_probe/skill.py:1) 这个示例 Skill 会：
-
-- 在当前目录创建 `output.txt`
-- 读取 `/etc/hosts`
-- 请求 `https://example.com`
-- 启动一次 `sh -c`
-
-因此报告里通常会出现：
-
-- 文件创建
-- 敏感路径读取
-- DNS/HTTPS 连接
-- shell 启动
-
-## 如何新增你自己的 Skill
-
-假设你要新增一个 Python Skill：
-
-```text
-examples/skills/my_skill/
-└── skill.py
-```
-
-`skill.py`：
-
-```python
-from pathlib import Path
-
-Path("hello.txt").write_text("hello sandbox\n", encoding="utf-8")
-print("done")
-```
-
-然后调用：
+### 使用 DeepSeek API 分析 LLM Skill
 
 ```bash
 curl --noproxy '*' -X POST http://127.0.0.1:8000/analyze-skill \
   -H 'Content-Type: application/json' \
   -d '{
-    "skill_path": "./examples/skills/my_skill",
-    "command": ["python", "skill.py"],
-    "timeout_seconds": 20
+    "skill_path": "./examples/skills/deepseek_skill_demo",
+    "input_payload": {
+      "message": "hello-deepseek"
+    },
+    "timeout_seconds": 60,
+    "network_policy": "default",
+    "llm_config": {
+      "enabled": true,
+      "provider": "deepseek",
+      "base_url": "https://api.deepseek.com",
+      "api_key": "YOUR_DEEPSEEK_API_KEY",
+      "model": "deepseek-chat",
+      "temperature": 0.0,
+      "max_steps": 8
+    }
   }'
 ```
 
-## 常见问题
+### 使用 DeepSeek API 分析没有 `skill-actions` 的真实 SKILL.md
 
-### 1. Skill 一定要实现 HTTP API 吗？
-
-不用。
-
-这个系统分析的是“代码执行行为”，不是“服务对外接口行为”。只要 Skill 能被命令行启动即可。
-
-### 2. Skill 一定要叫 `skill.py` 吗？
-
-不用。
-
-名字完全可以自定义，只要你在 `command` 里写对入口命令即可。
-
-### 3. 这个系统会自动识别 Skill 入口吗？
-
-不会。
-
-当前 MVP 采用最简单方式：由调用方显式传入 `command`。
-
-### 4. 为什么不是上传 zip、执行 manifest、或注册 Skill 元数据？
-
-因为这是 MVP。
-
-当前版本优先保证：
-
-- 能跑
-- 能隔离
-- 能采集
-- 能输出安全报告
-
-后续如果要产品化，可以增加：
-
-- Skill manifest
-- Skill 包上传
-- 版本管理
-- 远程对象存储
-- 批量分析
-- 权限与鉴权
-
-### 5. 为什么有的文件访问看起来像系统初始化？
-
-因为底层是基于 `strace` 做动态采集，运行时会带出一些解释器和系统层行为。
-
-当前 analyzer 已经过滤了一部分噪音，但这仍然是一个“最小可运行”的动态分析系统，不是完整商用级沙箱。
-
-## 本地启动
-
-这一节保留一个最简版速查：
+这正是 `test/SKILL.md` 这种输入的默认模式。
 
 ```bash
-docker --version
-docker info
-python3 -m app.main --host 0.0.0.0 --port 8000
 curl --noproxy '*' -X POST http://127.0.0.1:8000/analyze-skill \
   -H 'Content-Type: application/json' \
   -d '{
-    "skill_path": "./examples/skills/network_file_probe",
-    "command": ["python", "skill.py"],
-    "timeout_seconds": 20
+    "skill_path": "./test",
+    "input_payload": {
+      "task": "根据 SKILL.md 的说明尝试执行一次最小真实工作流。如果依赖缺失，请验证并写出失败结论。",
+      "query": "上海周末咖啡店推荐"
+    },
+    "timeout_seconds": 90,
+    "network_policy": "default",
+    "llm_config": {
+      "enabled": true,
+      "provider": "deepseek",
+      "base_url": "https://api.deepseek.com",
+      "api_key": "YOUR_DEEPSEEK_API_KEY",
+      "model": "deepseek-chat",
+      "temperature": 0.0,
+      "max_steps": 8
+    }
   }'
 ```
 
-## 示例返回
+### 一键跑示例 Skill 和 `test/` Skill
+
+```bash
+cd /root/projects/clawguard-skill-sandbox
+python3 scripts/run_deepseek_suite.py --api-key YOUR_DEEPSEEK_API_KEY
+```
+
+这个脚本会：
+
+- 运行 `examples/skills/deepseek_skill_demo`
+- 运行 `test/SKILL.md`
+- 把每次结果写入 `Log/`
+- 在终端输出一个精简汇总 JSON
+
+### 查询任务
+
+```bash
+curl --noproxy '*' http://127.0.0.1:8000/task/<execution_id>
+```
+
+### 查看每次 Docker 运行的资源占用
+
+每次新的分析任务都会返回并写入：
+
+- `resource_usage.memory_limit_bytes`
+- `resource_usage.memory_peak_bytes`
+- `resource_usage.writable_layer_bytes`
+- `resource_usage.skill_bundle_bytes`
+- `resource_usage.artifacts_bytes`
+- `resource_usage.estimated_total_disk_bytes`
+
+批量查看日志里的资源统计：
+
+```bash
+python3 scripts/render_log_resources.py Log
+```
+
+## 示例 JSON 输出
+
+下面是一个典型返回结构示例：
 
 ```json
 {
-  "skill_path": "/abs/path/examples/skills/network_file_probe",
-  "sandbox_image": "skill-sandbox-mvp:latest",
-  "command": ["python", "skill.py"],
+  "execution_id": "9f9d53df1ed74f72a4b6a99ef0b2a7a0",
+  "status": "completed",
+  "skill_path": "/abs/path/examples/skills/skill_bundle_demo",
+  "skill_file": "SKILL.md",
+  "sandbox_image": "skill-runtime-sandbox:latest",
+  "runtime_name": "tinyclaw-embedded",
+  "network_policy": "default",
   "exit_code": 0,
   "timed_out": false,
-  "stdout": "Read /etc/hosts bytes: 172\nFetched bytes: 120\n{\"child_stdout\": \"child-process-ran\"}\n",
+  "stdout": "helper processed: sandbox-demo\n",
   "stderr": "",
   "trace_summary": {
     "file_event_count": 9,
     "network_event_count": 3,
-    "process_event_count": 4,
-    "stdout_line_count": 3,
+    "process_event_count": 2,
+    "tool_call_count": 8,
+    "llm_event_count": 10,
+    "stdout_line_count": 1,
     "stderr_line_count": 0
   },
   "risk_score": 100,
   "detected_behaviors": [
-    "child_process_execution",
-    "file_write_activity",
-    "network_activity",
-    "sensitive_file_access",
-    "shell_spawn"
+    "file_write",
+    "network_access",
+    "process_spawn",
+    "read_then_exfiltration",
+    "sensitive_file_read",
+    "shell_execution"
   ],
   "evidence_timeline": [
     {
-      "timestamp": "12:00:00.000001",
-      "category": "file",
-      "action": "read",
-      "detail": "read /etc/hosts",
+      "timestamp": "2026-04-17T12:00:00Z",
+      "category": "tool_call",
+      "action": "start",
+      "detail": "start Read Hosts File (read_file)",
       "metadata": {
-        "path": "/etc/hosts",
-        "pid": "17"
+        "tool_id": "read_sensitive_hosts",
+        "tool_name": "Read Hosts File",
+        "tool_type": "read_file",
+        "status": null
       }
     }
-  ]
+  ],
+  "file_events": [],
+  "network_events": [],
+  "process_events": [],
+  "tool_calls": [],
+  "llm_events": [],
+  "data_flows": []
 }
 ```
 
-## 说明
+## 当前实现状态
 
-- 这是 MVP，实现目标是先跑通端到端链路，不做复杂调度、多租户、鉴权。
-- 当前行为采集基于 `strace` 文本解析，便于演示与扩展；后续可替换为 eBPF、seccomp 审计或更细粒度事件模型。
-- 当前环境默认允许容器出网，这样才能观测网络行为；后续可以再增加可配置网络策略。
-- 当前 Skill 载体是“目录 + 命令”，不是插件注册中心格式，也不是必须提供 API 的服务型 Skill。
+已经落地的能力：
+
+- 以 `SKILL.md` / Skill 目录为核心输入
+- TinyClaw 作为运行基础
+- 支持真实 LLM API 的 Skill Runtime
+- 支持 DeepSeek API 接入
+- 独立 sandbox 生命周期管理
+- 自动销毁
+- 真实行为采集
+- 工具调用链 telemetry
+- 规则分析与评分
+- `POST /analyze-skill`
+- `GET /task/{id}`
+- `GET /health`
+
+## 限制与后续扩展
+
+当前是完整可运行工程，但仍然是第一版 Runtime Sandbox，后续可继续增强：
+
+- 支持 service 型 Skill
+- 支持 manifest 型 Skill
+- 更丰富的 `SKILL.md` 语法
+- 更细粒度的数据流分析
+- eBPF 级别 telemetry
+- 持久化任务存储
+- 多任务异步队列
+- 更细粒度网络策略
+
+## 结论
+
+这个工程已经不是“只执行脚本”的简化器，而是一个真正围绕 `SKILL.md` / Skill 目录构建的 Skill 动态安全沙箱系统：
+
+- 输入对象正确
+- 有 Skill Runtime / Executor
+- 有 sandbox 生命周期管理
+- 有真实运行时行为采集
+- 有规则分析引擎
+- 有任务接口和结果查询
+- 有 TinyClaw 运行基础

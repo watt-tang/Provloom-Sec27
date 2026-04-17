@@ -59,6 +59,8 @@ def _parse_file_open(timestamp: str, body: str, pid: str | None) -> FileEvent:
 
 
 def _parse_process(timestamp: str, body: str, pid: str | None) -> ProcessEvent:
+    if "= -1 ENOENT" in body:
+        return ProcessEvent(timestamp=timestamp, action="skip", command="skip", raw=body, pid=pid)
     command = _extract_first_string(body)
     action = body.split("(", 1)[0]
     return ProcessEvent(timestamp=timestamp, action=action, command=command, raw=body, pid=pid)
