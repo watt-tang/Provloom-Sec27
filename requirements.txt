@@ -1,0 +1,2 @@
+# This MVP uses only Python standard library for the API layer.
+# No Python package installation is required.
