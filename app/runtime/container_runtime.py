@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import urllib.request
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -24,17 +25,23 @@ class SkillToolExecutor:
         self.context = context
         self._emit = emit_func
 
-    def execute_action(self, action: SkillAction, overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+    def execute_action(
+        self,
+        action: SkillAction,
+        overrides: dict[str, Any] | None = None,
+        step_id: str | None = None,
+        parent_event_id: str | None = None,
+    ) -> dict[str, Any]:
         base_config = dict(action.config)
         if overrides:
             base_config.update(overrides)
         resolved = _resolve_templates(base_config, self.context)
-        self._emit("tool_call", "start", {
+        start_event_id = self._emit("tool_call", "start", {
             "tool_id": action.id,
             "tool_name": action.name,
             "tool_type": action.type,
             "config": resolved,
-        })
+        }, step_id=step_id, parent_event_id=parent_event_id)
 
         try:
             if action.type == "read_file":
@@ -63,10 +70,16 @@ class SkillToolExecutor:
             "exit_code": result["exit_code"],
             "stdout_preview": result["stdout"][:200],
             "stderr_preview": result["stderr"][:200],
-        })
+        }, step_id=step_id, parent_event_id=start_event_id)
         return result
 
-    def execute_virtual_tool(self, tool_id: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+    def execute_virtual_tool(
+        self,
+        tool_id: str,
+        arguments: dict[str, Any] | None = None,
+        step_id: str | None = None,
+        parent_event_id: str | None = None,
+    ) -> dict[str, Any]:
         tool_spec = self._virtual_tool_specs().get(tool_id)
         if tool_spec is None:
             raise RuntimeError(f"Unsupported virtual tool: {tool_id}")
@@ -78,7 +91,12 @@ class SkillToolExecutor:
             description=tool_spec["description"],
             arguments_schema=tool_spec.get("arguments_schema", {}),
         )
-        return self.execute_action(action, overrides=arguments or {})
+        return self.execute_action(
+            action,
+            overrides=arguments or {},
+            step_id=step_id,
+            parent_event_id=parent_event_id,
+        )
 
     def get_tool_catalog(self, actions: list[SkillAction]) -> list[dict[str, Any]]:
         if actions:
@@ -311,15 +329,28 @@ class TinyClawSkillRuntime:
         })
         return exit_code
 
-    def _emit(self, category: str, event: str, payload: dict[str, Any]) -> None:
+    def _emit(
+        self,
+        category: str,
+        event: str,
+        payload: dict[str, Any],
+        step_id: str | None = None,
+        parent_event_id: str | None = None,
+    ) -> str:
+        event_id = f"{category}-{uuid.uuid4().hex}"
         record = {
+            "event_id": event_id,
             "timestamp": utc_now(),
+            "source": "runtime",
+            "step_id": step_id,
             "category": category,
             "event": event,
+            "parent_event_id": parent_event_id,
             "payload": payload,
         }
         with self.events_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        return event_id
 
 
 class LLMAgentSkillRuntime:
@@ -355,17 +386,18 @@ class LLMAgentSkillRuntime:
         last_exit_code = 0
 
         for step in range(1, max_steps + 1):
-            self._emit("llm", "request", {
+            step_id = f"step-{step}"
+            request_event_id = self._emit("llm", "request", {
                 "step": step,
                 "provider": self.llm_config.get("provider", "openai-compatible"),
                 "model": self.llm_config["model"],
                 "message_count": len(messages),
-            })
+            }, step_id=step_id)
             response = self.client.chat(messages)
             self._emit("llm", "response", {
                 "step": step,
                 "content_preview": response.content[:400],
-            })
+            }, step_id=step_id, parent_event_id=request_event_id)
 
             parsed = _extract_json_object(response.content)
             action = parsed.get("action", {})
@@ -380,7 +412,12 @@ class LLMAgentSkillRuntime:
                     sys.stdout.flush()
                 return last_exit_code
 
-            result, tool_key = self._execute_tool(action_name, arguments)
+            result, tool_key, skill_action = self._execute_tool(
+                action_name,
+                arguments,
+                step_id=step_id,
+                parent_event_id=request_event_id,
+            )
             self.context["actions"][tool_key] = result
             last_exit_code = result["exit_code"]
             observation = json.dumps(
@@ -406,12 +443,42 @@ class LLMAgentSkillRuntime:
                 return action
         return None
 
-    def _execute_tool(self, tool_id: str, arguments: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    def _execute_tool(
+        self,
+        tool_id: str,
+        arguments: dict[str, Any],
+        step_id: str | None = None,
+        parent_event_id: str | None = None,
+    ) -> tuple[dict[str, Any], str, SkillAction]:
         action = self._find_action(tool_id)
         if action is not None:
-            return self.executor.execute_action(action, overrides=arguments), action.id
+            return (
+                self.executor.execute_action(
+                    action,
+                    overrides=arguments,
+                    step_id=step_id,
+                    parent_event_id=parent_event_id,
+                ),
+                action.id,
+                action,
+            )
         if not self.definition.actions:
-            return self.executor.execute_virtual_tool(tool_id, arguments), tool_id
+            virtual_action = SkillAction(
+                id=tool_id,
+                type=tool_id,
+                name=tool_id,
+                continue_on_error=False,
+            )
+            return (
+                self.executor.execute_virtual_tool(
+                    tool_id,
+                    arguments,
+                    step_id=step_id,
+                    parent_event_id=parent_event_id,
+                ),
+                tool_id,
+                virtual_action,
+            )
         raise RuntimeError(f"Unknown tool requested by model: {tool_id}")
 
     def _system_prompt(self) -> str:

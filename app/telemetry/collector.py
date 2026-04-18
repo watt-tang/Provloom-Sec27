@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from app.runner.models import DataFlowEvent, FileEvent, LLMEvent, NetworkEvent, ProcessEvent, SandboxExecution, ToolCallEvent
+from app.telemetry.normalizer import build_normalized_events, persist_normalized_events
 
 
 def load_runtime_events(path: Path) -> list[ToolCallEvent]:
@@ -25,6 +26,10 @@ def load_runtime_events(path: Path) -> list[ToolCallEvent]:
                 event=record.get("event", ""),
                 status=payload.get("status"),
                 metadata=payload,
+                event_id=record.get("event_id"),
+                parent_event_id=record.get("parent_event_id"),
+                step_id=record.get("step_id"),
+                source=record.get("source", "runtime"),
             )
         )
     return tool_calls
@@ -43,6 +48,10 @@ def load_llm_events(path: Path) -> list[LLMEvent]:
                 timestamp=record["timestamp"],
                 event=record.get("event", ""),
                 metadata=record.get("payload", {}),
+                event_id=record.get("event_id"),
+                parent_event_id=record.get("parent_event_id"),
+                step_id=record.get("step_id"),
+                source=record.get("source", "runtime"),
             )
         )
     return llm_events
@@ -74,6 +83,8 @@ def build_data_flow_hints(
 
 
 def build_execution_report(execution: SandboxExecution) -> dict[str, Any]:
+    normalized_events = build_normalized_events(execution)
+    persist_normalized_events(execution.artifacts_dir, normalized_events)
     return {
         "file_events": [event.to_dict() for event in execution.file_events],
         "network_events": [event.to_dict() for event in execution.network_events],
@@ -81,4 +92,5 @@ def build_execution_report(execution: SandboxExecution) -> dict[str, Any]:
         "tool_calls": [event.to_dict() for event in execution.tool_calls],
         "llm_events": [event.to_dict() for event in execution.llm_events],
         "data_flows": [event.to_dict() for event in execution.data_flows],
+        "normalized_events": [event.to_dict() for event in normalized_events],
     }

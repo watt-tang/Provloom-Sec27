@@ -52,6 +52,7 @@ class AnalyzeSkillRequest:
     input_payload: dict[str, Any] = field(default_factory=dict)
     timeout_seconds: int = 30
     network_policy: str = "default"
+    analysis_mode: str = "rule_plus_epg"
     llm_config: LLMConfig = field(default_factory=LLMConfig)
 
     @classmethod
@@ -60,6 +61,7 @@ class AnalyzeSkillRequest:
         input_payload = payload.get("input_payload", {})
         timeout_seconds = payload.get("timeout_seconds", 30)
         network_policy = payload.get("network_policy", "default")
+        analysis_mode = payload.get("analysis_mode", "rule_plus_epg")
         llm_config = LLMConfig.from_dict(payload.get("llm_config", {}))
 
         if not isinstance(skill_path, str) or not skill_path.strip():
@@ -70,12 +72,15 @@ class AnalyzeSkillRequest:
             raise ValueError("`timeout_seconds` must be an integer between 1 and 300.")
         if network_policy not in {"default", "disabled"}:
             raise ValueError("`network_policy` must be one of: default, disabled.")
+        if analysis_mode not in {"rule_only", "rule_plus_epg", "static_only"}:
+            raise ValueError("`analysis_mode` must be one of: rule_only, rule_plus_epg, static_only.")
 
         return cls(
             skill_path=skill_path,
             input_payload=input_payload,
             timeout_seconds=timeout_seconds,
             network_policy=network_policy,
+            analysis_mode=analysis_mode,
             llm_config=llm_config,
         )
 
@@ -98,6 +103,7 @@ class AnalyzeSkillResponse:
     sandbox_image: str
     runtime_name: str
     network_policy: str
+    analysis_mode: str
     llm_config: dict[str, Any]
     exit_code: int | None
     timed_out: bool
@@ -119,6 +125,11 @@ class AnalyzeSkillResponse:
     llm_events: list[dict[str, Any]]
     data_flows: list[dict[str, Any]]
     resource_usage: dict[str, Any]
+    normalized_events: list[dict[str, Any]] = field(default_factory=list)
+    primary_chain: list[dict[str, Any]] = field(default_factory=list)
+    root_cause: str = "unknown"
+    root_cause_detail: str = "unknown"
+    graph_summary: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

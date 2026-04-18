@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import json
 import uuid
+from pathlib import Path
 from wsgiref.util import setup_testing_defaults
 
-from app.analyzer.rules import analyze_trace
+from app.analyzer.rules import analyze_static_skill, analyze_trace
 from app.backend.log_writer import ExecutionLogWriter
 from app.backend.schemas import AnalyzeSkillRequest, AnalyzeSkillResponse, TaskResponse
 from app.backend.task_store import TaskStore
 from app.reporting.risk_mapper import map_risk_profile
+from app.runtime.skill_parser import load_skill_definition, resolve_skill_target
 from app.runner.docker_runner import DockerRunner, DockerUnavailableError, SandboxRunError
 from app.telemetry.collector import build_execution_report
 
@@ -43,6 +45,7 @@ def _handle_analyze_skill(environ, start_response):
             "input_payload": payload.input_payload,
             "timeout_seconds": payload.timeout_seconds,
             "network_policy": payload.network_policy,
+            "analysis_mode": payload.analysis_mode,
             "llm_config": payload.llm_config.to_public_dict(),
         })
         task_request = {
@@ -50,6 +53,7 @@ def _handle_analyze_skill(environ, start_response):
             "input_payload": payload.input_payload,
             "timeout_seconds": payload.timeout_seconds,
             "network_policy": payload.network_policy,
+            "analysis_mode": payload.analysis_mode,
             "llm_config": payload.llm_config.to_public_dict(),
         }
         log_writer.write(
@@ -57,6 +61,30 @@ def _handle_analyze_skill(environ, start_response):
             status="running",
             request=task_request,
         )
+
+        if payload.analysis_mode == "static_only":
+            source_dir, skill_file = resolve_skill_target(payload.skill_path)
+            definition = load_skill_definition(
+                source_dir,
+                skill_file,
+                allow_empty_actions=True,
+            )
+            report = analyze_static_skill(definition, analysis_mode=payload.analysis_mode)
+            response = _build_static_response(
+                execution_id=execution_id,
+                payload=payload,
+                source_dir=str(source_dir),
+                skill_file=skill_file,
+                report=report,
+            )
+            task_store.complete(execution_id, response.to_dict())
+            log_writer.write(
+                execution_id=execution_id,
+                status="completed",
+                request=task_request,
+                result=response.to_dict(),
+            )
+            return _json_response(start_response, 200, response.to_dict())
 
         execution = runner.run(
             execution_id=execution_id,
@@ -66,7 +94,7 @@ def _handle_analyze_skill(environ, start_response):
             network_policy=payload.network_policy,
             llm_config=payload.llm_config,
         )
-        report = analyze_trace(execution)
+        report = analyze_trace(execution, analysis_mode=payload.analysis_mode)
         telemetry_report = build_execution_report(execution)
         risk_profile = map_risk_profile(
             risk_score=report["risk_score"],
@@ -80,6 +108,7 @@ def _handle_analyze_skill(environ, start_response):
             sandbox_image=execution.sandbox_image,
             runtime_name=execution.runtime_name,
             network_policy=payload.network_policy,
+            analysis_mode=payload.analysis_mode,
             llm_config=payload.llm_config.to_public_dict(),
             exit_code=execution.exit_code,
             timed_out=execution.timed_out,
@@ -100,7 +129,12 @@ def _handle_analyze_skill(environ, start_response):
             tool_calls=telemetry_report["tool_calls"],
             llm_events=telemetry_report["llm_events"],
             data_flows=telemetry_report["data_flows"],
+            normalized_events=telemetry_report.get("normalized_events", []),
             resource_usage=execution.resource_usage.to_dict(),
+            primary_chain=report.get("primary_chain", []),
+            root_cause=report.get("root_cause", "unknown"),
+            root_cause_detail=report.get("root_cause_detail", "unknown"),
+            graph_summary=report.get("graph_summary", {}),
         )
         task_store.complete(execution_id, response.to_dict())
         log_writer.write(
@@ -170,3 +204,78 @@ def _json_response(start_response, status_code: int, payload: dict):
     ]
     start_response(status_text, headers)
     return [body]
+
+
+def _build_static_response(
+    execution_id: str,
+    payload: AnalyzeSkillRequest,
+    source_dir: str,
+    skill_file: str,
+    report: dict,
+) -> AnalyzeSkillResponse:
+    artifacts_dir = Path("artifacts/runs") / execution_id
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    (artifacts_dir / "normalized-events.jsonl").write_text("", encoding="utf-8")
+    (artifacts_dir / "attack-chain.json").write_text(
+        json.dumps(report.get("primary_chain", []), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (artifacts_dir / "epg.json").write_text(
+        json.dumps(report.get("graph_export", {
+            "execution_id": execution_id,
+            "nodes": [],
+            "edges": [],
+            "summary": report.get("graph_summary", {}),
+        }), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (artifacts_dir / "static-analysis.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=2, default=_json_default),
+        encoding="utf-8",
+    )
+    risk_profile = map_risk_profile(
+        risk_score=report["risk_score"],
+        detected_behaviors=report["detected_behaviors"],
+    )
+    return AnalyzeSkillResponse(
+        execution_id=execution_id,
+        status="completed",
+        skill_path=source_dir,
+        skill_file=skill_file,
+        sandbox_image="static-only",
+        runtime_name="static-analysis",
+        network_policy=payload.network_policy,
+        analysis_mode=payload.analysis_mode,
+        llm_config=payload.llm_config.to_public_dict(),
+        exit_code=None,
+        timed_out=False,
+        stdout="",
+        stderr="",
+        trace_summary=report["trace_summary"],
+        risk_score=report["risk_score"],
+        risk_level=risk_profile["risk_level"],
+        risk_level_name=risk_profile["risk_level_name"],
+        primary_risk=risk_profile["primary_risk"],
+        risk_labels=risk_profile["risk_labels"],
+        risk_summary=risk_profile["risk_summary"],
+        detected_behaviors=report["detected_behaviors"],
+        evidence_timeline=report["evidence_timeline"],
+        file_events=[],
+        network_events=[],
+        process_events=[],
+        tool_calls=[],
+        llm_events=[],
+        data_flows=[],
+        resource_usage={},
+        normalized_events=[],
+        primary_chain=report.get("primary_chain", []),
+        root_cause=report.get("root_cause", "unknown"),
+        root_cause_detail=report.get("root_cause_detail", "unknown"),
+        graph_summary=report.get("graph_summary", {}),
+    )
+
+
+def _json_default(value):
+    if hasattr(value, "to_dict"):
+        return value.to_dict()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")

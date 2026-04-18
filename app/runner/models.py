@@ -31,6 +31,10 @@ class FileEvent:
     action: str
     raw: str
     pid: str | None = None
+    event_id: str | None = None
+    parent_event_id: str | None = None
+    step_id: str | None = None
+    source: str = "strace"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -43,6 +47,10 @@ class NetworkEvent:
     action: str
     raw: str
     pid: str | None = None
+    event_id: str | None = None
+    parent_event_id: str | None = None
+    step_id: str | None = None
+    source: str = "strace"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -55,6 +63,10 @@ class ProcessEvent:
     command: str
     raw: str
     pid: str | None = None
+    event_id: str | None = None
+    parent_event_id: str | None = None
+    step_id: str | None = None
+    source: str = "strace"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -69,6 +81,10 @@ class ToolCallEvent:
     event: str
     status: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    event_id: str | None = None
+    parent_event_id: str | None = None
+    step_id: str | None = None
+    source: str = "runtime"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -79,6 +95,10 @@ class LLMEvent:
     timestamp: str
     event: str
     metadata: dict[str, Any] = field(default_factory=dict)
+    event_id: str | None = None
+    parent_event_id: str | None = None
+    step_id: str | None = None
+    source: str = "runtime"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -92,6 +112,9 @@ class DataFlowEvent:
     sink: str
     sink_detail: str
     note: str
+    event_id: str | None = None
+    parent_event_id: str | None = None
+    step_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

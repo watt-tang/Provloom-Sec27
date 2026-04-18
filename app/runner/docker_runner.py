@@ -35,9 +35,13 @@ class DockerRunner:
         self,
         image_name: str = "skill-runtime-sandbox:latest",
         dockerfile_dir: str = "docker/sandbox",
+        artifacts_root: str = "artifacts/runs",
     ) -> None:
         self.image_name = image_name
         self.dockerfile_dir = Path(dockerfile_dir)
+        # Docker bind mounts require absolute host paths for reproducible benchmark runs.
+        self.artifacts_root = Path(artifacts_root).resolve()
+        self.artifacts_root.mkdir(parents=True, exist_ok=True)
 
     def run(
         self,
@@ -60,8 +64,10 @@ class DockerRunner:
         with tempfile.TemporaryDirectory(prefix="skill-sandbox-") as temp_dir:
             temp_root = Path(temp_dir)
             mounted_skill_dir = temp_root / "skill"
-            artifacts_dir = temp_root / "artifacts"
+            artifacts_dir = self.artifacts_root / execution_id
             shutil.copytree(source_dir, mounted_skill_dir)
+            if artifacts_dir.exists():
+                shutil.rmtree(artifacts_dir)
             artifacts_dir.mkdir(parents=True, exist_ok=True)
 
             (artifacts_dir / "input-payload.json").write_text(
