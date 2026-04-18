@@ -224,9 +224,16 @@ skill_bundle/
     "message": "sandbox-demo"
   },
   "timeout_seconds": 60,
-  "network_policy": "default"
+  "network_policy": "default",
+  "analysis_mode": "rule_plus_epg"
 }
 ```
+
+`analysis_mode` 支持三种消融模式：
+
+- `rule_only`：只做现有规则分析
+- `rule_plus_epg`：规则分析 + 规范化事件 + EPG + attack chain reconstruction
+- `static_only`：只解析 `SKILL.md` 与 action，不真实执行
 
 ## Skill Runtime 约定
 
@@ -241,7 +248,166 @@ Skill 本身不是天然可执行程序，所以这里实现了受控的 Skill R
   - 顺序受控执行
   - LLM 决策执行
 - 将动作结果写入 context
-- 后续动作可引用前面动作输出
+- 将 runtime 事件写入 `runtime-events.jsonl`
+
+## 复现实验
+
+### 1. 运行单个 case
+
+启动 API：
+
+```bash
+python3 -m app.main --host 0.0.0.0 --port 8000
+```
+
+分析单个 Skill：
+
+```bash
+curl -s http://127.0.0.1:8000/analyze-skill \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "skill_path": "./examples/skills/network_file_probe",
+    "timeout_seconds": 30,
+    "network_policy": "default",
+    "analysis_mode": "rule_plus_epg"
+  }'
+```
+
+如果只想做静态消融：
+
+```bash
+curl -s http://127.0.0.1:8000/analyze-skill \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "skill_path": "./examples/skills/network_file_probe",
+    "analysis_mode": "static_only"
+  }'
+```
+
+### 2. 运行 benchmark
+
+将样本放到如下目录：
+
+```text
+datasets/
+├── skills/
+│   ├── benign/
+│   │   └── <case_id>/
+│   │       └── SKILL.md
+│   └── malicious/
+│       └── <case_id>/
+│           └── SKILL.md
+└── ground_truth/
+    └── <case_id>.json
+```
+
+运行 benchmark：
+
+```bash
+python3 scripts/run_benchmark.py \
+  --datasets-root ./datasets \
+  --timeout-seconds 30
+```
+
+默认会输出三条主基线：
+
+- `static_only`
+- `rule_only`
+- `rule_plus_epg`
+
+ground truth 最小 schema 见 [datasets/ground_truth/README.md](/root/projects/clawguard-skill-sandbox/datasets/ground_truth/README.md:1)，核心字段包括：
+
+- `case_id`
+- `is_malicious`
+- `expected_behaviors`
+- `expected_source_nodes`
+- `expected_sink_nodes`
+- `expected_primary_chain`
+- `expected_root_cause`
+- `dynamic_runnable`
+
+### 3. Artifact 输出
+
+单次真实执行的 artifact 默认写入：
+
+```text
+artifacts/
+└── runs/
+    └── <execution_id>/
+        ├── input-payload.json
+        ├── llm-config.json
+        ├── meta.json
+        ├── runtime-events.jsonl
+        ├── normalized-events.jsonl
+        ├── epg.json
+        ├── attack-chain.json
+        ├── stdout.log
+        ├── stderr.log
+        ├── runtime-resource-usage.txt
+        └── trace.log*
+```
+
+benchmark 汇总输出默认写入：
+
+```text
+artifacts/
+└── benchmark/
+    ├── benchmark-summary.json
+    └── benchmark-summary.csv
+```
+
+其中：
+
+- `benchmark-summary.json`：包含三基线聚合结果和逐 case 结果
+- `benchmark-summary.csv`：按 baseline 汇总，适合直接生成论文主表
+
+### 4. 各 artifact 文件含义
+
+- `runtime-events.jsonl`：runtime 原始事件流，包含 LLM 与 tool call 事件
+- `normalized-events.jsonl`：统一事件模型，包含 `event_id`、`parent_event_id`、`step_id`
+- `epg.json`：Execution Provenance Graph，包含节点、边以及图摘要
+- `attack-chain.json`：从 EPG 提取出的主攻击链；链不完整时会标记 `completeness=partial`
+- `trace.log*`：`strace` 原始系统调用日志
+- `stdout.log` / `stderr.log`：Skill 运行标准输出与错误输出
+- `runtime-resource-usage.txt`：GNU time 记录的资源占用
+- `benchmark-summary.json`：包含三基线聚合指标和每个 case 的结果明细
+- `benchmark-summary.csv`：面向论文主表的 baseline 级汇总结果
+
+### 5. EPG 增强后的新增分析字段
+
+API 保持原有语义，并在原结果上增量补充：
+
+- `analysis_mode`
+- `normalized_events`
+- `primary_chain`
+- `root_cause`
+- `root_cause_detail`
+- `graph_summary`
+
+其中：
+
+- `primary_chain`：source -> sink 的主链或 partial chain
+- `root_cause`：对外兼容的 coarse-grained 标签
+- `root_cause_detail`：论文评测使用的 fine-grained 标签，例如 `unsafe_dataflow_design`、`unsafe_command_construction`
+- `graph_summary`：图摘要，当前会额外包含 `summary_scope` 用于说明统计口径
+
+### 6. Benchmark 指标
+
+- `detection_rate`：恶意样本中，GT 行为全部命中的比例
+- `false_positive_rate`：良性样本中，被预测为恶意的比例
+- `endpoint_accuracy`：source 和 sink 是否命中 GT
+- `edge_level_f1`：预测链边集合与 GT 主链边集合的 F1
+- `complete_chain_rate`：是否完整覆盖 GT 主链
+- `partial_chain_usefulness`：是否至少恢复 source -> sink 主方向
+- `root_cause_accuracy`：恶意样本上预测细粒度根因与 GT 是否一致
+- `avg_latency_ms`：已完成样本的平均延迟
+
+### 7. Graph Summary 语义
+
+- `summary_scope=execution_provenance_graph`：动态运行得到的完整 EPG 摘要
+- `summary_scope=abstract_skill_graph`：`static_only` 下基于 action 和已推断主链生成的抽象图摘要
+
+这样可以避免把静态抽象图和动态执行图混为一谈，也避免 `primary_chain` 与 `graph_summary` 的统计口径不一致。
 
 支持的动作类型：
 

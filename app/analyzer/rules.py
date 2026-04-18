@@ -4,11 +4,13 @@ import json
 from pathlib import Path
 
 from app.analyzer.attack_chain import extract_primary_attack_chain
+from app.analyzer.decision_engine import evaluate_decision
 from app.backend.schemas import EvidenceEvent
 from app.graph.builder import build_execution_provenance_graph
 from app.graph.exporter import export_graph
+from app.runtime.skill_parser import SkillDefinition, load_skill_definition
 from app.runner.models import SandboxExecution
-from app.telemetry.normalizer import build_normalized_events, persist_normalized_events
+from app.telemetry.normalizer import NormalizedEvent, build_normalized_events, persist_normalized_events
 
 
 SENSITIVE_PATH_PREFIXES = [
@@ -50,46 +52,38 @@ NETWORK_UNKNOWN = "unknown"
 
 
 def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_epg") -> dict:
+    skill_definition = _load_dynamic_skill_definition(execution)
     interesting_files = _interesting_file_events(execution.file_events)
     interesting_network = _interesting_network_events(execution.network_events)
     interesting_processes = _interesting_process_events(execution.process_events)
+    normalized_events = build_normalized_events(execution)
 
-    score = 0
     detected: set[str] = set()
 
     if interesting_network:
-        score += 30
         detected.add("network_access")
 
     if any(event.command in {"/bin/sh", "/usr/bin/sh", "/bin/bash", "/usr/bin/bash"} for event in interesting_processes):
-        score += 25
         detected.add("shell_execution")
 
     if interesting_processes:
-        score += min(20, len(interesting_processes) * 5)
         detected.add("process_spawn")
 
     write_events = [event for event in interesting_files if event.action in {"write", "create", "delete_or_rename"}]
     if write_events:
-        score += min(20, len(write_events) * 4)
         detected.add("file_write")
 
-    if any(_is_sensitive_path(event.path) for event in interesting_files):
-        score += 25
+    if _has_sensitive_source_evidence(execution, interesting_files, skill_definition):
         detected.add("sensitive_file_read")
 
-    if _has_read_then_exfiltration(interesting_files, interesting_network):
-        score += 20
+    if _has_read_then_exfiltration(execution, interesting_files, interesting_network, skill_definition):
         detected.add("read_then_exfiltration")
 
     if execution.timed_out:
-        score += 15
         detected.add("execution_timeout")
 
-    score = min(score, 100)
-
     result = {
-        "risk_score": score,
+        "risk_score": 0,
         "detected_behaviors": sorted(detected),
         "analysis_mode": analysis_mode,
         "trace_summary": {
@@ -110,24 +104,57 @@ def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_e
         "root_cause_detail": "unknown",
         "root_cause_evidence": {},
         "graph_summary": {},
+        "final_decision": "benign",
+        "triggered_factors": [],
+        "suppression_factors": [],
+        "decision_evidence": {},
+        "source_assessment": {},
+        "sink_assessment": {},
     }
     if analysis_mode in {"rule_plus_epg", "epg_without_filtering", "epg_with_filtering"}:
         _augment_with_epg(
             execution,
             result,
+            normalized_events=normalized_events,
             filter_noise=analysis_mode == "epg_with_filtering",
         )
-    elif analysis_mode == "rule_only":
-        detail = _infer_root_cause_detail(execution, result["detected_behaviors"], primary_chain=[])
-        result["root_cause_detail"] = detail
-        result["root_cause"] = _to_coarse_root_cause(detail)
-        result["root_cause_evidence"] = _build_root_cause_evidence(
-            execution=execution,
-            root_cause_detail=detail,
-            primary_chain=[],
-            graph_nodes=[],
-            graph_edges=[],
-        )
+
+    decision = evaluate_decision(
+        detected_behaviors=result["detected_behaviors"],
+        normalized_events=[event.to_dict() for event in normalized_events],
+        primary_chain=result["primary_chain"],
+        graph_summary=result["graph_summary"],
+        skill_definition=skill_definition,
+        tool_calls=execution.tool_calls,
+        file_events=interesting_files,
+        network_events=interesting_network,
+        llm_events=execution.llm_events,
+    )
+    result["risk_score"] = decision.risk_score
+    result["final_decision"] = decision.final_decision.value
+    result["triggered_factors"] = [factor.to_dict() for factor in decision.triggered_factors]
+    result["suppression_factors"] = [factor.to_dict() for factor in decision.suppression_factors]
+    result["decision_evidence"] = decision.evidence_bundle
+    result["source_assessment"] = decision.evidence_bundle.get("source_assessment", {})
+    result["sink_assessment"] = decision.evidence_bundle.get("sink_assessment", {})
+
+    detail = _infer_root_cause_detail(
+        execution,
+        result["detected_behaviors"],
+        primary_chain=result["primary_chain"],
+        source_assessment=result["source_assessment"],
+        sink_assessment=result["sink_assessment"],
+        skill_definition=skill_definition,
+    )
+    result["root_cause_detail"] = detail
+    result["root_cause"] = _to_coarse_root_cause(detail)
+    result["root_cause_evidence"] = _build_root_cause_evidence(
+        execution=execution,
+        root_cause_detail=detail,
+        primary_chain=result["primary_chain"],
+        graph_nodes=[],
+        graph_edges=[],
+    )
     return result
 
 
@@ -216,6 +243,73 @@ def analyze_static_skill(skill_definition, analysis_mode: str = "static_only") -
 
 def _is_sensitive_path(path: str) -> bool:
     return any(path.startswith(prefix) for prefix in SENSITIVE_PATH_PREFIXES)
+
+
+def _load_dynamic_skill_definition(execution: SandboxExecution) -> SkillDefinition | None:
+    try:
+        return load_skill_definition(execution.skill_path, execution.skill_file, allow_empty_actions=True)
+    except Exception:
+        return None
+
+
+def _has_sensitive_source_evidence(
+    execution: SandboxExecution,
+    files,
+    skill_definition: SkillDefinition | None,
+) -> bool:
+    return any(_is_sensitive_file_event(event.path, execution, skill_definition) for event in files)
+
+
+def _is_sensitive_file_event(
+    path: str,
+    execution: SandboxExecution,
+    skill_definition: SkillDefinition | None,
+) -> bool:
+    if not _is_sensitive_path(path):
+        return False
+    if any(
+        event.event == "start"
+        and event.tool_type == "read_file"
+        and str(event.metadata.get("config", {}).get("path", "")) == path
+        for event in execution.tool_calls
+    ):
+        return True
+    if skill_definition is not None:
+        for action in skill_definition.actions:
+            if action.type == "read_file" and str(action.config.get("path", "")) == path:
+                return True
+            if action.type == "run_command" and path in str(action.config.get("command", "")):
+                return True
+    return False
+
+
+def _has_risky_command_definition(
+    skill_definition: SkillDefinition | None,
+    execution: SandboxExecution | None,
+) -> bool:
+    if skill_definition is not None:
+        for action in skill_definition.actions:
+            if action.type != "run_command":
+                continue
+            command = str(action.config.get("command", ""))
+            if "{{ input_payload." in command or "{{input_payload." in command:
+                return True
+            if bool(action.config.get("shell")) and any(token in command for token in ["|", ";", "$(", "`", "&&"]):
+                return True
+            if any(path in command for path in ["/etc/passwd", "/etc/shadow", "/etc/hosts", "/root/"]):
+                return True
+    if execution is None:
+        return False
+    return any(
+        event.event == "start"
+        and event.tool_type == "run_command"
+        and bool(event.metadata.get("config", {}).get("shell"))
+        and any(
+            token in str(event.metadata.get("config", {}).get("command", ""))
+            for token in ["|", ";", "$(", "`", "&&"]
+        )
+        for event in execution.tool_calls
+    )
 
 
 def _interesting_file_events(events):
@@ -344,8 +438,13 @@ def _is_noisy_file_event(path: str) -> bool:
     return False
 
 
-def _has_read_then_exfiltration(files, network) -> bool:
-    sensitive_reads = [event for event in files if _is_sensitive_path(event.path)]
+def _has_read_then_exfiltration(
+    execution: SandboxExecution,
+    files,
+    network,
+    skill_definition: SkillDefinition | None,
+) -> bool:
+    sensitive_reads = [event for event in files if _is_sensitive_file_event(event.path, execution, skill_definition)]
     if not sensitive_reads or not network:
         return False
     first_read = min(event.timestamp for event in sensitive_reads)
@@ -353,7 +452,13 @@ def _has_read_then_exfiltration(files, network) -> bool:
     return first_read <= first_network
 
 
-def _augment_with_epg(execution: SandboxExecution, result: dict, *, filter_noise: bool) -> None:
+def _augment_with_epg(
+    execution: SandboxExecution,
+    result: dict,
+    *,
+    normalized_events: list[NormalizedEvent],
+    filter_noise: bool,
+) -> None:
     telemetry_report = {
         "file_events": [event.to_dict() for event in execution.file_events],
         "network_events": [event.to_dict() for event in execution.network_events],
@@ -362,7 +467,6 @@ def _augment_with_epg(execution: SandboxExecution, result: dict, *, filter_noise
         "llm_events": [event.to_dict() for event in execution.llm_events],
         "data_flows": [event.to_dict() for event in execution.data_flows],
     }
-    normalized_events = build_normalized_events(execution)
     normalized_path = persist_normalized_events(execution.artifacts_dir, normalized_events)
     graph = build_execution_provenance_graph(
         execution_id=execution.execution_id,
@@ -377,16 +481,6 @@ def _augment_with_epg(execution: SandboxExecution, result: dict, *, filter_noise
     )
     _write_json_artifact(Path(execution.artifacts_dir) / "attack-chain.json", primary_chain)
     result["primary_chain"] = primary_chain
-    detail = _infer_root_cause_detail(execution, result["detected_behaviors"], primary_chain)
-    result["root_cause_detail"] = detail
-    result["root_cause"] = _to_coarse_root_cause(detail)
-    result["root_cause_evidence"] = _build_root_cause_evidence(
-        execution=execution,
-        root_cause_detail=detail,
-        primary_chain=primary_chain,
-        graph_nodes=graph.to_dict().get("nodes", []),
-        graph_edges=graph.to_dict().get("edges", []),
-    )
     result["graph_summary"] = graph.to_dict()["summary"]
 
 
@@ -394,39 +488,41 @@ def _infer_root_cause_detail(
     execution: SandboxExecution,
     detected_behaviors: list[str],
     primary_chain: list[dict],
+    source_assessment: dict | None = None,
+    sink_assessment: dict | None = None,
+    skill_definition: SkillDefinition | None = None,
 ) -> str:
     if any(_looks_like_prompt_injection(event.metadata) for event in execution.llm_events):
         return "prompt_injection_suspected"
     if execution.llm_events and (primary_chain or "network_access" in detected_behaviors):
         return "llm_decision_induced_action"
-    if any(
-        event.tool_type == "run_command"
-        and (
-            event.metadata.get("config", {}).get("shell") is True
-            or "{{" in str(event.metadata.get("config", {}).get("command", ""))
-        )
-        for event in execution.tool_calls
-        if event.event == "start"
-    ):
+    if _has_risky_command_definition(skill_definition, execution):
         return "unsafe_command_construction"
-    primary_source_label = str(primary_chain[0].get("label", "")) if primary_chain else ""
+    source_assessment = source_assessment or {}
+    sink_assessment = sink_assessment or {}
+    primary_source_label = str(primary_chain[0].get("label", "")) if primary_chain else str(source_assessment.get("label", ""))
     if (
-        primary_chain
+        (primary_chain or source_assessment)
         and _looks_like_generated_artifact(primary_source_label)
         and any(
             event.tool_type == "http_request"
             for event in execution.tool_calls
             if event.event == "start"
         )
+        and source_assessment.get("from_public_lineage") is not True
     ):
         return "overprivileged_tool_use"
-    if primary_chain or "read_then_exfiltration" in detected_behaviors:
+    if (
+        (primary_chain or "read_then_exfiltration" in detected_behaviors)
+        and source_assessment.get("sensitivity") != "LOW_SENSITIVITY"
+        and sink_assessment.get("semantics") != "PUBLIC_FETCH_ONLY"
+    ):
         return "unsafe_dataflow_design"
     if any(
         event.tool_type == "http_request"
         for event in execution.tool_calls
         if event.event == "start"
-    ):
+    ) and source_assessment.get("sensitivity") in {"HIGH_SENSITIVITY", "MEDIUM_SENSITIVITY"}:
         return "overprivileged_tool_use"
     return "unknown"
 
@@ -437,14 +533,7 @@ def _infer_static_root_cause_detail(skill_definition, detected_behaviors: list[s
         return "prompt_injection_suspected"
     if skill_definition.runtime in {"deepseek-agent", "llm-agent", "llm-native"} and detected_behaviors:
         return "llm_decision_induced_action"
-    if any(
-        action.type == "run_command"
-        and (
-            bool(action.config.get("shell"))
-            or "{{" in str(action.config.get("command", ""))
-        )
-        for action in skill_definition.actions
-    ):
+    if _has_risky_command_definition(skill_definition, execution=None):
         return "unsafe_command_construction"
     primary_source_label = str(primary_chain[0].get("label", "")) if primary_chain else ""
     if primary_chain and _looks_like_generated_artifact(primary_source_label):

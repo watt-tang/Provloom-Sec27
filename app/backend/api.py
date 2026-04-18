@@ -135,6 +135,10 @@ def _handle_analyze_skill(environ, start_response):
             root_cause=report.get("root_cause", "unknown"),
             root_cause_detail=report.get("root_cause_detail", "unknown"),
             graph_summary=report.get("graph_summary", {}),
+            final_decision=report.get("final_decision", "unknown"),
+            triggered_factors=report.get("triggered_factors", []),
+            suppression_factors=report.get("suppression_factors", []),
+            decision_evidence=report.get("decision_evidence", {}),
         )
         task_store.complete(execution_id, response.to_dict())
         log_writer.write(
@@ -272,6 +276,10 @@ def _build_static_response(
         root_cause=report.get("root_cause", "unknown"),
         root_cause_detail=report.get("root_cause_detail", "unknown"),
         graph_summary=report.get("graph_summary", {}),
+        final_decision=report.get("final_decision", "unknown"),
+        triggered_factors=report.get("triggered_factors", []),
+        suppression_factors=report.get("suppression_factors", []),
+        decision_evidence=report.get("decision_evidence", {}),
     )
 
 
