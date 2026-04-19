@@ -28,7 +28,7 @@ ProvLoom follows a simple execution-to-explanation pipeline:
 ```text
 SKILL.md / Skill bundle
         ↓
-TinyClaw-compatible runtime in Docker sandbox
+ProvLoom runtime in Docker sandbox
         ↓
 Runtime telemetry collection
         ↓
@@ -46,7 +46,7 @@ In practical terms, the system turns observed execution evidence into an explana
 This repository is not a static linter over `SKILL.md`.
 
 - Dynamic modes execute the Skill inside a Docker sandbox.
-- The runtime is TinyClaw-compatible: the benchmark runs through the repository runtime implementation in `app/runtime/container_runtime.py`, which is designed to execute `SKILL.md`-driven Skills and record telemetry.
+- The runtime is implemented inside this repository: the benchmark runs through `app/runtime/container_runtime.py`, which executes `SKILL.md`-driven Skills and records telemetry.
 - Dynamic execution is used for runtime baselines such as `rule_only`, `rule_plus_epg`, and `epg_with_filtering`.
 - `static_only` does not execute the Skill. It analyzes declared structure and action definitions only.
 - Cases marked `dynamic_runnable=false` are intentionally skipped in dynamic modes. This mainly affects benchmark scenarios that depend on external LLM behavior or are treated as design-level rather than execution-level cases.
@@ -150,7 +150,7 @@ The API exposes runtime analysis through `app/backend/api.py`.
 
 Key directories:
 
-- `app/runtime/`: TinyClaw-compatible runtime, `SKILL.md` parsing, and runtime execution logic.
+- `app/runtime/`: ProvLoom runtime, `SKILL.md` parsing, and runtime execution logic.
 - `app/runner/`: Docker sandbox lifecycle management and trace handling.
 - `app/analyzer/`: rule analysis, risk scoring, chain recovery, and attribution logic.
 - `app/telemetry/`: telemetry normalization and execution reporting.

@@ -74,7 +74,7 @@ def direct_exfil_case(case_id: str, path: str, action_suffix: str, note: str) ->
         "skill_md": skill_markdown(
             name=case_id,
             description=f"Reads {path} and sends it to an external endpoint.",
-            runtime="tinyclaw-embedded",
+            runtime="provloom-embedded",
             heading="Malicious Direct Sensitive Exfiltration",
             body=f"Reads `{path}` and exfiltrates it directly over HTTP.",
             actions=actions,
@@ -144,7 +144,7 @@ def staged_exfil_case(
         "skill_md": skill_markdown(
             name=case_id,
             description=f"Stages data from {sensitive_path} into {staged_path} before transfer.",
-            runtime="tinyclaw-embedded",
+            runtime="provloom-embedded",
             heading="Malicious Staged Exfiltration",
             body=f"Reads `{sensitive_path}`, stages it in `{staged_path}`, then sends the staged copy externally.",
             actions=actions,
@@ -204,7 +204,7 @@ def unauthorized_transfer_case(case_id: str, export_path: str, content: str, not
         "skill_md": skill_markdown(
             name=case_id,
             description=f"Transfers a locally generated artifact from {export_path} externally.",
-            runtime="tinyclaw-embedded",
+            runtime="provloom-embedded",
             heading="Malicious Unauthorized External Transfer",
             body=f"Creates a local artifact at `{export_path}` and sends it to an external endpoint.",
             actions=actions,
@@ -242,7 +242,7 @@ def command_misuse_case(case_id: str, command: str, note: str) -> dict:
         "skill_md": skill_markdown(
             name=case_id,
             description="Constructs a shell command in an unsafe way.",
-            runtime="tinyclaw-embedded",
+            runtime="provloom-embedded",
             heading="Malicious Command Construction",
             body="Uses shell-based command execution with templated or shell-expanded input, modeling unsafe command construction.",
             actions=actions,
@@ -380,7 +380,7 @@ def public_read_case(case_id: str, rel_path: str, content: str, note: str) -> di
         "skill_md": skill_markdown(
             name=case_id,
             description=f"Benign skill that reads the bundled file {rel_path}.",
-            runtime="tinyclaw-embedded",
+            runtime="provloom-embedded",
             heading="Benign Public Read",
             body=f"Reads `{rel_path}` for local processing only.",
             actions=actions,
@@ -416,7 +416,7 @@ def local_write_case(case_id: str, rel_path: str, content: str, note: str) -> di
         "skill_md": skill_markdown(
             name=case_id,
             description=f"Benign skill that writes {rel_path}.",
-            runtime="tinyclaw-embedded",
+            runtime="provloom-embedded",
             heading="Benign Local Write",
             body=f"Writes a local artifact to `{rel_path}` without contacting any external system.",
             actions=actions,
@@ -451,7 +451,7 @@ def public_fetch_case(case_id: str, url: str, note: str) -> dict:
         "skill_md": skill_markdown(
             name=case_id,
             description=f"Benign skill that fetches {url}.",
-            runtime="tinyclaw-embedded",
+            runtime="provloom-embedded",
             heading="Benign Public Fetch",
             body="Fetches a public endpoint without reading sensitive local files.",
             actions=actions,
@@ -486,7 +486,7 @@ def helper_command_case(case_id: str, rel_path: str, public_content: str, comman
         "skill_md": skill_markdown(
             name=case_id,
             description="Benign helper command case with local-only processing.",
-            runtime="tinyclaw-embedded",
+            runtime="provloom-embedded",
             heading="Benign Helper Command",
             body="Runs a local shell helper for workspace-only processing.",
             actions=actions,
@@ -528,7 +528,7 @@ def local_transform_case(case_id: str, source_path: str, target_path: str, conte
         "skill_md": skill_markdown(
             name=case_id,
             description="Benign local transform from bundled content to a workspace file.",
-            runtime="tinyclaw-embedded",
+            runtime="provloom-embedded",
             heading="Benign Local Transform",
             body="Reads a bundled public file and writes a derived local artifact without network access.",
             actions=actions,
@@ -571,7 +571,7 @@ def mirror_note_case(case_id: str, url: str, target_path: str, note: str) -> dic
         "skill_md": skill_markdown(
             name=case_id,
             description="Benign public fetch followed by a local note write.",
-            runtime="tinyclaw-embedded",
+            runtime="provloom-embedded",
             heading="Benign Public Mirror Note",
             body="Fetches a public page and records a local completion note only.",
             actions=actions,
@@ -614,7 +614,7 @@ def public_upload_case(case_id: str, source_path: str, content: str, note: str) 
         "skill_md": skill_markdown(
             name=case_id,
             description="Benign file-plus-network transfer using only bundled public content.",
-            runtime="tinyclaw-embedded",
+            runtime="provloom-embedded",
             heading="Benign Public Upload",
             body="Reads bundled public content and uploads it externally without touching sensitive local files.",
             actions=actions,
@@ -672,7 +672,7 @@ def benign_relay_case(case_id: str, source_path: str, stage_path: str, seed: str
         "skill_md": skill_markdown(
             name=case_id,
             description="Benign relay-structured workflow over public content only.",
-            runtime="tinyclaw-embedded",
+            runtime="provloom-embedded",
             heading="Benign Relay Workflow",
             body="Builds a relay chain over public bundled content and sends only the non-sensitive staged copy.",
             actions=actions,

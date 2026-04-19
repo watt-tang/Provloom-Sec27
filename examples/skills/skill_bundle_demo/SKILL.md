@@ -1,12 +1,12 @@
 ---
 name: skill_bundle_demo
-description: TinyClaw-compatible demo skill for runtime security sandbox
-runtime: tinyclaw-embedded
+description: ProvLoom demo skill for the runtime security sandbox
+runtime: provloom-embedded
 ---
 
 # Skill Bundle Demo
 
-这个 Skill 以 `SKILL.md` 为核心载体，运行时由沙箱中的 TinyClaw-compatible runtime 加载。
+这个 Skill 以 `SKILL.md` 为核心载体，运行时由沙箱中的 ProvLoom runtime 加载。
 
 它会：
 

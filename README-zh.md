@@ -28,7 +28,7 @@ ProvLoom 的核心执行链路如下：
 ```text
 SKILL.md / Skill bundle
         ↓
-Docker sandbox 中的 TinyClaw-compatible runtime
+Docker sandbox 中的 ProvLoom runtime
         ↓
 Runtime telemetry collection
         ↓
@@ -46,7 +46,7 @@ Analyst-facing explanation + root cause
 这一点非常关键：ProvLoom 不是静态分析器。
 
 - 动态模式下，系统会在 Docker sandbox 中真实执行 Skill。
-- 运行时使用的是 TinyClaw-compatible runtime，也就是仓库内的 `app/runtime/container_runtime.py` 实现，用来执行 `SKILL.md` 驱动的 Skill 并记录运行期事件。
+- 运行时使用的是仓库内自实现的 ProvLoom runtime，也就是 `app/runtime/container_runtime.py`，用来执行 `SKILL.md` 驱动的 Skill 并记录运行期事件。
 - `rule_only`、`rule_plus_epg`、`epg_with_filtering` 等动态基线都会触发真实执行。
 - `static_only` 不会运行 Skill，只会分析声明结构和 action 定义。
 - 标记为 `dynamic_runnable=false` 的 benchmark case 会在动态模式下被跳过。这类 case 主要对应依赖外部 LLM 行为、或更适合作为设计层问题来分析的场景。
@@ -154,7 +154,7 @@ API 入口位于 `app/backend/api.py`。
 
 关键目录如下：
 
-- `app/runtime/`：TinyClaw-compatible runtime、`SKILL.md` 解析与执行逻辑。
+- `app/runtime/`：ProvLoom runtime、`SKILL.md` 解析与执行逻辑。
 - `app/runner/`：Docker sandbox 生命周期管理与 trace 处理。
 - `app/analyzer/`：规则分析、风险评分、链恢复和归因逻辑。
 - `app/telemetry/`：telemetry 规范化与执行报告生成。

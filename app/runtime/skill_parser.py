@@ -72,7 +72,7 @@ def load_skill_definition(
     metadata = _parse_frontmatter(text)
     name = metadata.get("name") or _extract_title(text) or markdown_path.parent.name
     description = metadata.get("description") or _extract_first_paragraph(text)
-    runtime = metadata.get("runtime") or "tinyclaw-embedded"
+    runtime = metadata.get("runtime") or "provloom-embedded"
     actions = _parse_actions(text)
     llm_native_runtime = runtime in {"deepseek-agent", "llm-agent", "llm-native"}
     if not actions and not llm_native_runtime and not allow_empty_actions:

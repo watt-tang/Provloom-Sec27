@@ -1,6 +1,6 @@
 ---
 name: deepseek_skill_demo
-description: DeepSeek-powered TinyClaw-compatible skill runtime demo
+description: DeepSeek-powered ProvLoom skill runtime demo
 runtime: deepseek-agent
 ---
 

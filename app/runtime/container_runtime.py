@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import subprocess
 import sys
 import urllib.request
@@ -262,7 +261,7 @@ class SkillToolExecutor:
         }
 
 
-class TinyClawSkillRuntime:
+class ProvLoomSkillRuntime:
     def __init__(
         self,
         skill_root: Path,
@@ -293,14 +292,11 @@ class TinyClawSkillRuntime:
         self.executor = SkillToolExecutor(self.skill_root, self.context, self._emit)
 
     def execute(self) -> int:
-        tinyclaw_path = shutil.which("tinyclaw")
         self._emit("runtime", "start", {
             "skill_name": self.definition.name,
             "skill_file": self.definition.skill_file,
             "action_count": len(self.definition.actions),
             "runtime": self.definition.runtime,
-            "tinyclaw_installed": bool(tinyclaw_path),
-            "tinyclaw_path": tinyclaw_path or "",
             "llm_enabled": bool(self.llm_config.get("enabled")),
         })
 
@@ -483,7 +479,7 @@ class LLMAgentSkillRuntime:
 
     def _system_prompt(self) -> str:
         return (
-            "You are the runtime brain for a TinyClaw-compatible skill sandbox.\n"
+            "You are the runtime brain for the ProvLoom skill sandbox.\n"
             "You must decide which tool to call next based on the skill and user input.\n"
             "If the SKILL.md is instruction-heavy and does not declare explicit actions, interpret it as a real skill and use the built-in tools to carry out the workflow.\n"
             "Prefer staying inside the skill workspace unless the skill explicitly requires another path.\n"
@@ -554,7 +550,7 @@ def _extract_json_object(text: str) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="TinyClaw-compatible skill runtime")
+    parser = argparse.ArgumentParser(description="ProvLoom skill runtime")
     parser.add_argument("--skill-root", required=True)
     parser.add_argument("--skill-file", default="SKILL.md")
     parser.add_argument("--input-payload", required=True)
@@ -566,7 +562,7 @@ def main() -> int:
     llm_config = {}
     if args.llm_config:
         llm_config = json.loads(Path(args.llm_config).read_text(encoding="utf-8"))
-    runtime = TinyClawSkillRuntime(
+    runtime = ProvLoomSkillRuntime(
         skill_root=Path(args.skill_root),
         skill_file=args.skill_file,
         input_payload=input_payload,
