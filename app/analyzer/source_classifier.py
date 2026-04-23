@@ -11,6 +11,10 @@ from app.runtime.skill_parser import SkillAction, SkillDefinition
 ACTION_REF_RE = re.compile(r"actions\.([A-Za-z0-9_]+)\.stdout")
 PATH_RE = re.compile(r"(/etc/[^\s\"']+|/root/[^\s\"']+|/proc/[^\s\"']+|/sys/[^\s\"']+|runtime_output/[^\s\"']+|public/[^\s\"']+)")
 SENSITIVE_PREFIXES = ("/etc/", "/root/", "/proc/", "/sys/", "/var/run/")
+SYNTHETIC_SENSITIVE_MARKERS = (
+    ".provloom/adapters/credential_state/",
+    "/.provloom/adapters/credential_state/",
+)
 NOISY_SENSITIVE_PATHS = {
     "/etc/ld.so.cache",
     "/etc/localtime",
@@ -332,6 +336,8 @@ def _paths_in_text(text: str) -> list[str]:
 def _is_sensitive_path(path: str) -> bool:
     if not path or path in NOISY_SENSITIVE_PATHS:
         return False
+    if any(marker in path for marker in SYNTHETIC_SENSITIVE_MARKERS):
+        return True
     return path.startswith(SENSITIVE_PREFIXES)
 
 

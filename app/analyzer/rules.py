@@ -4,13 +4,18 @@ import json
 from pathlib import Path
 
 from app.analyzer.attack_chain import extract_primary_attack_chain
+from app.analyzer.capability_inference import infer_capability_profile
+from app.analyzer.dual_axis_decision import infer_dual_axis_decision
+from app.analyzer.root_cause_v2 import infer_root_cause_v2
 from app.analyzer.decision_engine import evaluate_decision
+from app.analyzer.endpoint_semantics import endpoint_semantics, infer_endpoint_kind
 from app.backend.schemas import EvidenceEvent
 from app.graph.builder import build_execution_provenance_graph
 from app.graph.exporter import export_graph
 from app.runtime.skill_parser import SkillDefinition, load_skill_definition
 from app.runner.models import SandboxExecution
 from app.telemetry.normalizer import NormalizedEvent, build_normalized_events, persist_normalized_events
+from app.reporting.risk_mapper import map_risk_profile
 
 
 SENSITIVE_PATH_PREFIXES = [
@@ -19,6 +24,10 @@ SENSITIVE_PATH_PREFIXES = [
     "/proc/",
     "/sys/",
     "/var/run/",
+]
+SYNTHETIC_SENSITIVE_MARKERS = [
+    ".provloom/adapters/credential_state/",
+    "/.provloom/adapters/credential_state/",
 ]
 
 NOISY_FILE_PREFIXES = [
@@ -53,10 +62,15 @@ NETWORK_UNKNOWN = "unknown"
 
 def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_epg") -> dict:
     skill_definition = _load_dynamic_skill_definition(execution)
+    capability_profile = infer_capability_profile(
+        skill_root=execution.skill_path,
+        skill_file=execution.skill_file,
+        skill_definition=skill_definition,
+    )
+    normalized_events = build_normalized_events(execution)
     interesting_files = _interesting_file_events(execution.file_events)
     interesting_network = _interesting_network_events(execution.network_events)
     interesting_processes = _interesting_process_events(execution.process_events)
-    normalized_events = build_normalized_events(execution)
 
     detected: set[str] = set()
 
@@ -102,6 +116,7 @@ def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_e
         "primary_chain": [],
         "root_cause": "unknown",
         "root_cause_detail": "unknown",
+        "root_cause_v2": {},
         "root_cause_evidence": {},
         "graph_summary": {},
         "final_decision": "benign",
@@ -110,6 +125,21 @@ def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_e
         "decision_evidence": {},
         "source_assessment": {},
         "sink_assessment": {},
+        "capability_profile": capability_profile.to_dict(),
+        "capability_tags": capability_profile.capability_tags,
+        "recommended_execution_profile": capability_profile.recommended_profile,
+        "recommended_trigger_mode": capability_profile.recommended_trigger_mode,
+        "estimated_budget_class": capability_profile.estimated_budget_class,
+        "execution_feasibility": capability_profile.execution_feasibility,
+        "blocking_requirements": capability_profile.blocking_requirements,
+        "enabled_adapters": list(execution.enabled_adapters),
+        "adapter_events_summary": dict(execution.adapter_events_summary or {}),
+        "synthetic_artifact_summary": dict(execution.synthetic_artifact_summary or {}),
+        "trigger_plan": dict(execution.trigger_plan or {}),
+        "trigger_used": list(execution.trigger_used or []),
+        "trigger_hits": list(execution.trigger_hits or []),
+        "trigger_unexecuted": list(execution.trigger_unexecuted or []),
+        "trigger_events_summary": dict(execution.trigger_events_summary or {}),
     }
     if analysis_mode in {"rule_plus_epg", "epg_without_filtering", "epg_with_filtering"}:
         _augment_with_epg(
@@ -138,6 +168,26 @@ def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_e
     result["source_assessment"] = decision.evidence_bundle.get("source_assessment", {})
     result["sink_assessment"] = decision.evidence_bundle.get("sink_assessment", {})
 
+    legacy_profile = map_risk_profile(
+        risk_score=int(result["risk_score"]),
+        detected_behaviors=list(result.get("detected_behaviors", [])),
+    )
+    dual_axis = infer_dual_axis_decision(
+        risk_score=int(result["risk_score"]),
+        risk_level=str(legacy_profile.get("risk_level", "unknown")),
+        detected_behaviors=list(result.get("detected_behaviors", [])),
+        source_assessment=result.get("source_assessment", {}),
+        sink_assessment=result.get("sink_assessment", {}),
+        primary_chain=result.get("primary_chain", []),
+        trigger_used=list(result.get("trigger_used", [])),
+        trigger_hits=list(result.get("trigger_hits", [])),
+        enabled_adapters=list(result.get("enabled_adapters", [])),
+        execution_outcome=str(result.get("execution_outcome", "")),
+        skip_category=str(result.get("skip_category", "")),
+        llm_involved=bool(execution.llm_events),
+    )
+    result.update(dual_axis)
+
     detail = _infer_root_cause_detail(
         execution,
         result["detected_behaviors"],
@@ -155,11 +205,32 @@ def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_e
         graph_nodes=[],
         graph_edges=[],
     )
+    result["root_cause_v2"] = infer_root_cause_v2(
+        legacy_root_cause=result["root_cause"],
+        legacy_root_cause_detail=result["root_cause_detail"],
+        detected_behaviors=result["detected_behaviors"],
+        source_assessment=result.get("source_assessment", {}),
+        sink_assessment=result.get("sink_assessment", {}),
+        primary_chain=result.get("primary_chain", []),
+        root_cause_evidence=result.get("root_cause_evidence", {}),
+        execution_outcome=str(result.get("execution_outcome", "completed_full")),
+        skip_category=result.get("skip_category"),
+        trigger_used=list(result.get("trigger_used", [])),
+        trigger_hits=list(result.get("trigger_hits", [])),
+        enabled_adapters=list(result.get("enabled_adapters", [])),
+        llm_involved=bool(execution.llm_events),
+        analysis_mode=analysis_mode,
+    )
     return result
 
 
 def analyze_static_skill(skill_definition, analysis_mode: str = "static_only") -> dict:
     """Simplified static-only analyzer for ablation mode."""
+    capability_profile = infer_capability_profile(
+        skill_root=skill_definition.skill_root,
+        skill_file=skill_definition.skill_file,
+        skill_definition=skill_definition,
+    )
 
     detected: set[str] = set()
     for action in skill_definition.actions:
@@ -198,25 +269,67 @@ def analyze_static_skill(skill_definition, analysis_mode: str = "static_only") -
             (str(action.config.get("url", "")) for action in skill_definition.actions if action.type == "http_request"),
             "unknown",
         )
-        primary_chain = [
-            {
-                "node_id": f"file:{source_path}",
-                "node_type": "file",
-                "label": source_path,
-                "edge_type": None,
-                "completeness": "partial",
-            },
+        endpoint_kind = infer_endpoint_kind(label=sink_url, host=None, source="static_http_request")
+        sink_meta = endpoint_semantics(label=sink_url, host=None, endpoint_kind=endpoint_kind)
+        primary_chain = [{
+            "node_id": f"file:{source_path}",
+            "node_type": "file",
+            "label": source_path,
+            "edge_type": None,
+            "completeness": "partial",
+            "role": "source",
+        }]
+        primary_chain.append(
             {
                 "node_id": f"network:{sink_url}",
                 "node_type": "network_endpoint",
                 "label": sink_url,
                 "edge_type": "flows_to",
                 "completeness": "partial",
-            },
-        ]
+                "role": sink_meta["endpoint_role"],
+                **sink_meta,
+            }
+        )
+        if sink_meta["endpoint_role"] == "relay" and sink_meta["is_llm_provider"]:
+            primary_chain.append(
+                {
+                    "node_id": f"network:unknown-via:network:{sink_url}",
+                    "node_type": "network_endpoint",
+                    "label": "unknown",
+                    "edge_type": "llm_mediated",
+                    "completeness": "partial",
+                    "role": "sink",
+                    "endpoint_role": "sink",
+                    "is_llm_provider": False,
+                    "llm_provider_name": "unknown",
+                    "sink_resolution_status": "llm-mediated",
+                    "llm_relay": False,
+                    "relay_label": sink_url,
+                    "relay_llm_provider_name": sink_meta["llm_provider_name"],
+                    "relay_node_id": f"network:{sink_url}",
+                }
+            )
 
     graph_export = _build_static_graph(skill_definition, primary_chain)
     root_cause_detail = _infer_static_root_cause_detail(skill_definition, sorted(detected), primary_chain)
+    root_cause = _to_coarse_root_cause(root_cause_detail)
+    root_cause_evidence = _build_static_root_cause_evidence(skill_definition, root_cause_detail, primary_chain)
+    root_cause_v2 = infer_root_cause_v2(
+        legacy_root_cause=root_cause,
+        legacy_root_cause_detail=root_cause_detail,
+        detected_behaviors=sorted(detected),
+        source_assessment={},
+        sink_assessment={},
+        primary_chain=primary_chain,
+        root_cause_evidence=root_cause_evidence,
+        execution_outcome="completed_full",
+        skip_category=None,
+        trigger_used=[],
+        trigger_hits=[],
+        enabled_adapters=[],
+        llm_involved=skill_definition.runtime in {"deepseek-agent", "llm-agent", "llm-native"},
+        analysis_mode=analysis_mode,
+    )
 
     return {
         "risk_score": score,
@@ -233,16 +346,57 @@ def analyze_static_skill(skill_definition, analysis_mode: str = "static_only") -
         },
         "evidence_timeline": timeline,
         "primary_chain": primary_chain,
-        "root_cause": _to_coarse_root_cause(root_cause_detail),
+        "root_cause": root_cause,
         "root_cause_detail": root_cause_detail,
-        "root_cause_evidence": _build_static_root_cause_evidence(skill_definition, root_cause_detail, primary_chain),
+        "root_cause_v2": root_cause_v2,
+        "root_cause_evidence": root_cause_evidence,
         "graph_summary": graph_export["summary"],
         "graph_export": graph_export,
+        "capability_profile": capability_profile.to_dict(),
+        "capability_tags": capability_profile.capability_tags,
+        "recommended_execution_profile": capability_profile.recommended_profile,
+        "recommended_trigger_mode": capability_profile.recommended_trigger_mode,
+        "estimated_budget_class": capability_profile.estimated_budget_class,
+        "execution_feasibility": capability_profile.execution_feasibility,
+        "blocking_requirements": capability_profile.blocking_requirements,
+        "enabled_adapters": [],
+        "adapter_events_summary": {},
+        "synthetic_artifact_summary": {},
+        "trigger_plan": {},
+        "trigger_used": [],
+        "trigger_hits": [],
+        "trigger_unexecuted": [],
+        "trigger_events_summary": {},
+        "execution_outcome": "completed_full",
+        "skip_category": None,
+        "skip_explanation": None,
+        "partial_evidence": None,
+        "profile_promotion_recommended": None,
+        "severity_label": "weakly_suspicious" if score >= 20 else "benign_like",
+        "evidence_strength": "speculative",
+        "decision_rationale": {
+            "severity_factors": ["static_only_estimation"],
+            "evidence_factors": ["static_analysis_without_runtime_trace"],
+            "uncertainty_factors": ["runtime_trace_not_available"],
+            "legacy_risk": {
+                "risk_score": score,
+                "risk_level": map_risk_profile(risk_score=score, detected_behaviors=sorted(detected)).get("risk_level", "unknown"),
+            },
+            "observability_context": {
+                "trigger_used_count": 0,
+                "trigger_hit_count": 0,
+                "enabled_adapter_count": 0,
+                "execution_outcome": "completed_full",
+                "skip_category": None,
+            },
+        },
     }
 
 
 def _is_sensitive_path(path: str) -> bool:
-    return any(path.startswith(prefix) for prefix in SENSITIVE_PATH_PREFIXES)
+    return any(path.startswith(prefix) for prefix in SENSITIVE_PATH_PREFIXES) or any(
+        marker in path for marker in SYNTHETIC_SENSITIVE_MARKERS
+    )
 
 
 def _load_dynamic_skill_definition(execution: SandboxExecution) -> SkillDefinition | None:
@@ -330,9 +484,10 @@ def _interesting_network_events(events):
     filtered = []
     seen: set[tuple[str, str]] = set()
     for event in events:
-        if event.address == NETWORK_UNKNOWN:
+        label = _network_event_label(event)
+        if label == NETWORK_UNKNOWN:
             continue
-        key = (event.action, event.address)
+        key = (event.action, label)
         if key in seen:
             continue
         seen.add(key)
@@ -370,13 +525,19 @@ def _filtered_timeline(execution: SandboxExecution, files, network, processes):
             }
         )
     for event in network:
+        label = _network_event_label(event)
         timeline.append(
             {
                 "timestamp": event.timestamp,
                 "category": "network",
                 "action": event.action,
-                "detail": f"{event.action} {event.address}",
-                "metadata": {"address": event.address, "pid": event.pid},
+                "detail": f"{event.action} {label}",
+                "metadata": {
+                    "address": event.address,
+                    "display_label": getattr(event, "display_label", None),
+                    "endpoint_kind": getattr(event, "endpoint_kind", None),
+                    "pid": event.pid,
+                },
             }
         )
     for event in processes:
@@ -578,9 +739,14 @@ def _build_root_cause_evidence(
             if not _is_noisy_file_event(event.path)
         ],
         "network_events": [
-            {"address": event.address, "action": event.action, "timestamp": event.timestamp}
+            {
+                "address": event.address,
+                "display_label": getattr(event, "display_label", None),
+                "action": event.action,
+                "timestamp": event.timestamp,
+            }
             for event in execution.network_events
-            if event.address != NETWORK_UNKNOWN
+            if _network_event_label(event) != NETWORK_UNKNOWN
         ],
         "process_events": [
             {"command": event.command, "action": event.action, "timestamp": event.timestamp}
@@ -676,6 +842,15 @@ def _looks_like_generated_artifact(path: str) -> bool:
     return path.startswith("runtime_output/") or (not path.startswith("/") and not path.startswith("public/"))
 
 
+def _network_event_label(event) -> str:
+    return str(
+        getattr(event, "sink_display_label", None)
+        or getattr(event, "display_label", None)
+        or getattr(event, "address", NETWORK_UNKNOWN)
+        or NETWORK_UNKNOWN
+    )
+
+
 def _to_coarse_root_cause(root_cause_detail: str) -> str:
     mapping = {
         "unsafe_dataflow_design": "skill_design",
@@ -723,11 +898,16 @@ def _build_static_graph(skill_definition, primary_chain: list[dict]) -> dict:
             })
         if action.type == "http_request" and action.config.get("url"):
             url = str(action.config["url"])
+            endpoint_kind = infer_endpoint_kind(label=url, host=None, source="static_http_request")
             nodes.append({
                 "node_id": f"network:{url}",
                 "node_type": "network_endpoint",
                 "label": url,
-                "metadata": {"address": url},
+                "metadata": {
+                    "address": url,
+                    "endpoint_kind": endpoint_kind,
+                    **endpoint_semantics(label=url, host=None, endpoint_kind=endpoint_kind),
+                },
             })
             node_types["network_endpoint"] = node_types.get("network_endpoint", 0) + 1
             edge_types["connects"] = edge_types.get("connects", 0) + 1
@@ -759,7 +939,11 @@ def _build_static_graph(skill_definition, primary_chain: list[dict]) -> dict:
                 "node_id": node["node_id"],
                 "node_type": node["node_type"],
                 "label": node["label"],
-                "metadata": {},
+                "metadata": {
+                    key: value
+                    for key, value in node.items()
+                    if key not in {"node_id", "node_type", "label", "edge_type", "completeness", "role"}
+                },
             },
         )
         node_types[node["node_type"]] = node_types.get(node["node_type"], 0) + int(

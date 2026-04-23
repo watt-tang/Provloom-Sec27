@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from app.runtime.llm_client import OpenAICompatibleClient
 from app.runtime.skill_parser import SkillAction, SkillDefinition, load_skill_definition
@@ -300,7 +301,7 @@ class ProvLoomSkillRuntime:
             "llm_enabled": bool(self.llm_config.get("enabled")),
         })
 
-        if self.llm_config.get("enabled") or self.definition.runtime in {"deepseek-agent", "llm-agent"}:
+        if self.llm_config.get("enabled") or self.definition.runtime in {"deepseek-agent", "llm-agent", "llm-native"}:
             exit_code = LLMAgentSkillRuntime(
                 definition=self.definition,
                 input_payload=self.input_payload,
@@ -371,6 +372,7 @@ class LLMAgentSkillRuntime:
             api_key=llm_config["api_key"],
             model=llm_config["model"],
             temperature=float(llm_config.get("temperature", 0.0)),
+            provider=str(llm_config.get("provider", "openai-compatible")),
         )
 
     def execute(self) -> int:
@@ -387,6 +389,8 @@ class LLMAgentSkillRuntime:
                 "step": step,
                 "provider": self.llm_config.get("provider", "openai-compatible"),
                 "model": self.llm_config["model"],
+                "base_url": self.client.base_url,
+                "endpoint_host": urlparse(self.client.base_url).hostname,
                 "message_count": len(messages),
             }, step_id=step_id)
             response = self.client.chat(messages)

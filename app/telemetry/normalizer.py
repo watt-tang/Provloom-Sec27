@@ -6,6 +6,14 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from app.analyzer.network_sink_resolution import (
+    candidate_from_domain,
+    candidate_from_network_event,
+    candidate_from_url,
+    event_metadata_from_resolution,
+    extract_network_candidates_from_text,
+    resolve_best_network_sink,
+)
 from app.runner.models import DataFlowEvent, FileEvent, LLMEvent, NetworkEvent, ProcessEvent, SandboxExecution, ToolCallEvent
 
 
@@ -29,6 +37,7 @@ class NormalizedEvent:
 def build_normalized_events(execution: SandboxExecution) -> list[NormalizedEvent]:
     """Normalize heterogeneous telemetry into a stable event stream."""
 
+    _enrich_network_events(execution)
     events: list[NormalizedEvent] = []
     llm_events = _normalize_llm_events(execution)
     tool_events = _normalize_tool_events(execution, llm_events)
@@ -199,6 +208,31 @@ def _normalize_network_events(
         build_metadata=lambda event: {
             "action": event.action,
             "address": event.address,
+            "display_label": event.display_label or event.address,
+            "host": event.host,
+            "port": event.port,
+            "endpoint_kind": event.endpoint_kind,
+            "endpoint_source": event.endpoint_source,
+            "endpoint_role": event.endpoint_role,
+            "is_llm_provider": event.is_llm_provider,
+            "llm_provider_name": event.llm_provider_name,
+            "sink_resolution_status": event.sink_resolution_status,
+            "raw_address": event.raw_address,
+            "raw_host": event.raw_host,
+            "raw_port": event.raw_port,
+            "original_domain": event.original_domain,
+            "original_url": event.original_url,
+            "resolved_ip": event.resolved_ip,
+            "sink_display_label": event.sink_display_label,
+            "sink_raw_ip": event.sink_raw_ip,
+            "sink_domain": event.sink_domain,
+            "sink_url": event.sink_url,
+            "sink_port": event.sink_port,
+            "sink_type": event.sink_type,
+            "is_controlled_sink": event.is_controlled_sink,
+            "network_evidence_sources": list(event.network_evidence_sources),
+            "original_target_candidates": list(event.original_target_candidates),
+            "selected_sink_reason": event.selected_sink_reason,
             "pid": event.pid,
             "raw": event.raw,
         },
@@ -278,6 +312,147 @@ def _normalize_trace_events(
         event.step_id = step_id
         normalized.append(normalized_event)
     return normalized
+
+
+def _enrich_network_events(execution: SandboxExecution) -> None:
+    command_endpoints_by_pid: dict[str, list[dict[str, Any]]] = {}
+    for event in execution.process_events:
+        if not event.pid:
+            continue
+        endpoints = extract_network_candidates_from_text(event.command, source="command")
+        if endpoints:
+            command_endpoints_by_pid[event.pid] = endpoints
+
+    tool_endpoints: list[dict[str, Any]] = []
+    for event in execution.tool_calls:
+        if event.event != "start":
+            continue
+        config = event.metadata.get("config", {})
+        endpoints = _endpoints_from_tool_call(event.tool_type, config)
+        for endpoint in endpoints:
+            endpoint["step_id"] = event.step_id
+            tool_endpoints.append(endpoint)
+
+    llm_endpoints: list[dict[str, Any]] = []
+    for event in execution.llm_events:
+        if event.event != "request":
+            continue
+        base_url = str(event.metadata.get("base_url", "")).strip()
+        if not base_url:
+            continue
+        endpoint = candidate_from_url(base_url, source="llm_base_url")
+        endpoint["step_id"] = event.step_id
+        llm_endpoints.append(endpoint)
+
+    for event in execution.network_events:
+        raw_address = event.raw_address or event.address
+        raw_host = event.raw_host or event.host
+        raw_port = event.raw_port if event.raw_port is not None else event.port
+        candidates = _best_candidates_for_network_event(
+            event=event,
+            command_endpoints_by_pid=command_endpoints_by_pid,
+            tool_endpoints=tool_endpoints,
+            llm_endpoints=llm_endpoints,
+        )
+        resolved = resolve_best_network_sink(
+            raw_address=raw_address,
+            raw_host=raw_host,
+            raw_port=raw_port,
+            candidates=candidates,
+        )
+        _apply_endpoint_metadata(event, resolved)
+
+
+def _best_candidates_for_network_event(
+    *,
+    event: NetworkEvent,
+    command_endpoints_by_pid: dict[str, list[dict[str, Any]]],
+    tool_endpoints: list[dict[str, Any]],
+    llm_endpoints: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    current = candidate_from_network_event(event)
+    if current is not None:
+        candidates.append(current)
+    if event.original_url:
+        candidates.append(candidate_from_url(event.original_url, source="trace"))
+    if event.original_domain:
+        candidates.append(candidate_from_domain(event.original_domain, source="dns"))
+    if event.pid and event.pid in command_endpoints_by_pid:
+        candidates.extend(command_endpoints_by_pid[event.pid])
+    if tool_endpoints:
+        candidates.extend(tool_endpoints)
+    if llm_endpoints:
+        candidates.extend(llm_endpoints)
+    return candidates
+
+
+def _endpoints_from_tool_call(tool_type: str, config: dict[str, Any]) -> list[dict[str, Any]]:
+    if tool_type == "http_request":
+        url = str(config.get("url", "")).strip()
+        if not url:
+            return []
+        return [candidate_from_url(url, source="tool")]
+
+    if tool_type == "run_command":
+        command = config.get("command", "")
+        return extract_network_candidates_from_text(command, source="command")
+
+    return []
+
+
+def _apply_endpoint_metadata(event: NetworkEvent, endpoint: dict[str, Any]) -> None:
+    metadata = event_metadata_from_resolution(endpoint)
+    address = str(metadata.get("address", "") or "").strip()
+    display_label = str(metadata.get("display_label", "") or "").strip()
+    if address:
+        event.address = address
+    if display_label:
+        event.display_label = display_label
+    if metadata.get("host"):
+        event.host = str(metadata["host"])
+    if metadata.get("port") is not None:
+        event.port = int(metadata["port"])
+    if metadata.get("endpoint_kind"):
+        event.endpoint_kind = str(metadata["endpoint_kind"])
+    if metadata.get("endpoint_source"):
+        event.endpoint_source = str(metadata["endpoint_source"])
+    if metadata.get("endpoint_role"):
+        event.endpoint_role = str(metadata["endpoint_role"])
+    if metadata.get("is_llm_provider") is not None:
+        event.is_llm_provider = bool(metadata["is_llm_provider"])
+    if metadata.get("llm_provider_name"):
+        event.llm_provider_name = str(metadata["llm_provider_name"])
+    if metadata.get("sink_resolution_status"):
+        event.sink_resolution_status = str(metadata["sink_resolution_status"])
+    event.raw_address = str(metadata.get("raw_address", event.raw_address or "")) or event.raw_address
+    event.raw_host = str(metadata.get("raw_host", event.raw_host or "")) or event.raw_host
+    if metadata.get("raw_port") is not None:
+        event.raw_port = int(metadata["raw_port"])
+    if metadata.get("original_domain"):
+        event.original_domain = str(metadata["original_domain"])
+    if metadata.get("original_url"):
+        event.original_url = str(metadata["original_url"])
+    if metadata.get("resolved_ip"):
+        event.resolved_ip = str(metadata["resolved_ip"])
+    if metadata.get("sink_display_label"):
+        event.sink_display_label = str(metadata["sink_display_label"])
+    if metadata.get("sink_raw_ip"):
+        event.sink_raw_ip = str(metadata["sink_raw_ip"])
+    if metadata.get("sink_domain"):
+        event.sink_domain = str(metadata["sink_domain"])
+    if metadata.get("sink_url"):
+        event.sink_url = str(metadata["sink_url"])
+    if metadata.get("sink_port") is not None:
+        event.sink_port = int(metadata["sink_port"])
+    if metadata.get("sink_type"):
+        event.sink_type = str(metadata["sink_type"])
+    if metadata.get("is_controlled_sink") is not None:
+        event.is_controlled_sink = bool(metadata["is_controlled_sink"])
+    event.network_evidence_sources = list(metadata.get("network_evidence_sources", event.network_evidence_sources))
+    event.original_target_candidates = list(metadata.get("original_target_candidates", event.original_target_candidates))
+    if metadata.get("selected_sink_reason"):
+        event.selected_sink_reason = str(metadata["selected_sink_reason"])
 
 
 def _last_tool_event(events: list[NormalizedEvent]) -> NormalizedEvent | None:

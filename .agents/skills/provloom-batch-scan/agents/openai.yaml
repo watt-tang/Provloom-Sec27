@@ -1,0 +1,4 @@
+interface:
+  display_name: "ProvLoom Batch Scan"
+  short_description: "Rerun dangerous skill scans and inspect progress/results"
+  default_prompt: "Use $provloom-batch-scan to rerun the dangerous skill scan and inspect progress or recent results."

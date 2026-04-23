@@ -1,0 +1,3 @@
+name,skill_id,skill_root,risk_level,risk_level_name,risk_score,severity_label,evidence_strength,root_cause,root_cause_detail
+openclaw-leaderboard,mnt_e_dangerous_skills_openclaw-leaderboard_openclaw-skill,/mnt/e/dangerous_skills/openclaw-leaderboard/openclaw-skill,high,高风险,70,weakly_suspicious,partial,llm_decision,llm_decision_induced_action
+truefoundry-docs,mnt_e_dangerous_skills_tfy-agent-skills_skills_docs,/mnt/e/dangerous_skills/tfy-agent-skills/skills/docs,high,高风险,70,weakly_suspicious,partial,llm_decision,llm_decision_induced_action

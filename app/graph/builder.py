@@ -4,6 +4,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from app.analyzer.network_sink_resolution import candidate_from_url, event_metadata_from_resolution, resolve_best_network_sink
 from app.graph.models import ExecutionProvenanceGraph, GraphEdge, GraphNode
 from app.telemetry.normalizer import NormalizedEvent, load_normalized_events
 
@@ -83,12 +84,43 @@ class GraphBuilder:
                 },
             )
         elif event.event_type == "network":
+            label = (
+                event.metadata.get("sink_display_label")
+                or event.metadata.get("display_label")
+                or event.metadata.get("address", "network")
+            )
+            address = event.metadata.get("address") or label
             node_id = self._upsert_node(
-                node_id=f"network:{event.metadata.get('address')}",
+                node_id=f"network:{address}",
                 node_type="network_endpoint",
-                label=event.metadata.get("address", "network"),
+                label=label,
                 metadata={
-                    "address": event.metadata.get("address"),
+                    "address": address,
+                    "display_label": event.metadata.get("display_label") or label,
+                    "host": event.metadata.get("host"),
+                    "port": event.metadata.get("port"),
+                    "endpoint_kind": event.metadata.get("endpoint_kind"),
+                    "endpoint_source": event.metadata.get("endpoint_source"),
+                    "endpoint_role": event.metadata.get("endpoint_role"),
+                    "is_llm_provider": event.metadata.get("is_llm_provider"),
+                    "llm_provider_name": event.metadata.get("llm_provider_name"),
+                    "sink_resolution_status": event.metadata.get("sink_resolution_status"),
+                    "raw_address": event.metadata.get("raw_address"),
+                    "raw_host": event.metadata.get("raw_host"),
+                    "raw_port": event.metadata.get("raw_port"),
+                    "original_domain": event.metadata.get("original_domain"),
+                    "original_url": event.metadata.get("original_url"),
+                    "resolved_ip": event.metadata.get("resolved_ip"),
+                    "sink_display_label": event.metadata.get("sink_display_label") or label,
+                    "sink_raw_ip": event.metadata.get("sink_raw_ip"),
+                    "sink_domain": event.metadata.get("sink_domain"),
+                    "sink_url": event.metadata.get("sink_url"),
+                    "sink_port": event.metadata.get("sink_port"),
+                    "sink_type": event.metadata.get("sink_type"),
+                    "is_controlled_sink": event.metadata.get("is_controlled_sink"),
+                    "network_evidence_sources": list(event.metadata.get("network_evidence_sources", [])),
+                    "original_target_candidates": list(event.metadata.get("original_target_candidates", [])),
+                    "selected_sink_reason": event.metadata.get("selected_sink_reason"),
                     "last_event_id": event.event_id,
                 },
             )
@@ -133,11 +165,20 @@ class GraphBuilder:
             self._add_edge(tool_node_id, file_node_id, "writes", {"via": "tool_config"})
         elif tool_type == "http_request" and "url" in config:
             address = config["url"]
+            resolved = resolve_best_network_sink(
+                raw_address=None,
+                raw_host=None,
+                raw_port=None,
+                candidates=[candidate_from_url(address, source="tool")],
+            )
+            metadata = event_metadata_from_resolution(resolved)
             network_node_id = self._upsert_node(
-                node_id=f"network:{address}",
+                node_id=f"network:{metadata.get('address') or address}",
                 node_type="network_endpoint",
-                label=address,
-                metadata={"address": address},
+                label=str(metadata.get("sink_display_label") or address),
+                metadata={
+                    **metadata,
+                },
             )
             self._add_edge(tool_node_id, network_node_id, "connects", {"via": "tool_config"})
 
@@ -206,6 +247,10 @@ class GraphBuilder:
                 metadata=dict(metadata),
             )
         else:
+            if existing.node_type == "network_endpoint":
+                preferred_label = metadata.get("display_label") or metadata.get("address")
+                if preferred_label and existing.label in {"network", "unknown"}:
+                    existing.label = preferred_label
             existing.metadata.update({key: value for key, value in metadata.items() if value not in (None, "")})
         return node_id
 

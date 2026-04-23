@@ -25,6 +25,7 @@ class SinkSemantics(_StrEnum):
     PUBLIC_FETCH_ONLY = "PUBLIC_FETCH_ONLY"
     CALLBACK_OR_WEBHOOK = "CALLBACK_OR_WEBHOOK"
     TOOL_INTERNAL_ENDPOINT = "TOOL_INTERNAL_ENDPOINT"
+    LLM_MEDIATED_UNKNOWN_SINK = "LLM_MEDIATED_UNKNOWN_SINK"
     UNKNOWN_NETWORK_SINK = "UNKNOWN_NETWORK_SINK"
 
 
@@ -79,6 +80,23 @@ class SinkAssessment:
     declared_endpoint: bool = False
     tool_linked_http_action: bool = False
     is_external: bool = False
+    endpoint_role: str = "sink"
+    is_llm_provider: bool = False
+    llm_provider_name: str = "unknown"
+    sink_resolution_status: str = "unresolved"
+    sink_display_label: str = ""
+    sink_raw_ip: str = ""
+    sink_domain: str = ""
+    sink_url: str = ""
+    sink_port: int | None = None
+    sink_type: str = "unknown"
+    is_controlled_sink: bool = False
+    network_evidence_sources: list[str] = field(default_factory=list)
+    original_target_candidates: list[str] = field(default_factory=list)
+    selected_sink_reason: str = ""
+    relay_label: str = ""
+    relay_is_llm_provider: bool = False
+    relay_llm_provider_name: str = "unknown"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -89,6 +107,23 @@ class SinkAssessment:
             "declared_endpoint": self.declared_endpoint,
             "tool_linked_http_action": self.tool_linked_http_action,
             "is_external": self.is_external,
+            "endpoint_role": self.endpoint_role,
+            "is_llm_provider": self.is_llm_provider,
+            "llm_provider_name": self.llm_provider_name,
+            "sink_resolution_status": self.sink_resolution_status,
+            "sink_display_label": self.sink_display_label,
+            "sink_raw_ip": self.sink_raw_ip,
+            "sink_domain": self.sink_domain,
+            "sink_url": self.sink_url,
+            "sink_port": self.sink_port,
+            "sink_type": self.sink_type,
+            "is_controlled_sink": self.is_controlled_sink,
+            "network_evidence_sources": self.network_evidence_sources,
+            "original_target_candidates": self.original_target_candidates,
+            "selected_sink_reason": self.selected_sink_reason,
+            "relay_label": self.relay_label,
+            "relay_is_llm_provider": self.relay_is_llm_provider,
+            "relay_llm_provider_name": self.relay_llm_provider_name,
         }
 
 

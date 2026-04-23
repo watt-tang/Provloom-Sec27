@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import uuid
 from pathlib import Path
 import sys
@@ -12,7 +13,15 @@ if str(REPO_ROOT) not in sys.path:
 
 from app.analyzer.rules import analyze_trace
 from app.backend.log_writer import ExecutionLogWriter
-from app.backend.schemas import AnalyzeSkillResponse, LLMConfig
+from app.backend.schemas import (
+    AnalyzeSkillResponse,
+    DEFAULT_LLM_PROVIDER,
+    LLMConfig,
+    default_llm_api_key,
+    default_llm_base_url,
+    default_llm_model,
+    normalize_llm_provider,
+)
 from app.reporting.risk_mapper import map_risk_profile
 from app.runner.docker_runner import DockerRunner
 from app.telemetry.collector import build_execution_report
@@ -65,19 +74,21 @@ def build_response(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run DeepSeek-backed sandbox smoke tests and write JSON logs.")
-    parser.add_argument("--api-key", required=True)
-    parser.add_argument("--base-url", default="https://api.deepseek.com")
-    parser.add_argument("--model", default="deepseek-chat")
+    parser = argparse.ArgumentParser(description="Run SiliconFlow-backed sandbox smoke tests and write JSON logs.")
+    parser.add_argument("--provider", default=DEFAULT_LLM_PROVIDER)
+    parser.add_argument("--api-key", default=os.getenv("PROVLOOM_SCAN_API_KEY", default_llm_api_key(DEFAULT_LLM_PROVIDER)))
+    parser.add_argument("--base-url", default=default_llm_base_url(DEFAULT_LLM_PROVIDER))
+    parser.add_argument("--model", default=default_llm_model(DEFAULT_LLM_PROVIDER))
     parser.add_argument("--timeout-seconds", type=int, default=90)
     args = parser.parse_args()
 
     repo_root = REPO_ROOT
     runner = DockerRunner()
     log_writer = ExecutionLogWriter(log_dir=str(repo_root / "Log"))
+    provider = normalize_llm_provider(args.provider)
     llm_config = LLMConfig(
         enabled=True,
-        provider="deepseek",
+        provider=provider,
         base_url=args.base_url,
         api_key=args.api_key,
         model=args.model,

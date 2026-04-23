@@ -9,17 +9,48 @@ from app.analyzer.risk_model import (
 )
 
 
+def _has_evidence_backed_external_sink(inputs: DecisionInputs) -> bool:
+    """External sink severity depends on outbound evidence, not sink resolution quality."""
+
+    if not inputs.sink.is_external:
+        return False
+    return any(
+        (
+            inputs.sink.declared_endpoint,
+            inputs.sink.tool_linked_http_action,
+            bool(inputs.sink.network_evidence_sources),
+            bool(inputs.primary_chain),
+            "network_access" in inputs.detected_behaviors,
+        )
+    )
+
+
+def _supports_critical_external_transfer(inputs: DecisionInputs) -> bool:
+    """Critical exfiltration severity is source-to-network driven and resolution-agnostic."""
+
+    return (
+        inputs.source.sensitivity == SensitivityTier.HIGH
+        and _has_evidence_backed_external_sink(inputs)
+    )
+
+
 def score_risk_factors(inputs: DecisionInputs) -> tuple[int, list[RiskFactor], FinalDecision]:
     """Convert structured evidence into auditable risk factors and a final decision."""
 
     factors: list[RiskFactor] = []
-    if inputs.source.sensitivity == SensitivityTier.HIGH and inputs.sink.is_external:
+    if _supports_critical_external_transfer(inputs):
         factors.append(
             RiskFactor(
                 code="high_sensitivity_source_to_external_sink",
                 score_delta=80,
-                rationale="High-sensitivity source is connected to an external network sink.",
-                evidence={"source": inputs.source.to_dict(), "sink": inputs.sink.to_dict()},
+                rationale=(
+                    "High-sensitivity source is connected to an evidence-backed external network direction. "
+                    "Sink resolution status does not reduce severity by itself."
+                ),
+                evidence={
+                    "source": inputs.source.to_dict(),
+                    "sink": inputs.sink.to_dict(),
+                },
             )
         )
     if (
@@ -27,6 +58,7 @@ def score_risk_factors(inputs: DecisionInputs) -> tuple[int, list[RiskFactor], F
         and inputs.sink.semantics in {
             SinkSemantics.PUBLIC_UPLOAD_OR_POST,
             SinkSemantics.CALLBACK_OR_WEBHOOK,
+            SinkSemantics.LLM_MEDIATED_UNKNOWN_SINK,
             SinkSemantics.UNKNOWN_NETWORK_SINK,
         }
         and not inputs.source.from_public_lineage
@@ -69,7 +101,11 @@ def score_risk_factors(inputs: DecisionInputs) -> tuple[int, list[RiskFactor], F
     if (
         inputs.source.sensitivity == SensitivityTier.UNKNOWN
         and inputs.outward_network
-        and inputs.sink.semantics in {SinkSemantics.CALLBACK_OR_WEBHOOK, SinkSemantics.UNKNOWN_NETWORK_SINK}
+        and inputs.sink.semantics in {
+            SinkSemantics.CALLBACK_OR_WEBHOOK,
+            SinkSemantics.LLM_MEDIATED_UNKNOWN_SINK,
+            SinkSemantics.UNKNOWN_NETWORK_SINK,
+        }
     ):
         factors.append(
             RiskFactor(

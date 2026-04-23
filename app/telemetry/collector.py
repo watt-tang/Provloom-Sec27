@@ -63,7 +63,12 @@ def build_data_flow_hints(
     tool_calls: list[ToolCallEvent],
 ) -> list[DataFlowEvent]:
     flows: list[DataFlowEvent] = []
-    sensitive_reads = [event for event in file_events if event.path.startswith(("/etc/", "/root/", "/proc/", "/sys/"))]
+    sensitive_reads = [
+        event
+        for event in file_events
+        if event.path.startswith(("/etc/", "/root/", "/proc/", "/sys/"))
+        or ".provloom/adapters/credential_state/" in event.path
+    ]
     if not sensitive_reads or not network_events:
         return flows
 

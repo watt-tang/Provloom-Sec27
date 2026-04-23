@@ -13,6 +13,8 @@ from threading import Lock
 from shlex import quote
 
 from app.backend.schemas import LLMConfig
+from app.analyzer.trigger_synthesis import TriggerPlan, build_trigger_event_injections, materialize_artifact_triggers
+from app.runtime.adapter_layer import AdapterContext, AdapterManager
 from app.runtime.skill_parser import load_skill_definition, resolve_skill_target
 from app.runner.models import ResourceUsage, SandboxExecution
 from app.telemetry.collector import build_data_flow_hints, load_llm_events, load_runtime_events
@@ -51,6 +53,15 @@ class DockerRunner:
         timeout_seconds: int,
         network_policy: str,
         llm_config: LLMConfig,
+        memory_limit_mb: int = 256,
+        execution_profile: str = "base_lightweight",
+        trigger_depth_level: int = 1,
+        telemetry_verbosity: str = "standard",
+        browser_enabled: bool = False,
+        adapters_enabled: list[str] | None = None,
+        escalation_allowed: bool = False,
+        trigger_plan: dict | None = None,
+        trigger_prompt_used: list[str] | None = None,
     ) -> SandboxExecution:
         source_dir, skill_file = resolve_skill_target(skill_path)
         skill_definition = load_skill_definition(
@@ -86,6 +97,49 @@ class DockerRunner:
                 }, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+            adapter_ctx = AdapterContext(
+                skill_workspace=mounted_skill_dir,
+                artifacts_dir=artifacts_dir,
+                execution_id=execution_id,
+                execution_profile=execution_profile,
+                browser_enabled=browser_enabled,
+                adapters_enabled=list(adapters_enabled or []),
+            )
+            adapter_manager = AdapterManager(
+                enabled_adapters=list(adapters_enabled or []),
+                browser_enabled=browser_enabled,
+            )
+            adapter_manager.setup(adapter_ctx)
+            (artifacts_dir / "adapter-state.json").write_text(
+                json.dumps(
+                    {
+                        "enabled_adapters": adapter_manager.enabled_adapters(),
+                        "synthetic_artifact_summary": adapter_manager.synthetic_artifact_summary(),
+                        "adapter_events_summary": adapter_manager.adapter_events_summary(),
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            parsed_trigger_plan = TriggerPlan.from_dict(trigger_plan or {})
+            trigger_artifact_used = materialize_artifact_triggers(mounted_skill_dir, parsed_trigger_plan)
+            trigger_event_injections = build_trigger_event_injections(parsed_trigger_plan)
+            trigger_event_bundle = self._build_trigger_event_bundle(trigger_event_injections)
+            trigger_used = list(trigger_prompt_used or []) + trigger_artifact_used + [item.get("trigger_id", "") for item in trigger_event_injections]
+            trigger_used = [item for item in trigger_used if item]
+            (artifacts_dir / "trigger-plan.json").write_text(
+                json.dumps(
+                    {
+                        "trigger_plan": parsed_trigger_plan.to_dict(),
+                        "trigger_used": trigger_used,
+                        "trigger_event_injections": trigger_event_injections,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
 
             runner_script = self._build_runner_script(skill_file=skill_file, timeout_seconds=timeout_seconds)
             container_name = f"skill-sandbox-{uuid.uuid4().hex[:10]}"
@@ -102,7 +156,7 @@ class DockerRunner:
                 "--pids-limit",
                 "64",
                 "--memory",
-                "256m",
+                f"{max(64, int(memory_limit_mb))}m",
                 "--cpus",
                 "1.0",
                 "--mount",
@@ -116,6 +170,18 @@ class DockerRunner:
                 docker_cmd.extend(["--network", "none"])
 
             docker_cmd.extend([
+                "-e",
+                f"PROVLOOM_EXECUTION_PROFILE={execution_profile}",
+                "-e",
+                f"PROVLOOM_TRIGGER_DEPTH={int(trigger_depth_level)}",
+                "-e",
+                f"PROVLOOM_TELEMETRY_VERBOSITY={telemetry_verbosity}",
+                "-e",
+                f"PROVLOOM_BROWSER_ENABLED={'1' if browser_enabled else '0'}",
+                "-e",
+                f"PROVLOOM_ADAPTERS_ENABLED={','.join(adapters_enabled or [])}",
+                "-e",
+                f"PROVLOOM_ESCALATION_ALLOWED={'1' if escalation_allowed else '0'}",
                 self.image_name,
                 "sh",
                 "-lc",
@@ -149,6 +215,7 @@ class DockerRunner:
                 if monitor_thread.is_alive():
                     monitor_thread.join(timeout=2)
 
+            self._sanitize_llm_config_artifact(artifacts_dir / "llm-config.json")
             meta = self._load_meta(artifacts_dir / "meta.json")
             stdout = self._read_text(artifacts_dir / "stdout.log")
             stderr = self._read_text(artifacts_dir / "stderr.log")
@@ -164,6 +231,15 @@ class DockerRunner:
                 if event.action != "skip"
             ]
             data_flows = build_data_flow_hints(file_events, network_events, tool_calls)
+            adapter_events = adapter_manager.adapter_events()
+            file_events = file_events + adapter_events.file_events
+            network_events = network_events + adapter_events.network_events
+            tool_calls = tool_calls + adapter_events.tool_calls
+            data_flows = data_flows + adapter_events.data_flows
+            file_events = file_events + trigger_event_bundle["file_events"]
+            network_events = network_events + trigger_event_bundle["network_events"]
+            tool_calls = tool_calls + trigger_event_bundle["tool_calls"]
+            data_flows = data_flows + trigger_event_bundle["data_flows"]
             resource_usage = self._collect_resource_usage(
                 container_name=container_name,
                 peak_memory_bytes=peak_holder["peak"],
@@ -199,8 +275,22 @@ class DockerRunner:
                     data_flows=data_flows,
                     resource_usage=resource_usage,
                     artifacts_dir=str(artifacts_dir),
+                    enabled_adapters=adapter_manager.enabled_adapters(),
+                    adapter_events_summary=adapter_manager.adapter_events_summary(),
+                    synthetic_artifact_summary=adapter_manager.synthetic_artifact_summary(),
+                    trigger_plan=parsed_trigger_plan.to_dict(),
+                    trigger_used=trigger_used,
+                    trigger_hits=[],
+                    trigger_unexecuted=[],
+                    trigger_events_summary={
+                        "event_injection_count": len(trigger_event_injections),
+                        "file_events": len(trigger_event_bundle["file_events"]),
+                        "network_events": len(trigger_event_bundle["network_events"]),
+                        "tool_calls": len(trigger_event_bundle["tool_calls"]),
+                    },
                 )
             finally:
+                adapter_manager.teardown(adapter_ctx)
                 self._force_cleanup(container_name)
 
     def _ensure_docker_available(self) -> None:
@@ -212,6 +302,16 @@ class DockerRunner:
     def _build_image(self) -> None:
         with self._build_lock:
             if self._image_built:
+                return
+            # Reuse an existing local image to keep benchmark reruns stable.
+            inspect_result = subprocess.run(
+                ["docker", "image", "inspect", self.image_name],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if inspect_result.returncode == 0:
+                self._image_built = True
                 return
             cmd = [
                 "docker",
@@ -261,6 +361,18 @@ exit 0
             capture_output=True,
             check=False,
         )
+
+    def _sanitize_llm_config_artifact(self, path: Path) -> None:
+        if not path.exists():
+            return
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return
+        if "api_key" not in payload:
+            return
+        payload["api_key"] = "***redacted***" if payload.get("api_key") else ""
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def _collect_resource_usage(
         self,
@@ -320,12 +432,19 @@ exit 0
         peak_holder: dict[str, int],
     ) -> None:
         while not stop_event.is_set():
-            result = subprocess.run(
-                ["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", container_name],
-                text=True,
-                capture_output=True,
-                check=False,
-            )
+            try:
+                result = subprocess.run(
+                    ["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", container_name],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    timeout=2,
+                )
+            except subprocess.TimeoutExpired:
+                # Keep the monitor non-blocking so benchmark execution can finish
+                # even if docker stats occasionally stalls.
+                time.sleep(0.2)
+                continue
             if result.returncode == 0:
                 usage = result.stdout.strip()
                 if usage:
@@ -402,3 +521,79 @@ exit 0
         if not path.exists():
             return ""
         return path.read_text(encoding="utf-8", errors="replace")
+
+    @staticmethod
+    def _build_trigger_event_bundle(injections: list[dict[str, str]]) -> dict[str, list]:
+        from app.runner.models import DataFlowEvent, FileEvent, NetworkEvent, ToolCallEvent
+
+        files: list[FileEvent] = []
+        networks: list[NetworkEvent] = []
+        tools: list[ToolCallEvent] = []
+        flows: list[DataFlowEvent] = []
+        now = time.time()
+
+        for idx, item in enumerate(injections, start=1):
+            ts = datetime_from_epoch(now + idx * 0.001)
+            trigger_id = str(item.get("trigger_id", f"trigger_event_{idx}"))
+            family = str(item.get("family", "event"))
+            endpoint = str(item.get("endpoint", "")).strip()
+            artifact_path = str(item.get("artifact_path", "")).strip()
+
+            tools.append(
+                ToolCallEvent(
+                    timestamp=ts,
+                    tool_id=f"trigger_{trigger_id}",
+                    tool_name=f"Trigger Event {family}",
+                    tool_type="trigger_event",
+                    event="finish",
+                    status="ok",
+                    source="trigger",
+                    metadata={"trigger_id": trigger_id, "family": family, "synthetic": True, "payload": item},
+                )
+            )
+            if endpoint:
+                networks.append(
+                    NetworkEvent(
+                        timestamp=ts,
+                        address=endpoint,
+                        action="connect",
+                        raw=f"trigger:{family}",
+                        source="trigger",
+                        sink_resolution_status="resolved",
+                        sink_url=endpoint,
+                        sink_type="url",
+                        network_evidence_sources=["trigger_plan"],
+                        selected_sink_reason=f"trigger_event:{family}",
+                    )
+                )
+            if artifact_path:
+                files.append(
+                    FileEvent(
+                        timestamp=ts,
+                        path=artifact_path,
+                        action="read",
+                        raw=f"trigger:{family}",
+                        source="trigger",
+                    )
+                )
+            if endpoint and artifact_path:
+                flows.append(
+                    DataFlowEvent(
+                        timestamp=ts,
+                        source="trigger_artifact",
+                        source_detail=artifact_path,
+                        sink="trigger_endpoint",
+                        sink_detail=endpoint,
+                        note=f"Synthetic trigger flow for {family}",
+                    )
+                )
+        return {
+            "file_events": files,
+            "network_events": networks,
+            "tool_calls": tools,
+            "data_flows": flows,
+        }
+
+
+def datetime_from_epoch(value: float) -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(value)) + f".{int((value % 1) * 1000):03d}Z"

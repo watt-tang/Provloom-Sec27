@@ -46,6 +46,31 @@ class NetworkEvent:
     address: str
     action: str
     raw: str
+    host: str | None = None
+    port: int | None = None
+    display_label: str | None = None
+    endpoint_kind: str | None = None
+    endpoint_source: str | None = None
+    endpoint_role: str | None = None
+    is_llm_provider: bool | None = None
+    llm_provider_name: str | None = None
+    sink_resolution_status: str | None = None
+    raw_address: str | None = None
+    raw_host: str | None = None
+    raw_port: int | None = None
+    original_domain: str | None = None
+    original_url: str | None = None
+    resolved_ip: str | None = None
+    sink_display_label: str | None = None
+    sink_raw_ip: str | None = None
+    sink_domain: str | None = None
+    sink_url: str | None = None
+    sink_port: int | None = None
+    sink_type: str | None = None
+    is_controlled_sink: bool | None = None
+    network_evidence_sources: list[str] = field(default_factory=list)
+    original_target_candidates: list[str] = field(default_factory=list)
+    selected_sink_reason: str | None = None
     pid: str | None = None
     event_id: str | None = None
     parent_event_id: str | None = None
@@ -149,3 +174,11 @@ class SandboxExecution:
     data_flows: list[DataFlowEvent]
     resource_usage: ResourceUsage
     artifacts_dir: str
+    enabled_adapters: list[str] = field(default_factory=list)
+    adapter_events_summary: dict[str, Any] = field(default_factory=dict)
+    synthetic_artifact_summary: dict[str, Any] = field(default_factory=dict)
+    trigger_plan: dict[str, Any] = field(default_factory=dict)
+    trigger_used: list[str] = field(default_factory=list)
+    trigger_hits: list[str] = field(default_factory=list)
+    trigger_unexecuted: list[str] = field(default_factory=list)
+    trigger_events_summary: dict[str, Any] = field(default_factory=dict)

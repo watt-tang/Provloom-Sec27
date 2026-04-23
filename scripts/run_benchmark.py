@@ -607,6 +607,8 @@ def _semantic_chain_edges(chain: list[dict[str, Any]]) -> set[tuple[str, str]]:
 def _semantic_node_role(node: dict[str, Any]) -> str | None:
     node_type = node.get("node_type")
     if node_type == "network_endpoint":
+        if node.get("endpoint_role") == "relay":
+            return "relay:network"
         return "sink:network"
     if node_type == "file":
         return "artifact:file"
