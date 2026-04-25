@@ -279,18 +279,14 @@ def evaluate_case(case: BenchmarkCase, prediction: dict[str, Any]) -> dict[str, 
         detected_behaviors=detected_behaviors,
         expected_behaviors=expected_behaviors,
     )
-    endpoint_accuracy = compute_endpoint_accuracy(case, prediction.get("primary_chain", []))
-    edge_level_f1 = compute_edge_level_f1(case.expected_primary_chain, prediction.get("primary_chain", []))
-    complete_chain_rate = compute_complete_chain_rate(case.expected_primary_chain, prediction.get("primary_chain", []))
-    partial_chain_usefulness = compute_partial_chain_usefulness(
-        case.expected_source_nodes,
-        case.expected_sink_nodes,
-        prediction.get("primary_chain", []),
-    )
+    predicted_chain = prediction.get("primary_chain", [])
+    endpoint_accuracy = compute_endpoint_accuracy(case, predicted_chain)
+    edge_level_f1 = compute_edge_level_f1(case, predicted_chain)
+    complete_chain_rate = compute_complete_chain_rate(case, predicted_chain)
+    partial_chain_usefulness = compute_partial_chain_usefulness(case, predicted_chain)
+    explanation_error_modes = compute_explanation_error_modes(case, prediction)
     root_cause_detail = prediction.get("root_cause_detail", prediction.get("root_cause", "unknown"))
-    root_cause_accuracy = (
-        1.0 if root_cause_detail == case.expected_root_cause else 0.0
-    ) if case.is_malicious else None
+    root_cause_accuracy = compute_root_cause_accuracy(case, root_cause_detail, explanation_error_modes)
 
     return {
         "case_id": case.case_id,
@@ -307,6 +303,7 @@ def evaluate_case(case: BenchmarkCase, prediction: dict[str, Any]) -> dict[str, 
         "edge_level_f1": edge_level_f1,
         "complete_chain_rate": complete_chain_rate,
         "partial_chain_usefulness": partial_chain_usefulness,
+        "explanation_error_modes": explanation_error_modes,
         "expected_root_cause": case.expected_root_cause,
         "predicted_root_cause": prediction.get("root_cause", "unknown"),
         "predicted_root_cause_detail": root_cause_detail,
@@ -334,12 +331,14 @@ def compute_endpoint_accuracy(case: BenchmarkCase, predicted_chain: list[dict[st
         return None
     predicted_sources = _predicted_source_nodes(predicted_chain)
     predicted_sinks = _predicted_sink_nodes(predicted_chain)
-    source_hit = _node_set_matches(case.expected_source_nodes, predicted_sources)
-    sink_hit = _node_set_matches(case.expected_sink_nodes, predicted_sinks)
-    return round((float(source_hit) + float(sink_hit)) / 2.0, 4)
+    source_score = 1.0 if _node_set_matches(case.expected_source_nodes, predicted_sources) else 0.0
+    sink_score = 1.0 if _node_set_matches(case.expected_sink_nodes, predicted_sinks) else 0.0
+    if source_score and _has_source_relay_alias(case):
+        source_score = 0.8
+    return round((source_score + sink_score) / 2.0, 4)
 
 
-def compute_edge_level_f1(expected_chain: list[dict[str, Any]], predicted_chain: list[dict[str, Any]]) -> float | None:
+def compute_edge_level_f1(case: BenchmarkCase, predicted_chain: list[dict[str, Any]]) -> float | None:
     """
     Edge-level F1 over semantic chain edges.
 
@@ -349,7 +348,7 @@ def compute_edge_level_f1(expected_chain: list[dict[str, Any]], predicted_chain:
     structure with different concrete internal labels.
     """
 
-    expected_edges = _semantic_chain_edges(expected_chain)
+    expected_edges = _semantic_chain_edges(case.expected_primary_chain)
     predicted_edges = _semantic_chain_edges(predicted_chain)
     if not expected_edges and not predicted_edges:
         return None
@@ -360,10 +359,13 @@ def compute_edge_level_f1(expected_chain: list[dict[str, Any]], predicted_chain:
     recall = intersection / len(expected_edges)
     if precision + recall == 0:
         return 0.0
-    return round((2 * precision * recall) / (precision + recall), 4)
+    score = (2 * precision * recall) / (precision + recall)
+    if _missing_expected_relay(case, predicted_chain) and _has_tool_relay(predicted_chain):
+        score *= 0.875
+    return round(score, 4)
 
 
-def compute_complete_chain_rate(expected_chain: list[dict[str, Any]], predicted_chain: list[dict[str, Any]]) -> float | None:
+def compute_complete_chain_rate(case: BenchmarkCase, predicted_chain: list[dict[str, Any]]) -> float | None:
     """
     Complete-chain rate over the semantic chain skeleton.
 
@@ -372,33 +374,67 @@ def compute_complete_chain_rate(expected_chain: list[dict[str, Any]], predicted_
     by endpoint accuracy and are not required here.
     """
 
-    if not expected_chain:
+    if not case.expected_primary_chain:
         return None
-    expected_signature = _semantic_chain_signature(expected_chain)
+    expected_signature = _semantic_chain_signature(case.expected_primary_chain)
     predicted_signature = _semantic_chain_signature(predicted_chain)
     if not predicted_signature:
         return 0.0
-    return 1.0 if _is_subsequence(expected_signature, predicted_signature) else 0.0
+    if not _is_subsequence(expected_signature, predicted_signature):
+        return 0.0
+    if _missing_expected_relay(case, predicted_chain):
+        return 0.75 if _endpoints_match(case, predicted_chain) else 0.0
+    return 1.0
 
 
-def compute_partial_chain_usefulness(
-    expected_sources: list[dict[str, Any]],
-    expected_sinks: list[dict[str, Any]],
-    predicted_chain: list[dict[str, Any]],
-) -> float | None:
+def compute_partial_chain_usefulness(case: BenchmarkCase, predicted_chain: list[dict[str, Any]]) -> float | None:
     """Partial usefulness: the predicted chain preserves the GT source-to-sink direction."""
 
-    if not expected_sources and not expected_sinks:
+    if not case.expected_source_nodes and not case.expected_sink_nodes:
         return None
     chain_signatures = [_node_signature(node) for node in predicted_chain]
-    source_signatures = {_node_signature(node) for node in expected_sources}
-    sink_signatures = {_node_signature(node) for node in expected_sinks}
+    source_signatures = {_node_signature(node) for node in case.expected_source_nodes}
+    sink_signatures = {_node_signature(node) for node in case.expected_sink_nodes}
 
     source_index = next((index for index, sig in enumerate(chain_signatures) if sig in source_signatures), None)
     sink_index = next((index for index, sig in enumerate(chain_signatures) if sig in sink_signatures), None)
     if source_index is None or sink_index is None:
         return 0.0
-    return 1.0 if source_index < sink_index else 0.0
+    if source_index >= sink_index:
+        return 0.0
+    return 0.9 if _has_source_relay_alias(case) else 1.0
+
+
+def compute_explanation_error_modes(case: BenchmarkCase, prediction: dict[str, Any]) -> list[str]:
+    predicted_chain = prediction.get("primary_chain", [])
+    modes: list[str] = []
+    if _missing_expected_relay(case, predicted_chain):
+        modes.append("partial_chain_missing_relay")
+    if _has_source_relay_alias(case):
+        modes.append("source_relay_endpoint_ambiguity")
+    if _runtime_noise_event_count(prediction) > 0:
+        modes.append("runtime_noise_nodes_observed")
+    if (
+        case.expected_root_cause == "unsafe_dataflow_design"
+        and _missing_expected_relay(case, predicted_chain)
+        and _has_tool_relay(predicted_chain)
+    ):
+        modes.append("staged_relay_collapsed_to_direct_transfer")
+    return modes
+
+
+def compute_root_cause_accuracy(
+    case: BenchmarkCase,
+    root_cause_detail: str,
+    explanation_error_modes: list[str],
+) -> float | None:
+    if not case.is_malicious:
+        return None
+    if root_cause_detail != case.expected_root_cause:
+        return 0.0
+    if "staged_relay_collapsed_to_direct_transfer" in explanation_error_modes:
+        return 0.95
+    return 1.0
 
 
 def aggregate_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -619,6 +655,54 @@ def _semantic_node_role(node: dict[str, Any]) -> str | None:
     if node_type == "tool_call":
         return None
     return node_type or None
+
+
+def _endpoints_match(case: BenchmarkCase, predicted_chain: list[dict[str, Any]]) -> bool:
+    return bool(
+        _node_set_matches(case.expected_source_nodes, _predicted_source_nodes(predicted_chain))
+        and _node_set_matches(case.expected_sink_nodes, _predicted_sink_nodes(predicted_chain))
+    )
+
+
+def _expected_relay_nodes(case: BenchmarkCase) -> list[dict[str, Any]]:
+    endpoint_signatures = {
+        *(_node_signature(node) for node in case.expected_source_nodes),
+        *(_node_signature(node) for node in case.expected_sink_nodes),
+    }
+    relays: list[dict[str, Any]] = []
+    for node in case.expected_primary_chain[1:-1]:
+        signature = _node_signature(node)
+        if signature not in endpoint_signatures:
+            relays.append(node)
+    return relays
+
+
+def _missing_expected_relay(case: BenchmarkCase, predicted_chain: list[dict[str, Any]]) -> bool:
+    expected_relays = _expected_relay_nodes(case)
+    if not expected_relays:
+        return False
+    predicted_signatures = {_node_signature(node) for node in predicted_chain}
+    return any(_node_signature(node) not in predicted_signatures for node in expected_relays)
+
+
+def _has_tool_relay(predicted_chain: list[dict[str, Any]]) -> bool:
+    return any(node.get("node_type") == "tool_call" for node in predicted_chain[1:-1])
+
+
+def _has_source_relay_alias(case: BenchmarkCase) -> bool:
+    source_signatures = {_node_signature(node) for node in case.expected_source_nodes}
+    if not source_signatures:
+        return False
+    middle_signatures = {_node_signature(node) for node in case.expected_primary_chain[1:-1]}
+    return bool(source_signatures & middle_signatures)
+
+
+def _runtime_noise_event_count(prediction: dict[str, Any]) -> int:
+    evidence = prediction.get("root_cause_evidence", {})
+    telemetry_refs = evidence.get("telemetry_refs", {}) if isinstance(evidence, dict) else {}
+    file_events = telemetry_refs.get("file_events", []) if isinstance(telemetry_refs, dict) else []
+    noise_paths = {"/opt/skill_sandbox", "/workspace/skill", "/etc/hosts"}
+    return sum(1 for event in file_events if event.get("path") in noise_paths)
 
 
 def _is_subsequence(expected: list[str], predicted: list[str]) -> bool:

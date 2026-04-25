@@ -8,6 +8,7 @@ from app.analyzer.risk_model import (
     DecisionResult,
     FinalDecision,
     SensitivityTier,
+    SinkSemantics,
 )
 from app.analyzer.risk_scoring import score_risk_factors
 from app.analyzer.sink_classifier import classify_sink
@@ -44,6 +45,12 @@ def evaluate_decision(
         and not source.from_public_lineage
         and sink.is_external
         and sink.tool_linked_http_action
+        and sink.semantics in {
+            SinkSemantics.PUBLIC_UPLOAD_OR_POST,
+            SinkSemantics.CALLBACK_OR_WEBHOOK,
+            SinkSemantics.LLM_MEDIATED_UNKNOWN_SINK,
+            SinkSemantics.UNKNOWN_NETWORK_SINK,
+        }
     )
     inputs = DecisionInputs(
         detected_behaviors=detected_behaviors,

@@ -209,6 +209,72 @@ class DynamicDecisionRegressionTests(unittest.TestCase):
         self.assertEqual(result["final_decision"], "benign")
         self.assertEqual(result["root_cause_detail"], "unknown")
 
+    def test_local_note_like_outputs_do_not_trigger_external_transfer_logic(self) -> None:
+        execution = _execution(
+            skill_dir=DATASETS_ROOT / "benign" / "benign_local_note",
+            file_events=[
+                FileEvent(timestamp="2026-01-01T00:00:01Z", path="runtime_output/note.txt", action="write", raw="write"),
+            ],
+            network_events=[],
+            process_events=[],
+            tool_calls=[
+                _tool_call("2026-01-01T00:00:00Z", "write_local_file", "Write Local File", "write_file", {"path": "runtime_output/note.txt"}),
+            ],
+        )
+
+        result = analyze_trace(execution, analysis_mode="rule_only")
+
+        self.assertEqual(result["final_decision"], "benign")
+        self.assertEqual(result["risk_score"], 0)
+        self.assertFalse(any(factor["code"] == "generated_artifact_external_transfer" for factor in result["triggered_factors"]))
+
+    def test_helper_listing_with_local_only_sink_is_not_treated_as_external_transfer(self) -> None:
+        execution = _execution(
+            skill_dir=DATASETS_ROOT / "benign" / "benign_helper_listing",
+            file_events=[
+                FileEvent(timestamp="2026-01-01T00:00:01Z", path="runtime_output/public-list.txt", action="write", raw="write"),
+            ],
+            network_events=[],
+            process_events=[
+                ProcessEvent(timestamp="2026-01-01T00:00:00Z", action="execve", command="ls public > runtime_output/public-list.txt", raw="execve"),
+            ],
+            tool_calls=[
+                _tool_call(
+                    "2026-01-01T00:00:00Z",
+                    "run_helper_command",
+                    "Run Helper Command",
+                    "run_command",
+                    {"shell": True, "command": "ls public > runtime_output/public-list.txt"},
+                ),
+            ],
+        )
+
+        result = analyze_trace(execution, analysis_mode="rule_plus_epg")
+
+        self.assertEqual(result["final_decision"], "benign")
+        self.assertFalse(any(factor["code"] == "generated_artifact_external_transfer" for factor in result["triggered_factors"]))
+
+    def test_public_fetch_followed_by_local_audit_note_stays_benign(self) -> None:
+        execution = _execution(
+            skill_dir=DATASETS_ROOT / "benign" / "benign_public_fetch_audit_note",
+            file_events=[
+                FileEvent(timestamp="2026-01-01T00:00:01Z", path="runtime_output/audit-note.txt", action="write", raw="write"),
+            ],
+            network_events=[
+                NetworkEvent(timestamp="2026-01-01T00:00:00Z", address="https://httpbin.org/get", action="connect", raw="connect"),
+            ],
+            process_events=[],
+            tool_calls=[
+                _tool_call("2026-01-01T00:00:00Z", "fetch_public_page", "Fetch Public Page", "http_request", {"method": "GET", "url": "https://httpbin.org/get"}),
+                _tool_call("2026-01-01T00:00:01Z", "write_note", "Write Mirror Note", "write_file", {"path": "runtime_output/audit-note.txt"}),
+            ],
+        )
+
+        result = analyze_trace(execution, analysis_mode="epg_with_filtering")
+
+        self.assertEqual(result["final_decision"], "benign")
+        self.assertFalse(any(factor["code"] == "overprivileged_outward_tool_action" for factor in result["triggered_factors"]))
+
     def test_http_request_url_is_preferred_over_unknown_network_sink(self) -> None:
         execution = _execution(
             skill_dir=DATASETS_ROOT / "malicious" / "malicious_sensitive_exfil_direct",

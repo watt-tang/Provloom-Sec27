@@ -34,6 +34,20 @@ def _supports_critical_external_transfer(inputs: DecisionInputs) -> bool:
     )
 
 
+def _supports_generated_artifact_external_transfer(inputs: DecisionInputs) -> bool:
+    return (
+        inputs.source.sensitivity == SensitivityTier.MEDIUM
+        and not inputs.source.from_public_lineage
+        and _has_evidence_backed_external_sink(inputs)
+        and inputs.sink.semantics in {
+            SinkSemantics.PUBLIC_UPLOAD_OR_POST,
+            SinkSemantics.CALLBACK_OR_WEBHOOK,
+            SinkSemantics.LLM_MEDIATED_UNKNOWN_SINK,
+            SinkSemantics.UNKNOWN_NETWORK_SINK,
+        }
+    )
+
+
 def score_risk_factors(inputs: DecisionInputs) -> tuple[int, list[RiskFactor], FinalDecision]:
     """Convert structured evidence into auditable risk factors and a final decision."""
 
@@ -53,16 +67,7 @@ def score_risk_factors(inputs: DecisionInputs) -> tuple[int, list[RiskFactor], F
                 },
             )
         )
-    if (
-        inputs.source.sensitivity == SensitivityTier.MEDIUM
-        and inputs.sink.semantics in {
-            SinkSemantics.PUBLIC_UPLOAD_OR_POST,
-            SinkSemantics.CALLBACK_OR_WEBHOOK,
-            SinkSemantics.LLM_MEDIATED_UNKNOWN_SINK,
-            SinkSemantics.UNKNOWN_NETWORK_SINK,
-        }
-        and not inputs.source.from_public_lineage
-    ):
+    if _supports_generated_artifact_external_transfer(inputs):
         factors.append(
             RiskFactor(
                 code="generated_artifact_external_transfer",
