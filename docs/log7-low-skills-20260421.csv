@@ -1,9 +1,0 @@
-name,skill_id,skill_root,risk_level,risk_level_name,risk_score,severity_label,evidence_strength,root_cause,root_cause_detail
-apiosk-gateway,mnt_e_dangerous_skills_apiosk-skill,/mnt/e/dangerous_skills/apiosk-skill,low,低风险,0,weakly_suspicious,partial,llm_decision,llm_decision_induced_action
-capability-evolver,mnt_e_dangerous_skills_capability-evolver,/mnt/e/dangerous_skills/capability-evolver,low,低风险,0,weakly_suspicious,partial,llm_decision,llm_decision_induced_action
-chinese-lottery-predict,mnt_e_dangerous_skills_chinese-lottery-predict-skills,/mnt/e/dangerous_skills/chinese-lottery-predict-skills,low,低风险,0,weakly_suspicious,partial,llm_decision,llm_decision_induced_action
-eigen-avs,mnt_e_dangerous_skills_eigen-skills_skills_eigen-avs,/mnt/e/dangerous_skills/eigen-skills/skills/eigen-avs,low,低风险,0,weakly_suspicious,partial,llm_decision,llm_decision_induced_action
-eigen-da,mnt_e_dangerous_skills_eigen-skills_skills_eigen-da,/mnt/e/dangerous_skills/eigen-skills/skills/eigen-da,low,低风险,0,weakly_suspicious,partial,llm_decision,llm_decision_induced_action
-eigen-delegation,mnt_e_dangerous_skills_eigen-skills_skills_eigen-delegation,/mnt/e/dangerous_skills/eigen-skills/skills/eigen-delegation,low,低风险,0,substantial_risk,partial,llm_decision,llm_decision_induced_action
-moltbook,mnt_e_dangerous_skills_moltbook-skill,/mnt/e/dangerous_skills/moltbook-skill,low,低风险,0,weakly_suspicious,partial,llm_decision,llm_decision_induced_action
-zynna-video-agent,mnt_e_dangerous_skills_zynna-skills_skills_zynna-video-agent,/mnt/e/dangerous_skills/zynna-skills/skills/zynna-video-agent,low,低风险,0,weakly_suspicious,partial,llm_decision,llm_decision_induced_action

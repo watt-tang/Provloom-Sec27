@@ -1,0 +1,6 @@
+% log7 completed-subset audit text
+The supporting real-world rerun in \texttt{/mnt/e/log7} contains 617 scheduled Skills, 465 completed executions, and 152 skipped executions. We treat the completed executions as the sampling boundary for a lightweight manual audit package rather than as a fully labeled benchmark.
+
+This rerun should not be read as a population-level accuracy benchmark. It is a candidate-risk corpus with an explicit execution-availability boundary: completed executions are the cases that could be exercised under the current sandbox, trigger, adapter, and credential setup, and they do not carry gold labels by default.
+
+We therefore generate a stratified human-review sheet over 96 completed cases spanning chain-backed critical findings, partial-evidence medium findings, note-like or local-output suspected benign-FP clusters, upload-like or mirror-like outward workflows, LLM-decision-heavy cases, and representative low-risk cases. At the time of this revision, 76 sampled cases have been reviewed and 20 remain pending. Among the reviewed subset, 40 cases are human-reviewed benign and 36 are human-reviewed ambiguous, with no confirmed malicious evidence. The audit should therefore be read as a calibration and error-analysis layer over the completed subset, not as a real-world precision/recall benchmark.

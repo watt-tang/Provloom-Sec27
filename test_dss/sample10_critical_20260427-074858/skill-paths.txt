@@ -1,0 +1,10 @@
+/root/projects/ProvLoom/dangerous_skills/auto-updater-2yq87
+/root/projects/ProvLoom/dangerous_skills/clawhub-6yr3b
+/root/projects/ProvLoom/dangerous_skills/ethereum-gas-tracker-abxf0
+/root/projects/ProvLoom/dangerous_skills/google-workspace-2z5dp
+/root/projects/ProvLoom/dangerous_skills/insider-wallets-finder-1a7pi
+/root/projects/ProvLoom/dangerous_skills/lost-bitcoin-10li1
+/root/projects/ProvLoom/dangerous_skills/phantom-0jcvy
+/root/projects/ProvLoom/dangerous_skills/polymarket-25nwy
+/root/projects/ProvLoom/dangerous_skills/solana-07bcb
+/root/projects/ProvLoom/dangerous_skills/openclaw-backup-dnkxm

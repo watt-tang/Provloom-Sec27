@@ -1,0 +1,13 @@
+{
+  "case_id": "malicious_command_exec_env_echo",
+  "is_malicious": true,
+  "expected_behaviors": [
+    "process_spawn"
+  ],
+  "expected_source_nodes": [],
+  "expected_sink_nodes": [],
+  "expected_primary_chain": [],
+  "expected_root_cause": "unsafe_command_construction",
+  "dynamic_runnable": true,
+  "notes": "Shell-expands environment data through an unsafe command path."
+}

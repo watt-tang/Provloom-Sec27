@@ -1,0 +1,31 @@
+{
+  "scan_id": "scan_20260517_142226",
+  "timestamp": "2026-05-17T14:22:26.719172Z",
+  "skill_path": "/root/projects/ProvLoom/benchmark_v2/datasets/skills/benign/v2_policy_benign_note_approved",
+  "skill_name": "v2_policy_benign_note_approved",
+  "risk_score": 0.24999999999999994,
+  "risk_level": "SAFE",
+  "total_files": 2,
+  "summary": {
+    "CRITICAL": 1,
+    "HIGH": 0,
+    "WARNING": 0,
+    "INFO": 0
+  },
+  "issues": [
+    {
+      "rule_id": "NET001",
+      "severity": "CRITICAL",
+      "file": "/root/projects/ProvLoom/benchmark_v2/datasets/skills/benign/v2_policy_benign_note_approved/SKILL.md",
+      "line": 37,
+      "pattern": "\"url\": \"https://httpbin.org/post?approved=1\",",
+      "description": "Detects external URLs or network request commands in skill files.",
+      "confidence": 0.49999999999999994
+    }
+  ],
+  "total_issues": 1,
+  "recommendation": "SAFE",
+  "status": "success",
+  "case_id": "v2_policy_benign_note_approved",
+  "duration_seconds": 0.002918
+}

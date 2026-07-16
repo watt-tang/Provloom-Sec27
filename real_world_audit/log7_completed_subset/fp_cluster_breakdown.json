@@ -1,0 +1,62 @@
+[
+  {
+    "cluster_tag": "chain_backed",
+    "risk_level": "critical",
+    "primary_chain_nonempty": true,
+    "count": 1
+  },
+  {
+    "cluster_tag": "helper_listing",
+    "risk_level": "medium",
+    "primary_chain_nonempty": false,
+    "count": 8
+  },
+  {
+    "cluster_tag": "llm_decision_heavy",
+    "risk_level": "critical",
+    "primary_chain_nonempty": true,
+    "count": 155
+  },
+  {
+    "cluster_tag": "llm_decision_heavy",
+    "risk_level": "high",
+    "primary_chain_nonempty": true,
+    "count": 2
+  },
+  {
+    "cluster_tag": "llm_decision_heavy",
+    "risk_level": "low",
+    "primary_chain_nonempty": false,
+    "count": 8
+  },
+  {
+    "cluster_tag": "llm_decision_heavy",
+    "risk_level": "medium",
+    "primary_chain_nonempty": false,
+    "count": 260
+  },
+  {
+    "cluster_tag": "note_like_local_output",
+    "risk_level": "critical",
+    "primary_chain_nonempty": true,
+    "count": 10
+  },
+  {
+    "cluster_tag": "note_like_local_output",
+    "risk_level": "medium",
+    "primary_chain_nonempty": false,
+    "count": 16
+  },
+  {
+    "cluster_tag": "upload_or_mirror_outward",
+    "risk_level": "critical",
+    "primary_chain_nonempty": true,
+    "count": 1
+  },
+  {
+    "cluster_tag": "upload_or_mirror_outward",
+    "risk_level": "medium",
+    "primary_chain_nonempty": false,
+    "count": 4
+  }
+]

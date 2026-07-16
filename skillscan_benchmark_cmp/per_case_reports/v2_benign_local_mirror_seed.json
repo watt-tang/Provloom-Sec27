@@ -1,0 +1,21 @@
+{
+  "scan_id": "scan_20260517_142226",
+  "timestamp": "2026-05-17T14:22:26.670515Z",
+  "skill_path": "/root/projects/ProvLoom/benchmark_v2/datasets/skills/benign/v2_benign_local_mirror_seed",
+  "skill_name": "v2_benign_local_mirror_seed",
+  "risk_score": 0.0,
+  "risk_level": "SAFE",
+  "total_files": 1,
+  "summary": {
+    "CRITICAL": 0,
+    "HIGH": 0,
+    "WARNING": 0,
+    "INFO": 0
+  },
+  "issues": [],
+  "total_issues": 0,
+  "recommendation": "SAFE",
+  "status": "success",
+  "case_id": "v2_benign_local_mirror_seed",
+  "duration_seconds": 0.001367
+}

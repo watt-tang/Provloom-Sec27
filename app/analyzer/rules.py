@@ -6,6 +6,7 @@ from pathlib import Path
 from app.analyzer.attack_chain import extract_primary_attack_chain
 from app.analyzer.capability_inference import infer_capability_profile
 from app.analyzer.dual_axis_decision import infer_dual_axis_decision
+from app.analyzer.instruction_chain import apply_instruction_chain_decision
 from app.analyzer.root_cause_v2 import infer_root_cause_v2
 from app.analyzer.decision_engine import evaluate_decision
 from app.analyzer.endpoint_semantics import endpoint_semantics, infer_endpoint_kind
@@ -75,6 +76,9 @@ def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_e
     detected: set[str] = set()
 
     if interesting_network:
+        detected.add("network_access")
+
+    if _has_external_http_tool_call(execution.tool_calls):
         detected.add("network_access")
 
     if any(event.command in {"/bin/sh", "/usr/bin/sh", "/bin/bash", "/usr/bin/bash"} for event in interesting_processes):
@@ -221,6 +225,12 @@ def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_e
         llm_involved=bool(execution.llm_events),
         analysis_mode=analysis_mode,
     )
+    apply_instruction_chain_decision(
+        result,
+        execution.skill_path,
+        execution.skill_file,
+        dynamic_chain_observed=bool(result.get("primary_chain")),
+    )
     return result
 
 
@@ -331,7 +341,7 @@ def analyze_static_skill(skill_definition, analysis_mode: str = "static_only") -
         analysis_mode=analysis_mode,
     )
 
-    return {
+    result = {
         "risk_score": score,
         "detected_behaviors": sorted(detected),
         "analysis_mode": analysis_mode,
@@ -391,6 +401,13 @@ def analyze_static_skill(skill_definition, analysis_mode: str = "static_only") -
             },
         },
     }
+    apply_instruction_chain_decision(
+        result,
+        skill_definition.skill_root,
+        skill_definition.skill_file,
+        dynamic_chain_observed=False,
+    )
+    return result
 
 
 def _is_sensitive_path(path: str) -> bool:
@@ -484,6 +501,8 @@ def _interesting_network_events(events):
     filtered = []
     seen: set[tuple[str, str]] = set()
     for event in events:
+        if _is_llm_provider_relay_event(event):
+            continue
         label = _network_event_label(event)
         if label == NETWORK_UNKNOWN:
             continue
@@ -493,6 +512,26 @@ def _interesting_network_events(events):
         seen.add(key)
         filtered.append(event)
     return filtered
+
+
+def _has_external_http_tool_call(tool_calls) -> bool:
+    for event in tool_calls:
+        if getattr(event, "event", "") != "start" or getattr(event, "tool_type", "") != "http_request":
+            continue
+        config = getattr(event, "metadata", {}).get("config", {})
+        url = str(config.get("url", "")).strip().lower()
+        if url.startswith(("http://", "https://")) and "localhost" not in url and "127.0.0.1" not in url:
+            return True
+    return False
+
+
+def _is_llm_provider_relay_event(event) -> bool:
+    return (
+        getattr(event, "is_llm_provider", False) is True
+        or getattr(event, "endpoint_role", "") == "relay"
+        or getattr(event, "endpoint_kind", "") == "model_api"
+        or getattr(event, "endpoint_source", "") == "llm_base_url"
+    )
 
 
 def _interesting_process_events(events):

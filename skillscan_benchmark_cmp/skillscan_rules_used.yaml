@@ -1,0 +1,107 @@
+network:
+  - id: NET001
+    name: External network request
+    severity: CRITICAL
+    description: Detects external URLs or network request commands in skill files.
+    patterns:
+      - 'https?://[^\s\)\]>"'']+'
+      - '\b(curl|wget)\b\s+[^\n]*https?://'
+      - '\brequests\.(get|post|put|delete|patch)\s*\('
+      - '\bfetch\s*\(\s*["'']https?://'
+    allowed_domains:
+      - docs.anthropic.com
+      - github.com
+      - pypi.org
+      - npmjs.com
+      - nodejs.org
+      - python.org
+      - localhost
+      - 127.0.0.1
+
+file_access:
+  - id: FILE001
+    name: Sensitive file access
+    severity: CRITICAL
+    description: Detects references to sensitive local files, credentials, keys, tokens, or secrets.
+    patterns:
+      - '(~|/home/[^/]+|/root)/\.ssh'
+      - '\bid_rsa\b|\bid_ed25519\b|private[_ -]?key'
+      - '(^|[/\s])\.env(\b|$)'
+      - '(cat|open|read|source|grep|cp|scp)\s+[^#\n]*(\.env|\.ssh|id_rsa|id_ed25519|credential|secret|password)'
+      - '(api[_-]?key|secret|credential|password)\s*[:=]'
+      - 'AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|GITHUB_TOKEN|NPM_TOKEN|PYPI_TOKEN'
+
+file_ops:
+  - id: FILE002
+    name: Dangerous file operation
+    severity: CRITICAL
+    description: Detects destructive file operations or broad permission changes.
+    patterns:
+      - 'rm\s+-rf\s+/'
+      - 'chmod\s+(777|a\+rwx)'
+      - '>\s+/(etc|usr|bin|sbin)/'
+
+commands:
+  - id: CMD001
+    name: Dangerous command execution
+    severity: CRITICAL
+    description: Detects dangerous shell commands such as sudo, rm -rf /, dd writes, or /dev/tcp redirection.
+    patterns:
+      - '\bsudo\b'
+      - 'rm\s+-rf\s+/'
+      - '>\s*/dev/(tcp|udp|null)'
+      - '\bdd\s+.*of=/'
+  - id: CMD002
+    name: System command invocation
+    severity: WARNING
+    description: Detects dynamic system command execution from code.
+    patterns:
+      - '\bos\.system\s*\('
+      - 'subprocess\.(call|run|Popen).*shell\s*=\s*True'
+      - '\bexec\s*\('
+
+injection:
+  - id: INJ001
+    name: Code injection pattern
+    severity: CRITICAL
+    description: Detects dynamic code execution or file injection patterns.
+    patterns:
+      - '\beval\s*\('
+      - '\bexec\s*\('
+      - '__import__\s*\('
+      - '\bcompile\s*\('
+      - '(inject|insert|prepend).*into.*file'
+  - id: INJ002
+    name: Dynamic code execution
+    severity: WARNING
+    description: Detects eval, exec, dynamic import, compile, or similar dynamic execution constructs.
+    patterns:
+      - '\beval\s*\('
+      - '\bexec\s*\('
+      - '__import__\s*\('
+      - '\bcompile\s*\('
+  - id: INJ003
+    name: Backdoor or reverse shell pattern
+    severity: CRITICAL
+    description: Detects reverse shell, netcat execution, or conditionally triggered shell behavior.
+    patterns:
+      - 'bash\s+-i\s+>&\s*/dev/tcp/'
+      - '(nc|netcat)\s+-.*-e\s+/'
+      - '(if|when).*PROD.*then.*(system|exec|eval|shell)'
+
+dependencies:
+  - id: DEP001
+    name: Global package installation
+    severity: WARNING
+    description: Detects package installation into global environments.
+    patterns:
+      - 'pip\s+install.*--global'
+      - 'npm\s+(install|i).*\s-g'
+      - 'yarn\s+global'
+  - id: DEP002
+    name: Forceful dependency overwrite
+    severity: WARNING
+    description: Detects force reinstall, upgrade, or version conflict patterns.
+    patterns:
+      - 'install.*==.*force'
+      - 'pip\s+install.*(--upgrade|--force-reinstall)'

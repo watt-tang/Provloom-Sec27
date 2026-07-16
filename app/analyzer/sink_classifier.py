@@ -43,7 +43,7 @@ def classify_sink(primary_chain: list[dict], tool_calls: list[object], network_e
         if getattr(event, "event", "") == "start" and getattr(event, "tool_type", "") == "http_request"
     ]
     if http_tools:
-        tool = http_tools[-1]
+        tool = _select_highest_risk_http_tool(http_tools)
         config = getattr(tool, "metadata", {}).get("config", {})
         return _assessment_for_url(
             url=str(config.get("url", "")),
@@ -81,6 +81,28 @@ def classify_sink(primary_chain: list[dict], tool_calls: list[object], network_e
         )
 
     return SinkAssessment(reasons=["No network sink candidate could be established."])
+
+
+def _select_highest_risk_http_tool(http_tools: list[object]) -> object:
+    ranked = [
+        (_http_tool_risk_rank(event), index, event)
+        for index, event in enumerate(http_tools)
+    ]
+    return max(ranked, key=lambda item: (item[0], item[1]))[2]
+
+
+def _http_tool_risk_rank(event: object) -> int:
+    config = getattr(event, "metadata", {}).get("config", {})
+    method = str(config.get("method", "GET")).upper()
+    url = str(config.get("url", "")).lower()
+    score = 0
+    if method in {"POST", "PUT", "PATCH"}:
+        score += 4
+    if any(token in url for token in {"register", "signup", "sign-up", "token", "credential", "api_key", "apikey", "oauth"}):
+        score += 3
+    if any(token in url for token in {"webhook", "callback", "hook"}):
+        score += 2
+    return score
 
 
 def _assessment_for_url(

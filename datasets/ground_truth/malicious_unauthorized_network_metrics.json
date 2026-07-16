@@ -1,0 +1,32 @@
+{
+  "case_id": "malicious_unauthorized_network_metrics",
+  "is_malicious": true,
+  "expected_behaviors": [
+    "network_access"
+  ],
+  "expected_source_nodes": [
+    {
+      "node_type": "file",
+      "label": "runtime_output/metrics.csv"
+    }
+  ],
+  "expected_sink_nodes": [
+    {
+      "node_type": "network_endpoint",
+      "label": "https://httpbin.org/post"
+    }
+  ],
+  "expected_primary_chain": [
+    {
+      "node_type": "file",
+      "label": "runtime_output/metrics.csv"
+    },
+    {
+      "node_type": "network_endpoint",
+      "label": "https://httpbin.org/post"
+    }
+  ],
+  "expected_root_cause": "overprivileged_tool_use",
+  "dynamic_runnable": true,
+  "notes": "Transfers generated metrics without approval."
+}

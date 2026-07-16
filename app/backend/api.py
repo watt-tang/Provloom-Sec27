@@ -158,6 +158,15 @@ def _handle_analyze_skill(environ, start_response):
             severity_label=report.get("severity_label", ""),
             evidence_strength=report.get("evidence_strength", ""),
             decision_rationale=report.get("decision_rationale", {}),
+            dynamic_chain_observed=report.get("dynamic_chain_observed", False),
+            instruction_chain_recovered=report.get("instruction_chain_recovered", False),
+            chain_evidence_type=report.get("chain_evidence_type", "none"),
+            instruction_chain=report.get("instruction_chain", []),
+            instruction_indicators=report.get("instruction_indicators", []),
+            static_supply_chain_risk=report.get("static_supply_chain_risk", {}),
+            instruction_document_scan=report.get("instruction_document_scan", {}),
+            final_risk_level=report.get("final_risk_level", ""),
+            final_label_reason=report.get("final_label_reason", ""),
         )
         task_store.complete(execution_id, response.to_dict())
         log_writer.write(
@@ -318,6 +327,15 @@ def _build_static_response(
         severity_label=report.get("severity_label", ""),
         evidence_strength=report.get("evidence_strength", ""),
         decision_rationale=report.get("decision_rationale", {}),
+        dynamic_chain_observed=report.get("dynamic_chain_observed", False),
+        instruction_chain_recovered=report.get("instruction_chain_recovered", False),
+        chain_evidence_type=report.get("chain_evidence_type", "none"),
+        instruction_chain=report.get("instruction_chain", []),
+        instruction_indicators=report.get("instruction_indicators", []),
+        static_supply_chain_risk=report.get("static_supply_chain_risk", {}),
+        instruction_document_scan=report.get("instruction_document_scan", {}),
+        final_risk_level=report.get("final_risk_level", ""),
+        final_label_reason=report.get("final_label_reason", ""),
     )
 
 

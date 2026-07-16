@@ -7,7 +7,7 @@ from typing import Any
 DEFAULT_LLM_PROVIDER = "siliconflow"
 DEFAULT_LLM_BASE_URL = "https://api.siliconflow.cn/v1"
 DEFAULT_LLM_API_KEY = "sk-iwrboivuqupzahrjrpmurlzwwafdretlqmdmttxcxxqdpvqt"
-DEFAULT_LLM_MODEL = "deepseek-ai/DeepSeek-V3-Chat"
+DEFAULT_LLM_MODEL = "deepseek-ai/DeepSeek-V3"
 LEGACY_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 LEGACY_DEEPSEEK_MODEL = "deepseek-chat"
 
@@ -197,6 +197,15 @@ class AnalyzeSkillResponse:
     severity_label: str = ""
     evidence_strength: str = ""
     decision_rationale: dict[str, Any] = field(default_factory=dict)
+    dynamic_chain_observed: bool = False
+    instruction_chain_recovered: bool = False
+    chain_evidence_type: str = "none"
+    instruction_chain: list[dict[str, Any]] = field(default_factory=list)
+    instruction_indicators: list[dict[str, Any]] = field(default_factory=list)
+    static_supply_chain_risk: dict[str, Any] = field(default_factory=dict)
+    instruction_document_scan: dict[str, Any] = field(default_factory=dict)
+    final_risk_level: str = ""
+    final_label_reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

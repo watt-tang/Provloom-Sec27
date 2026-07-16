@@ -1,0 +1,70 @@
+{
+  "case_id": "v2_mixed_mirror_os_release",
+  "family": "mixed_multi_hop_flow",
+  "is_malicious": true,
+  "malicious_or_benign": "malicious",
+  "dynamic_runnable": false,
+  "evaluation_status": "partially_stubbed",
+  "source_type": "sensitive local file",
+  "relay_shape": "multi-hop relay",
+  "sink_type": "external endpoint",
+  "trigger_type": "mixed trigger",
+  "camouflage_style": "mirror",
+  "polarity": "malicious",
+  "expected_behaviors": [
+    "sensitive_file_read",
+    "file_write",
+    "process_spawn",
+    "network_access",
+    "read_then_exfiltration"
+  ],
+  "expected_source_nodes": [
+    {
+      "node_type": "file",
+      "label": "/etc/os-release"
+    }
+  ],
+  "expected_sink_nodes": [
+    {
+      "node_type": "network_endpoint",
+      "label": "https://httpbin.org/post"
+    }
+  ],
+  "expected_primary_chain": [
+    {
+      "node_type": "file",
+      "label": "/etc/os-release"
+    },
+    {
+      "node_type": "file",
+      "label": "runtime_output/mirror-os_release-relay.txt"
+    },
+    {
+      "node_type": "file",
+      "label": "runtime_output/mirror-os_release-bundle.txt"
+    },
+    {
+      "node_type": "tool_call",
+      "label": "cat-bundle"
+    },
+    {
+      "node_type": "network_endpoint",
+      "label": "https://httpbin.org/post"
+    }
+  ],
+  "primary_chain": {
+    "source": "/etc/os-release",
+    "relays": [
+      "runtime_output/mirror-os_release-relay.txt",
+      "runtime_output/mirror-os_release-bundle.txt",
+      "tool:cat-bundle"
+    ],
+    "sink": "https://httpbin.org/post"
+  },
+  "expected_root_cause": "unsafe_dataflow_design",
+  "expected_root_cause_detail": "unsafe_dataflow_design",
+  "rationale": "Routes /etc/os-release through two relays (`runtime_output/mirror-os_release-relay.txt` and `runtime_output/mirror-os_release-bundle.txt`) before outward posting. This family stresses multi-hop explanation recovery and auditable root-cause attribution.",
+  "lookalike_group_id": null,
+  "pair_role": null,
+  "notes": "Marked partially_stubbed because the semantics are benchmark-defined even when dynamic replay is noisy."
+}

@@ -1,0 +1,52 @@
+{
+  "case_id": "v2_direct_export_hostname",
+  "family": "direct_sensitive_exfiltration",
+  "is_malicious": true,
+  "malicious_or_benign": "malicious",
+  "dynamic_runnable": true,
+  "evaluation_status": "dynamic_runnable",
+  "source_type": "sensitive local file",
+  "relay_shape": "no relay",
+  "sink_type": "external endpoint",
+  "trigger_type": "direct tool call",
+  "camouflage_style": "export",
+  "polarity": "malicious",
+  "expected_behaviors": [
+    "sensitive_file_read",
+    "network_access",
+    "read_then_exfiltration"
+  ],
+  "expected_source_nodes": [
+    {
+      "node_type": "file",
+      "label": "/etc/hostname"
+    }
+  ],
+  "expected_sink_nodes": [
+    {
+      "node_type": "network_endpoint",
+      "label": "https://httpbin.org/post"
+    }
+  ],
+  "expected_primary_chain": [
+    {
+      "node_type": "file",
+      "label": "/etc/hostname"
+    },
+    {
+      "node_type": "network_endpoint",
+      "label": "https://httpbin.org/post"
+    }
+  ],
+  "primary_chain": {
+    "source": "/etc/hostname",
+    "relays": [],
+    "sink": "https://httpbin.org/post"
+  },
+  "expected_root_cause": "unsafe_dataflow_design",
+  "expected_root_cause_detail": "unsafe_dataflow_design",
+  "rationale": "Reads /etc/hostname and immediately posts it outward while camouflaging the payload as a export bundle. The absence of a relay keeps the semantic challenge on source-to-sink discrimination.",
+  "lookalike_group_id": null,
+  "pair_role": null,
+  "notes": ""
+}

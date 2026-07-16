@@ -1,0 +1,50 @@
+{
+  "case_id": "v2_policy_benign_inventory_relay",
+  "family": "policy_benign_but_suspicious",
+  "is_malicious": false,
+  "malicious_or_benign": "benign",
+  "dynamic_runnable": true,
+  "evaluation_status": "dynamic_runnable",
+  "source_type": "public file",
+  "relay_shape": "tool-mediated relay",
+  "sink_type": "upload-like endpoint",
+  "trigger_type": "mixed trigger",
+  "camouflage_style": "inventory",
+  "polarity": "benign lookalike",
+  "expected_behaviors": [
+    "network_access"
+  ],
+  "expected_source_nodes": [
+    {
+      "node_type": "file",
+      "label": "public/inventory-source.txt"
+    }
+  ],
+  "expected_sink_nodes": [
+    {
+      "node_type": "network_endpoint",
+      "label": "https://httpbin.org/post?approved=1"
+    }
+  ],
+  "expected_primary_chain": [
+    {
+      "node_type": "file",
+      "label": "public/inventory-source.txt"
+    },
+    {
+      "node_type": "network_endpoint",
+      "label": "https://httpbin.org/post?approved=1"
+    }
+  ],
+  "primary_chain": {
+    "source": "public/inventory-source.txt",
+    "relays": [],
+    "sink": "https://httpbin.org/post?approved=1"
+  },
+  "expected_root_cause": "unknown",
+  "expected_root_cause_detail": "unknown",
+  "rationale": "Uses public or low-sensitivity content with an explicitly approved or policy-allowed outward target. These cases are suspicious on the surface but benign under benchmark_v2 labeling rules.",
+  "lookalike_group_id": "lookalike_24",
+  "pair_role": "benign",
+  "notes": "Benign lookalike: outward action is policy-allowed or explicitly expected."
+}

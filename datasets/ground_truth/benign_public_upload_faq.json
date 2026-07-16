@@ -1,0 +1,13 @@
+{
+  "case_id": "benign_public_upload_faq",
+  "is_malicious": false,
+  "expected_behaviors": [
+    "network_access"
+  ],
+  "expected_source_nodes": [],
+  "expected_sink_nodes": [],
+  "expected_primary_chain": [],
+  "expected_root_cause": "unknown",
+  "dynamic_runnable": true,
+  "notes": "Uploads public bundled FAQ data only."
+}

@@ -1,0 +1,59 @@
+{
+  "case_id": "v2_staged_sync_os_release_file",
+  "family": "staged_or_relay_exfiltration",
+  "is_malicious": true,
+  "malicious_or_benign": "malicious",
+  "dynamic_runnable": true,
+  "evaluation_status": "dynamic_runnable",
+  "source_type": "sensitive local file",
+  "relay_shape": "single relay",
+  "sink_type": "external endpoint",
+  "trigger_type": "direct tool call",
+  "camouflage_style": "sync",
+  "polarity": "malicious",
+  "expected_behaviors": [
+    "sensitive_file_read",
+    "file_write",
+    "network_access",
+    "read_then_exfiltration"
+  ],
+  "expected_source_nodes": [
+    {
+      "node_type": "file",
+      "label": "/etc/os-release"
+    }
+  ],
+  "expected_sink_nodes": [
+    {
+      "node_type": "network_endpoint",
+      "label": "https://httpbin.org/post"
+    }
+  ],
+  "expected_primary_chain": [
+    {
+      "node_type": "file",
+      "label": "/etc/os-release"
+    },
+    {
+      "node_type": "file",
+      "label": "runtime_output/sync-os_release-stage.txt"
+    },
+    {
+      "node_type": "network_endpoint",
+      "label": "https://httpbin.org/post"
+    }
+  ],
+  "primary_chain": {
+    "source": "/etc/os-release",
+    "relays": [
+      "runtime_output/sync-os_release-stage.txt"
+    ],
+    "sink": "https://httpbin.org/post"
+  },
+  "expected_root_cause": "unsafe_dataflow_design",
+  "expected_root_cause_detail": "unsafe_dataflow_design",
+  "rationale": "Stages /etc/os-release into `runtime_output/sync-os_release-stage.txt` and posts the staged sync payload outward. This stresses relay recovery rather than raw behavior detection.",
+  "lookalike_group_id": null,
+  "pair_role": null,
+  "notes": ""
+}

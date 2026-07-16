@@ -1,0 +1,11 @@
+cluster_tag,risk_level,primary_chain_nonempty,count
+chain_backed,critical,True,1
+helper_listing,medium,False,8
+llm_decision_heavy,critical,True,155
+llm_decision_heavy,high,True,2
+llm_decision_heavy,low,False,8
+llm_decision_heavy,medium,False,260
+note_like_local_output,critical,True,10
+note_like_local_output,medium,False,16
+upload_or_mirror_outward,critical,True,1
+upload_or_mirror_outward,medium,False,4

@@ -48,6 +48,28 @@ def _supports_generated_artifact_external_transfer(inputs: DecisionInputs) -> bo
     )
 
 
+def _supports_external_account_or_credential_registration(inputs: DecisionInputs) -> bool:
+    if not inputs.llm_involved or not inputs.sink.is_external:
+        return False
+    if inputs.sink.semantics != SinkSemantics.PUBLIC_UPLOAD_OR_POST:
+        return False
+    label = str(inputs.sink.label or inputs.sink.sink_url or inputs.sink.sink_display_label).lower()
+    return any(
+        token in label
+        for token in {
+            "register",
+            "signup",
+            "sign-up",
+            "credential",
+            "credentials",
+            "api_key",
+            "apikey",
+            "token",
+            "oauth",
+        }
+    )
+
+
 def score_risk_factors(inputs: DecisionInputs) -> tuple[int, list[RiskFactor], FinalDecision]:
     """Convert structured evidence into auditable risk factors and a final decision."""
 
@@ -92,6 +114,18 @@ def score_risk_factors(inputs: DecisionInputs) -> tuple[int, list[RiskFactor], F
                 score_delta=70,
                 rationale="Command evidence indicates templated or shell-abusive command construction.",
                 evidence={"reasons": inputs.risky_command_reasons, "commands": inputs.command_evidence},
+            )
+        )
+    if _supports_external_account_or_credential_registration(inputs):
+        factors.append(
+            RiskFactor(
+                code="llm_directed_external_account_registration",
+                score_delta=80,
+                rationale=(
+                    "LLM-directed execution attempted to create or register an external account, token, "
+                    "or credential-bearing resource through an outward POST request."
+                ),
+                evidence={"sink": inputs.sink.to_dict(), "llm_evidence": inputs.llm_evidence},
             )
         )
     if inputs.llm_involved and (inputs.outward_network or inputs.risky_command):

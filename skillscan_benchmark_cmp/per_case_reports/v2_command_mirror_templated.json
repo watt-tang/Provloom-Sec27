@@ -1,0 +1,21 @@
+{
+  "scan_id": "scan_20260517_142226",
+  "timestamp": "2026-05-17T14:22:26.585414Z",
+  "skill_path": "/root/projects/ProvLoom/benchmark_v2/datasets/skills/malicious/v2_command_mirror_templated",
+  "skill_name": "v2_command_mirror_templated",
+  "risk_score": 0.0,
+  "risk_level": "SAFE",
+  "total_files": 1,
+  "summary": {
+    "CRITICAL": 0,
+    "HIGH": 0,
+    "WARNING": 0,
+    "INFO": 0
+  },
+  "issues": [],
+  "total_issues": 0,
+  "recommendation": "SAFE",
+  "status": "success",
+  "case_id": "v2_command_mirror_templated",
+  "duration_seconds": 0.001346
+}

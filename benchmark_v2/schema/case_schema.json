@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProvLoom benchmark_v2 case schema",
+  "type": "object",
+  "required": [
+    "case_id",
+    "family",
+    "malicious_or_benign",
+    "dynamic_runnable",
+    "evaluation_status",
+    "source_type",
+    "relay_shape",
+    "sink_type",
+    "trigger_type",
+    "camouflage_style",
+    "polarity",
+    "expected_behaviors",
+    "primary_chain",
+    "expected_root_cause",
+    "rationale"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "family": {
+      "type": "string"
+    },
+    "is_malicious": {
+      "type": "boolean"
+    },
+    "malicious_or_benign": {
+      "enum": [
+        "malicious",
+        "benign"
+      ]
+    },
+    "dynamic_runnable": {
+      "type": "boolean"
+    },
+    "evaluation_status": {
+      "enum": [
+        "dynamic_runnable",
+        "static_evaluable",
+        "partially_stubbed"
+      ]
+    },
+    "source_type": {
+      "enum": [
+        "sensitive local file",
+        "generated artifact",
+        "public file",
+        "low-sensitivity file"
+      ]
+    },
+    "relay_shape": {
+      "enum": [
+        "no relay",
+        "single relay",
+        "multi-hop relay",
+        "tool-mediated relay"
+      ]
+    },
+    "sink_type": {
+      "enum": [
+        "external endpoint",
+        "approved endpoint",
+        "local-only",
+        "upload-like endpoint"
+      ]
+    },
+    "trigger_type": {
+      "enum": [
+        "direct tool call",
+        "command construction",
+        "LLM-mediated choice",
+        "mixed trigger"
+      ]
+    },
+    "camouflage_style": {
+      "enum": [
+        "note",
+        "report",
+        "sync",
+        "audit",
+        "helper",
+        "export",
+        "mirror",
+        "inventory"
+      ]
+    },
+    "polarity": {
+      "enum": [
+        "malicious",
+        "benign lookalike"
+      ]
+    },
+    "expected_behaviors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "primary_chain": {
+      "type": "object",
+      "required": [
+        "source",
+        "relays",
+        "sink"
+      ],
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "relays": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sink": {
+          "type": "string"
+        }
+      }
+    },
+    "expected_root_cause": {
+      "type": "string"
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "lookalike_group_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "pair_role": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

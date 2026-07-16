@@ -1,0 +1,28 @@
+case_id,evaluation_status,source_type,relay_shape,sink_type,trigger_type,camouflage_style,polarity,lookalike_group_id,pair_role,notes
+v2_benign_local_note_seed,dynamic_runnable,generated artifact,no relay,local-only,direct tool call,note,benign lookalike,lookalike_01,benign,Hard benign: outward-looking artifact naming with no network sink.
+v2_benign_local_report_seed,dynamic_runnable,generated artifact,no relay,local-only,direct tool call,report,benign lookalike,lookalike_02,benign,Hard benign: outward-looking artifact naming with no network sink.
+v2_benign_local_inventory_seed,dynamic_runnable,generated artifact,no relay,local-only,direct tool call,inventory,benign lookalike,lookalike_11,benign,Hard benign: outward-looking artifact naming with no network sink.
+v2_benign_local_audit_seed,dynamic_runnable,generated artifact,no relay,local-only,direct tool call,audit,benign lookalike,,,Hard benign: outward-looking artifact naming with no network sink.
+v2_benign_local_helper_seed,dynamic_runnable,generated artifact,no relay,local-only,direct tool call,helper,benign lookalike,,,Hard benign: outward-looking artifact naming with no network sink.
+v2_benign_local_mirror_seed,dynamic_runnable,generated artifact,no relay,local-only,direct tool call,mirror,benign lookalike,lookalike_04,benign,Hard benign: outward-looking artifact naming with no network sink.
+v2_benign_local_export_seed,dynamic_runnable,generated artifact,no relay,local-only,direct tool call,export,benign lookalike,lookalike_16,benign,Hard benign: outward-looking artifact naming with no network sink.
+v2_benign_local_note_review,dynamic_runnable,generated artifact,no relay,local-only,direct tool call,note,benign lookalike,,,Hard benign: outward-looking artifact naming with no network sink.
+v2_benign_local_report_review,dynamic_runnable,generated artifact,no relay,local-only,direct tool call,report,benign lookalike,,,Hard benign: outward-looking artifact naming with no network sink.
+v2_benign_local_inventory_review,dynamic_runnable,generated artifact,no relay,local-only,direct tool call,inventory,benign lookalike,,,Hard benign: outward-looking artifact naming with no network sink.
+v2_benign_local_audit_review,dynamic_runnable,generated artifact,no relay,local-only,direct tool call,audit,benign lookalike,,,Hard benign: outward-looking artifact naming with no network sink.
+v2_benign_local_helper_review,dynamic_runnable,generated artifact,no relay,local-only,direct tool call,helper,benign lookalike,,,Hard benign: outward-looking artifact naming with no network sink.
+v2_benign_local_mirror_review,dynamic_runnable,generated artifact,no relay,local-only,direct tool call,mirror,benign lookalike,,,Hard benign: outward-looking artifact naming with no network sink.
+v2_benign_local_export_review,dynamic_runnable,generated artifact,no relay,local-only,direct tool call,export,benign lookalike,,,Hard benign: outward-looking artifact naming with no network sink.
+v2_benign_fetch_audit_seed,dynamic_runnable,public file,no relay,local-only,direct tool call,audit,benign lookalike,lookalike_05,benign,Hard benign: public fetch followed by a local note/report artifact.
+v2_benign_fetch_mirror_seed,dynamic_runnable,public file,no relay,local-only,direct tool call,mirror,benign lookalike,,,Hard benign: public fetch followed by a local note/report artifact.
+v2_benign_fetch_report_seed,dynamic_runnable,public file,no relay,local-only,direct tool call,report,benign lookalike,lookalike_06,benign,Hard benign: public fetch followed by a local note/report artifact.
+v2_benign_fetch_note_seed,dynamic_runnable,public file,no relay,local-only,direct tool call,note,benign lookalike,,,Hard benign: public fetch followed by a local note/report artifact.
+v2_benign_fetch_audit_review,dynamic_runnable,public file,no relay,local-only,direct tool call,audit,benign lookalike,,,Hard benign: public fetch followed by a local note/report artifact.
+v2_benign_fetch_mirror_review,dynamic_runnable,public file,no relay,local-only,direct tool call,mirror,benign lookalike,,,Hard benign: public fetch followed by a local note/report artifact.
+v2_benign_fetch_report_review,dynamic_runnable,public file,no relay,local-only,direct tool call,report,benign lookalike,,,Hard benign: public fetch followed by a local note/report artifact.
+v2_benign_fetch_note_review,dynamic_runnable,public file,no relay,local-only,direct tool call,note,benign lookalike,,,Hard benign: public fetch followed by a local note/report artifact.
+v2_benign_helper_helper,dynamic_runnable,public file,tool-mediated relay,local-only,command construction,helper,benign lookalike,,,Hard benign: fixed helper command with local-only sink.
+v2_benign_helper_inventory,dynamic_runnable,public file,tool-mediated relay,local-only,command construction,inventory,benign lookalike,lookalike_helper_listing,benign,Hard benign: fixed helper command with local-only sink.
+v2_benign_helper_report,dynamic_runnable,public file,tool-mediated relay,local-only,command construction,report,benign lookalike,lookalike_20,benign,Hard benign: fixed helper command with local-only sink.
+v2_benign_helper_audit,dynamic_runnable,public file,tool-mediated relay,local-only,command construction,audit,benign lookalike,lookalike_21,benign,Hard benign: fixed helper command with local-only sink.
+v2_benign_helper_mirror,dynamic_runnable,public file,tool-mediated relay,local-only,command construction,mirror,benign lookalike,,,Hard benign: fixed helper command with local-only sink.

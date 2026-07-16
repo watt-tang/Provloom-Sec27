@@ -53,7 +53,10 @@ def infer_dual_axis_decision(
     evidence_factors: list[str] = []
     uncertainty_factors: list[str] = []
 
-    if has_sensitive_source and sink_external and chain_nontrivial:
+    if risk_score >= 80 and sink_external:
+        severity = SEVERITY_SEVERE
+        severity_factors.append("critical_score_with_external_sink")
+    elif has_sensitive_source and sink_external and chain_nontrivial:
         severity = SEVERITY_SEVERE
         severity_factors.append("high_sensitivity_source_to_external_sink_with_nontrivial_chain")
     elif has_read_then_exfil or (has_sensitive_source and sink_external) or (risky_command_signal and sink_external):
@@ -144,4 +147,3 @@ def _is_partial_context(
     }:
         return True
     return bool(trigger_used) and not trigger_hits
-

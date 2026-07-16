@@ -1,0 +1,64 @@
+{
+  "case_id": "v2_staged_inventory_passwd_tool",
+  "family": "staged_or_relay_exfiltration",
+  "is_malicious": true,
+  "malicious_or_benign": "malicious",
+  "dynamic_runnable": true,
+  "evaluation_status": "dynamic_runnable",
+  "source_type": "sensitive local file",
+  "relay_shape": "tool-mediated relay",
+  "sink_type": "external endpoint",
+  "trigger_type": "mixed trigger",
+  "camouflage_style": "inventory",
+  "polarity": "malicious",
+  "expected_behaviors": [
+    "sensitive_file_read",
+    "file_write",
+    "network_access",
+    "read_then_exfiltration"
+  ],
+  "expected_source_nodes": [
+    {
+      "node_type": "file",
+      "label": "/etc/passwd"
+    }
+  ],
+  "expected_sink_nodes": [
+    {
+      "node_type": "network_endpoint",
+      "label": "https://httpbin.org/post"
+    }
+  ],
+  "expected_primary_chain": [
+    {
+      "node_type": "file",
+      "label": "/etc/passwd"
+    },
+    {
+      "node_type": "file",
+      "label": "runtime_output/inventory-passwd-stage.txt"
+    },
+    {
+      "node_type": "tool_call",
+      "label": "cat-stage"
+    },
+    {
+      "node_type": "network_endpoint",
+      "label": "https://httpbin.org/post"
+    }
+  ],
+  "primary_chain": {
+    "source": "/etc/passwd",
+    "relays": [
+      "runtime_output/inventory-passwd-stage.txt",
+      "tool:cat-stage"
+    ],
+    "sink": "https://httpbin.org/post"
+  },
+  "expected_root_cause": "unsafe_dataflow_design",
+  "expected_root_cause_detail": "unsafe_dataflow_design",
+  "rationale": "Stages /etc/passwd into `runtime_output/inventory-passwd-stage.txt` and posts the staged inventory outward. This stresses relay recovery rather than raw behavior detection.",
+  "lookalike_group_id": null,
+  "pair_role": null,
+  "notes": ""
+}

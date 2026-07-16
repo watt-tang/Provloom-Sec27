@@ -103,8 +103,8 @@ ProvLoom 追求的是恢复“语义上足够”的因果路径，即解释风�
 ### 1. 克隆仓库
 
 ```bash
-git clone https://github.com/watt-tang/clawguard_sandbox.git
-cd clawguard_sandbox
+git clone https://github.com/watt-tang/clawguard_sandbox.git ProvLoom
+cd ProvLoom
 ```
 
 ### 2. 检查依赖

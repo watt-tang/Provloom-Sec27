@@ -57,6 +57,7 @@ from app.backend.schemas import (
     default_llm_model,
     normalize_llm_provider,
 )
+from app.reporting.skill_report import generate_report_file
 from app.reporting.risk_mapper import map_risk_profile
 from app.runner.docker_runner import DockerRunner
 from app.runtime.skill_parser import SkillDefinition, load_skill_definition
@@ -176,6 +177,15 @@ class SkillScanResult:
     severity_label: str | None = None
     evidence_strength: str | None = None
     decision_rationale: dict[str, Any] | None = None
+    dynamic_chain_observed: bool | None = None
+    instruction_chain_recovered: bool | None = None
+    chain_evidence_type: str | None = None
+    instruction_chain: list[dict[str, Any]] | None = None
+    instruction_indicators: list[dict[str, Any]] | None = None
+    static_supply_chain_risk: dict[str, Any] | None = None
+    instruction_document_scan: dict[str, Any] | None = None
+    final_risk_level: str | None = None
+    final_label_reason: str | None = None
     primary_chain: list[dict[str, Any]] | None = None
     root_cause: str | None = None
     root_cause_detail: str | None = None
@@ -269,6 +279,12 @@ class ProgressTracker:
             line = json.dumps(asdict(result), ensure_ascii=False)
             with self.results_jsonl.open("a", encoding="utf-8") as handle:
                 handle.write(line + "\n")
+            self._flush_locked()
+
+    def update_last_report(self, report_path: Path) -> None:
+        with self._lock:
+            self.state["updated_at"] = utc_now()
+            self.state["last_report_file"] = str(report_path)
             self._flush_locked()
 
     def finish(self) -> None:
@@ -409,6 +425,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int)
     parser.add_argument("--resume", action="store_true", default=True)
     parser.add_argument("--no-resume", dest="resume", action="store_false")
+    parser.add_argument(
+        "--generate-markdown-reports",
+        action="store_true",
+        help="Synchronously generate one Markdown report after each per-skill JSON result is written.",
+    )
+    parser.add_argument(
+        "--report-dir",
+        help="Directory for generated Markdown reports. Defaults to <log-dir>/reports when --generate-markdown-reports is set.",
+    )
     parser.add_argument("--force-llm-on-empty-actions", action="store_true", default=True)
     parser.add_argument("--no-force-llm-on-empty-actions", dest="force_llm_on_empty_actions", action="store_false")
     return parser.parse_args()
@@ -981,6 +1006,15 @@ def scan_one_skill(
             severity_label=dual_axis.get("severity_label"),
             evidence_strength=dual_axis.get("evidence_strength"),
             decision_rationale=dual_axis.get("decision_rationale"),
+            dynamic_chain_observed=report.get("dynamic_chain_observed"),
+            instruction_chain_recovered=report.get("instruction_chain_recovered"),
+            chain_evidence_type=report.get("chain_evidence_type"),
+            instruction_chain=report.get("instruction_chain", []),
+            instruction_indicators=report.get("instruction_indicators", []),
+            static_supply_chain_risk=report.get("static_supply_chain_risk", {}),
+            instruction_document_scan=report.get("instruction_document_scan", {}),
+            final_risk_level=report.get("final_risk_level"),
+            final_label_reason=report.get("final_label_reason"),
             primary_chain=report.get("primary_chain", []),
             root_cause=report.get("root_cause"),
             root_cause_detail=report.get("root_cause_detail"),
@@ -1080,6 +1114,15 @@ def scan_one_skill(
             severity_label=dual_axis.get("severity_label"),
             evidence_strength=dual_axis.get("evidence_strength"),
             decision_rationale=dual_axis.get("decision_rationale"),
+            dynamic_chain_observed=static_report.get("dynamic_chain_observed"),
+            instruction_chain_recovered=static_report.get("instruction_chain_recovered"),
+            chain_evidence_type=static_report.get("chain_evidence_type"),
+            instruction_chain=static_report.get("instruction_chain", []),
+            instruction_indicators=static_report.get("instruction_indicators", []),
+            static_supply_chain_risk=static_report.get("static_supply_chain_risk", {}),
+            instruction_document_scan=static_report.get("instruction_document_scan", {}),
+            final_risk_level=static_report.get("final_risk_level"),
+            final_label_reason=static_report.get("final_label_reason"),
             root_cause=static_report.get("root_cause"),
             root_cause_detail=static_report.get("root_cause_detail"),
             root_cause_v2=root_cause_v2,
@@ -1096,9 +1139,12 @@ def main() -> int:
     log_dir = normalize_user_path(args.log_dir)
     skill_list_csv = normalize_user_path(args.skill_list_csv) if args.skill_list_csv else None
     skill_paths_file = normalize_user_path(args.skill_paths_file) if args.skill_paths_file else None
+    report_dir = normalize_user_path(args.report_dir) if args.report_dir else (log_dir / "reports")
     log_dir.mkdir(parents=True, exist_ok=True)
     results_dir = log_dir / "skills"
     results_dir.mkdir(parents=True, exist_ok=True)
+    if args.generate_markdown_reports:
+        report_dir.mkdir(parents=True, exist_ok=True)
 
     tracker = ProgressTracker(
         log_dir=log_dir,
@@ -1120,6 +1166,8 @@ def main() -> int:
             "model": args.model,
             "llm_api_enabled": bool(args.api_key),
             "force_llm_on_empty_actions": args.force_llm_on_empty_actions,
+            "generate_markdown_reports": args.generate_markdown_reports,
+            "report_dir": str(report_dir) if args.generate_markdown_reports else None,
             "requested_skill_count": 0,
             "missing_requested_skill_count": 0,
             "execution_profile": args.execution_profile,
@@ -1207,9 +1255,25 @@ def main() -> int:
             "resume_enabled": args.resume,
             "existing_result_count": len(existing_results),
             "pending_skill_count": len(pending_skills),
+            "generate_markdown_reports": args.generate_markdown_reports,
+            "report_dir": str(report_dir) if args.generate_markdown_reports else None,
         }
     )
     tracker.update_phase("scanning")
+
+    def generate_markdown_report_for_result(result_path: Path) -> Path | None:
+        if not args.generate_markdown_reports:
+            return None
+        report_path = report_dir / f"{result_path.stem}.md"
+        generate_report_file(result_path, report_path)
+        tracker.update_last_report(report_path)
+        return report_path
+
+    if args.generate_markdown_reports and existing_results:
+        for skill_id in sorted(existing_results):
+            existing_result_path = results_dir / f"{skill_id}.json"
+            if existing_result_path.exists():
+                generate_markdown_report_for_result(existing_result_path)
 
     runner = DockerRunner()
     probe = CommandAvailabilityProbe(runner)
@@ -1452,6 +1516,15 @@ def main() -> int:
                 severity_label=dual_axis.get("severity_label"),
                 evidence_strength=dual_axis.get("evidence_strength"),
                 decision_rationale=dual_axis.get("decision_rationale"),
+                dynamic_chain_observed=static_report.get("dynamic_chain_observed"),
+                instruction_chain_recovered=static_report.get("instruction_chain_recovered"),
+                chain_evidence_type=static_report.get("chain_evidence_type"),
+                instruction_chain=static_report.get("instruction_chain", []),
+                instruction_indicators=static_report.get("instruction_indicators", []),
+                static_supply_chain_risk=static_report.get("static_supply_chain_risk", {}),
+                instruction_document_scan=static_report.get("instruction_document_scan", {}),
+                final_risk_level=static_report.get("final_risk_level"),
+                final_label_reason=static_report.get("final_label_reason"),
                 root_cause=static_report.get("root_cause"),
                 root_cause_detail=static_report.get("root_cause_detail"),
                 root_cause_v2=root_cause_v2,
@@ -1488,6 +1561,7 @@ def main() -> int:
             result = future.result()
             result_path = results_dir / f"{result.skill_id}.json"
             result_path.write_text(json.dumps(asdict(result), ensure_ascii=False, indent=2), encoding="utf-8")
+            generate_markdown_report_for_result(result_path)
             tracker.append_result(result, result_path)
             summary_rows.append(asdict(result))
 
@@ -1519,6 +1593,7 @@ def main() -> int:
                 "progress_file": str(tracker.progress_path),
                 "summary_file": str(tracker.summary_path),
                 "results_jsonl": str(tracker.results_jsonl),
+                "report_dir": str(report_dir) if args.generate_markdown_reports else None,
             },
             ensure_ascii=False,
             indent=2,

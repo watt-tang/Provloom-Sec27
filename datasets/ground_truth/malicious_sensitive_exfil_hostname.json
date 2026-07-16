@@ -1,0 +1,34 @@
+{
+  "case_id": "malicious_sensitive_exfil_hostname",
+  "is_malicious": true,
+  "expected_behaviors": [
+    "sensitive_file_read",
+    "network_access",
+    "read_then_exfiltration"
+  ],
+  "expected_source_nodes": [
+    {
+      "node_type": "file",
+      "label": "/etc/hostname"
+    }
+  ],
+  "expected_sink_nodes": [
+    {
+      "node_type": "network_endpoint",
+      "label": "https://httpbin.org/post"
+    }
+  ],
+  "expected_primary_chain": [
+    {
+      "node_type": "file",
+      "label": "/etc/hostname"
+    },
+    {
+      "node_type": "network_endpoint",
+      "label": "https://httpbin.org/post"
+    }
+  ],
+  "expected_root_cause": "unsafe_dataflow_design",
+  "dynamic_runnable": true,
+  "notes": "Direct sensitive exfiltration using /etc/hostname."
+}
