@@ -3,7 +3,9 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
+from app.analyzer.endpoint_semantics import endpoint_semantics, infer_endpoint_kind
 from app.analyzer.network_sink_resolution import candidate_from_url, event_metadata_from_resolution, resolve_best_network_sink
 from app.graph.models import ExecutionProvenanceGraph, GraphEdge, GraphNode
 from app.telemetry.normalizer import NormalizedEvent, load_normalized_events
@@ -134,6 +136,8 @@ class GraphBuilder:
                     **event.metadata,
                 },
             )
+        elif event.event_type in {"taint_source", "taint_propagation", "taint_sink", "candidate_dependency"}:
+            node_id = self._ingest_taint_event(event)
         else:
             node_id = self._upsert_node(
                 node_id=f"event:{event.event_id}",
@@ -218,18 +222,142 @@ class GraphBuilder:
                         self._add_edge(process_node.node_id, network_node.node_id, "connects", {"pid": event.get("pid")})
 
         for flow in telemetry_report.get("data_flows", []):
+            relation_type = "candidate_dependency" if "candidate_dependency" in str(flow.get("note", "")) else "legacy_data_flow_hint"
             data_node_id = self._upsert_node(
                 node_id=f"data:{flow.get('event_id') or uuid.uuid4().hex}",
                 node_type="data",
                 label=f"{flow.get('source_detail', 'source')} -> {flow.get('sink_detail', 'sink')}",
-                metadata=flow,
+                metadata={**flow, "relation_type": relation_type},
             )
             source_path = flow.get("source_detail")
             sink_address = flow.get("sink_detail")
             if source_path and f"file:{source_path}" in self.nodes:
-                self._add_edge(f"file:{source_path}", data_node_id, "flows_to", {"kind": "source"})
+                self._add_edge(f"file:{source_path}", data_node_id, relation_type, {"kind": "source", "evidence_level": "candidate"})
             if sink_address and f"network:{sink_address}" in self.nodes:
-                self._add_edge(data_node_id, f"network:{sink_address}", "flows_to", {"kind": "sink"})
+                self._add_edge(data_node_id, f"network:{sink_address}", relation_type, {"kind": "sink", "evidence_level": "candidate"})
+
+    def _ingest_taint_event(self, event: NormalizedEvent) -> str:
+        taint_ids = list(event.metadata.get("taint_ids", []))
+        taint_label = ",".join(taint_ids) if taint_ids else event.event_id
+        taint_node_id = self._upsert_node(
+            node_id=f"taint:{taint_label}",
+            node_type="taint",
+            label=taint_label,
+            metadata={
+                "event_id": event.event_id,
+                "taint_ids": taint_ids,
+                "evidence_level": event.metadata.get("evidence_level"),
+                "propagation_rule": event.metadata.get("propagation_rule"),
+            },
+        )
+
+        if event.event_type == "taint_source":
+            source_object = event.metadata.get("source_object")
+            if source_object:
+                source_node_id = self._upsert_node(
+                    node_id=f"file:{source_object}",
+                    node_type="file",
+                    label=str(source_object),
+                    metadata={"path": source_object, "source_type": event.metadata.get("source_type")},
+                )
+                self._add_edge(
+                    source_node_id,
+                    taint_node_id,
+                    "observed_relation",
+                    self._taint_edge_metadata(event, {"kind": "taint_source"}),
+                )
+            return taint_node_id
+
+        if event.event_type == "taint_propagation":
+            source_node_id = self._node_for_taint_ref(event.metadata.get("source", {}), fallback=taint_node_id)
+            target_node_id = self._node_for_taint_ref(event.metadata.get("target", {}), fallback=taint_node_id)
+            edge_type = "taint_propagates"
+            if source_node_id != target_node_id:
+                self._add_edge(source_node_id, target_node_id, edge_type, self._taint_edge_metadata(event))
+            return taint_node_id
+
+        if event.event_type == "taint_sink":
+            destination = event.metadata.get("destination") or "unknown"
+            parsed = urlparse(str(destination))
+            host = parsed.hostname
+            endpoint_kind = infer_endpoint_kind(label=str(destination), host=host, source="taint_sink")
+            semantics = endpoint_semantics(label=str(destination), host=host, endpoint_kind=endpoint_kind)
+            sink_node_id = self._upsert_node(
+                node_id=f"network:{destination}",
+                node_type="network_endpoint",
+                label=str(destination),
+                metadata={
+                    "address": destination,
+                    "display_label": event.metadata.get("sink_display_label") or destination,
+                    "sink_display_label": event.metadata.get("sink_display_label") or destination,
+                    "sink_raw_ip": event.metadata.get("sink_raw_ip"),
+                    "sink_domain": event.metadata.get("sink_domain"),
+                    "sink_url": event.metadata.get("sink_url") or (destination if str(destination).startswith(("http://", "https://")) else ""),
+                    "sink_port": event.metadata.get("sink_port"),
+                    "sink_type": event.metadata.get("sink_type"),
+                    "is_controlled_sink": event.metadata.get("is_controlled_sink", False),
+                    "network_evidence_sources": list(event.metadata.get("network_evidence_sources", [])),
+                    "original_target_candidates": list(event.metadata.get("original_target_candidates", [])),
+                    "selected_sink_reason": event.metadata.get("selected_sink_reason", ""),
+                    "endpoint_kind": endpoint_kind,
+                    "host": host,
+                    **semantics,
+                    "sink_resolution_status": event.metadata.get("sink_resolution_status") or semantics.get("sink_resolution_status"),
+                    "last_event_id": event.event_id,
+                },
+            )
+            edge_type = "exfiltrated_to" if event.metadata.get("evidence_level") == "confirmed" else "sent_to"
+            self._add_edge(taint_node_id, sink_node_id, edge_type, self._taint_edge_metadata(event, {"kind": "taint_sink"}))
+            return taint_node_id
+
+        if event.event_type == "candidate_dependency":
+            source_object = event.metadata.get("source_object")
+            sink_address = event.metadata.get("sink_address") or "unknown"
+            source_node_id = self._upsert_node(
+                node_id=f"file:{source_object}",
+                node_type="file",
+                label=str(source_object or "unknown-source"),
+                metadata={"path": source_object},
+            )
+            sink_node_id = self._upsert_node(
+                node_id=f"network:{sink_address}",
+                node_type="network_endpoint",
+                label=str(sink_address),
+                metadata={"address": sink_address, "sink_resolution_status": "candidate"},
+            )
+            self._add_edge(
+                source_node_id,
+                sink_node_id,
+                "candidate_dependency",
+                self._taint_edge_metadata(event, {"kind": "read_before_network"}),
+            )
+            return taint_node_id
+
+        return taint_node_id
+
+    def _node_for_taint_ref(self, ref: dict[str, Any], *, fallback: str) -> str:
+        ref_type = ref.get("type")
+        if ref_type == "file":
+            path = ref.get("path") or "unknown"
+            return self._upsert_node(node_id=f"file:{path}", node_type="file", label=str(path), metadata={"path": path})
+        if ref_type in {"tool_output", "tool_input", "command_output"}:
+            tool_id = ref.get("tool_id") or "unknown"
+            return self._upsert_node(node_id=f"tool:{tool_id}", node_type="tool_call", label=str(tool_id), metadata={"tool_id": tool_id})
+        if ref_type in {"command_input", "stdout"}:
+            tool_id = ref.get("tool_id") or ref.get("command_preview") or "command"
+            return self._upsert_node(node_id=f"process:{tool_id}", node_type="process", label=str(tool_id), metadata=ref)
+        return fallback
+
+    @staticmethod
+    def _taint_edge_metadata(event: NormalizedEvent, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+        return {
+            "event_id": event.event_id,
+            "taint_ids": list(event.metadata.get("taint_ids", [])),
+            "evidence_level": event.metadata.get("evidence_level"),
+            "propagation_rule": event.metadata.get("propagation_rule"),
+            "source_event_ids": list(event.metadata.get("source_event_ids", [])),
+            **(extra or {}),
+        }
 
     def _upsert_node(
         self,

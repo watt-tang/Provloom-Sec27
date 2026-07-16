@@ -106,6 +106,10 @@ class ToolCallEvent:
     event: str
     status: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    input_taint_ids: list[str] = field(default_factory=list)
+    output_taint_ids: list[str] = field(default_factory=list)
+    taint_evidence_level: str | None = None
+    taint_propagation_rule: str | None = None
     event_id: str | None = None
     parent_event_id: str | None = None
     step_id: str | None = None

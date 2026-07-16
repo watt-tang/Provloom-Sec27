@@ -204,6 +204,15 @@ class AnalyzeSkillResponse:
     instruction_indicators: list[dict[str, Any]] = field(default_factory=list)
     static_supply_chain_risk: dict[str, Any] = field(default_factory=dict)
     instruction_document_scan: dict[str, Any] = field(default_factory=dict)
+    instruction_actions: list[dict[str, Any]] = field(default_factory=list)
+    instruction_entities: list[dict[str, Any]] = field(default_factory=list)
+    instruction_graph: dict[str, Any] = field(default_factory=dict)
+    validated_instruction_paths: list[dict[str, Any]] = field(default_factory=list)
+    partial_instruction_paths: list[dict[str, Any]] = field(default_factory=list)
+    instruction_analysis_summary: dict[str, Any] = field(default_factory=dict)
+    extraction_coverage: dict[str, Any] = field(default_factory=dict)
+    abstention_reasons: list[str] = field(default_factory=list)
+    schema_version: str = ""
     final_risk_level: str = ""
     final_label_reason: str = ""
 

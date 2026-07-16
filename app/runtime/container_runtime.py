@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import urllib.request
@@ -13,6 +14,11 @@ from urllib.parse import urlparse
 
 from app.runtime.llm_client import OpenAICompatibleClient
 from app.runtime.skill_parser import SkillAction, SkillDefinition, load_skill_definition
+from app.taint.models import TaintEvidenceLevel, TaintLabel, TaintSet
+from app.taint.propagation import collect_action_refs
+from app.taint.sink_tracker import classify_http_sink
+from app.taint.source_registry import SourceRegistry, normalize_path
+from app.taint.state import TaintState
 
 
 def utc_now() -> str:
@@ -24,6 +30,9 @@ class SkillToolExecutor:
         self.skill_root = skill_root
         self.context = context
         self._emit = emit_func
+        self._taint_state = TaintState()
+        self._source_registry = SourceRegistry()
+        self.context.setdefault("_taint", {"actions": {}, "files": {}})
 
     def execute_action(
         self,
@@ -35,12 +44,17 @@ class SkillToolExecutor:
         base_config = dict(action.config)
         if overrides:
             base_config.update(overrides)
+        input_taint = self._input_taint_from_config(base_config)
         resolved = _resolve_templates(base_config, self.context)
         start_event_id = self._emit("tool_call", "start", {
             "tool_id": action.id,
             "tool_name": action.name,
             "tool_type": action.type,
             "config": resolved,
+            "input_taint_ids": input_taint.serialize(),
+            "output_taint_ids": [],
+            "taint_evidence_level": TaintEvidenceLevel.CONFIRMED.value if not input_taint.is_empty() else TaintEvidenceLevel.UNKNOWN.value,
+            "taint_propagation_rule": self._taint_rule_for_action(action.type, input_taint),
         }, step_id=step_id, parent_event_id=parent_event_id)
 
         try:
@@ -62,6 +76,15 @@ class SkillToolExecutor:
                 "stderr": str(exc),
             }
 
+        output_taint = self._update_taint_after_action(
+            action=action,
+            config=resolved,
+            input_taint=input_taint,
+            result=result,
+            start_event_id=start_event_id,
+        )
+        result["_taint_ids"] = output_taint.serialize()
+        self.context.setdefault("_taint", {}).setdefault("actions", {})[action.id] = output_taint.serialize()
         self._emit("tool_call", "finish", {
             "tool_id": action.id,
             "tool_name": action.name,
@@ -70,6 +93,10 @@ class SkillToolExecutor:
             "exit_code": result["exit_code"],
             "stdout_preview": result["stdout"][:200],
             "stderr_preview": result["stderr"][:200],
+            "input_taint_ids": input_taint.serialize(),
+            "output_taint_ids": output_taint.serialize(),
+            "taint_evidence_level": self._finish_evidence_level(action.type, input_taint, output_taint, resolved),
+            "taint_propagation_rule": self._taint_rule_for_action(action.type, output_taint or input_taint),
         }, step_id=step_id, parent_event_id=start_event_id)
         return result
 
@@ -261,6 +288,118 @@ class SkillToolExecutor:
             "method": method,
         }
 
+    def _input_taint_from_config(self, config: dict[str, Any]) -> TaintSet:
+        taint = TaintSet()
+        for action_id in collect_action_refs(config):
+            taint = taint.union(self._taint_state.taint_for_action(action_id))
+            taint = taint.union(self.context.get("_taint", {}).get("actions", {}).get(action_id, []))
+        for path in _paths_from_config(config):
+            taint = taint.union(self._taint_state.taint_for_file(path))
+        return taint
+
+    def _update_taint_after_action(
+        self,
+        *,
+        action: SkillAction,
+        config: dict[str, Any],
+        input_taint: TaintSet,
+        result: dict[str, Any],
+        start_event_id: str,
+    ) -> TaintSet:
+        if result.get("status") != "success":
+            self._taint_state.set_action_output(action.id, [])
+            return TaintSet()
+
+        if action.type == "read_file":
+            path = str(config.get("path", ""))
+            match = self._source_registry.match_path(path)
+            output_taint = self._taint_state.taint_for_file(path)
+            if match is not None:
+                label = TaintLabel.create(
+                    run_id=str(self.context.get("execution_id", "runtime")),
+                    source_type=match.source_type,
+                    sensitivity=match.sensitivity,
+                    source_object=match.normalized_path,
+                    source_event_id=start_event_id,
+                    created_at=utc_now(),
+                    metadata={**match.metadata, "tool_call_id": action.id},
+                )
+                self._taint_state.add_label(label)
+                output_taint = output_taint.union([label.taint_id])
+                self._taint_state.taint_file(path, output_taint)
+            self._taint_state.set_action_output(action.id, output_taint)
+            return output_taint
+
+        if action.type == "write_file":
+            path = str(config.get("path", ""))
+            if input_taint.is_empty():
+                if not config.get("append"):
+                    self._taint_state.clear_file(path)
+                self._taint_state.set_action_output(action.id, [])
+                return TaintSet()
+            if config.get("append"):
+                self._taint_state.taint_file(path, input_taint, writer_event_id=start_event_id)
+            else:
+                self._taint_state.set_file_taint(path, input_taint, writer_event_id=start_event_id)
+            self._taint_state.set_action_output(action.id, input_taint)
+            return input_taint
+
+        if action.type == "run_command":
+            output_taint = input_taint
+            for path in _paths_from_config(config):
+                match = self._source_registry.match_path(path)
+                if match is not None:
+                    label = TaintLabel.create(
+                        run_id=str(self.context.get("execution_id", "runtime")),
+                        source_type=match.source_type,
+                        sensitivity=match.sensitivity,
+                        source_object=match.normalized_path,
+                        source_event_id=start_event_id,
+                        created_at=utc_now(),
+                        metadata={**match.metadata, "tool_call_id": action.id, "via": "command_argument"},
+                    )
+                    self._taint_state.add_label(label)
+                    self._taint_state.taint_file(path, [label.taint_id])
+                output_taint = output_taint.union(self._taint_state.taint_for_file(path))
+            self._taint_state.set_action_output(action.id, output_taint)
+            return output_taint
+
+        if action.type == "http_request":
+            sink = classify_http_sink(config, input_taint)
+            self._taint_state.set_action_output(action.id, [])
+            if sink.get("is_sink"):
+                return TaintSet()
+            return TaintSet()
+
+        self._taint_state.set_action_output(action.id, input_taint)
+        return input_taint
+
+    def _finish_evidence_level(
+        self,
+        tool_type: str,
+        input_taint: TaintSet,
+        output_taint: TaintSet,
+        config: dict[str, Any],
+    ) -> str:
+        if input_taint.is_empty() and output_taint.is_empty():
+            return TaintEvidenceLevel.UNKNOWN.value
+        if tool_type in {"read_file", "write_file", "http_request"}:
+            return TaintEvidenceLevel.CONFIRMED.value
+        if tool_type == "run_command":
+            return TaintEvidenceLevel.CONSERVATIVE.value
+        return TaintEvidenceLevel.CONSERVATIVE.value
+
+    @staticmethod
+    def _taint_rule_for_action(tool_type: str, taint: TaintSet) -> str:
+        if taint.is_empty() and tool_type != "read_file":
+            return ""
+        return {
+            "read_file": "read_file_rule",
+            "write_file": "write_file_rule",
+            "http_request": "network_sink_rule",
+            "run_command": "opaque_command_transform",
+        }.get(tool_type, "opaque_tool_conservative")
+
 
 class ProvLoomSkillRuntime:
     def __init__(
@@ -289,6 +428,7 @@ class ProvLoomSkillRuntime:
                 "description": self.definition.description,
                 "file": self.definition.skill_file,
             },
+            "execution_id": os.environ.get("PROVLOOM_EXECUTION_ID", ""),
         }
         self.executor = SkillToolExecutor(self.skill_root, self.context, self._emit)
 
@@ -538,6 +678,20 @@ def _lookup(expression: str, context: dict[str, Any]) -> Any:
         else:
             current = getattr(current, part, "")
     return current
+
+
+def _paths_from_config(config: dict[str, Any]) -> list[str]:
+    paths: set[str] = set()
+    for key in ("path", "command", "body", "content", "url"):
+        value = config.get(key)
+        if not isinstance(value, str):
+            continue
+        for token in value.replace("\\", "/").split():
+            cleaned = token.strip("\"'{}[](),")
+            normalized = normalize_path(cleaned)
+            if normalized.startswith(("/etc/", "/root/", "/proc/", "/sys/", "/var/run/")) or "credential_state/" in normalized or normalized.startswith(("runtime_output/", "public/")):
+                paths.add(normalized)
+    return sorted(paths)
 
 
 def _extract_json_object(text: str) -> dict[str, Any]:

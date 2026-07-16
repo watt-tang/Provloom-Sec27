@@ -44,8 +44,7 @@ def extract_primary_attack_chain(
 
     behaviors = set(detected_behaviors)
     if not (
-        {"sensitive_file_read", "network_access"} <= behaviors
-        or "read_then_exfiltration" in behaviors
+        "read_then_exfiltration" in behaviors
         or {"file_write", "network_access"} <= behaviors
     ):
         return []
@@ -116,8 +115,10 @@ def extract_primary_attack_chain(
 def _build_adjacency(graph: ExecutionProvenanceGraph) -> dict[str, list[tuple[str, str]]]:
     adjacency: dict[str, list[tuple[str, str]]] = {}
     for edge in graph.edges:
+        if edge.edge_type == "candidate_dependency":
+            continue
         adjacency.setdefault(edge.source_node_id, []).append((edge.target_node_id, edge.edge_type))
-        if edge.edge_type in {"causes", "flows_to"}:
+        if edge.edge_type in {"causes", "flows_to", "taint_propagates", "sent_to", "exfiltrated_to"}:
             adjacency.setdefault(edge.target_node_id, []).append((edge.source_node_id, edge.edge_type))
     return adjacency
 
@@ -295,7 +296,7 @@ def _node_role(
         return "sink"
     if node.node_type == "network_endpoint":
         return _network_node_semantics(node)["endpoint_role"]
-    if node.node_type in {"file", "data", "process", "tool_call"}:
+    if node.node_type in {"file", "data", "process", "tool_call", "taint"}:
         return "relay"
     return "context"
 

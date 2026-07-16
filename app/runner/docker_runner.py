@@ -171,6 +171,8 @@ class DockerRunner:
 
             docker_cmd.extend([
                 "-e",
+                f"PROVLOOM_EXECUTION_ID={execution_id}",
+                "-e",
                 f"PROVLOOM_EXECUTION_PROFILE={execution_profile}",
                 "-e",
                 f"PROVLOOM_TRIGGER_DEPTH={int(trigger_depth_level)}",

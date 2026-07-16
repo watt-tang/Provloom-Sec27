@@ -4,3 +4,7 @@ __pycache__/
 *.pyd
 .DS_Store
 Log/
+Latex/
+artifacts/
+skillscan/
+skillscan_results/

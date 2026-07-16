@@ -1,0 +1,6 @@
+{
+  "validated_paths": [],
+  "absent_validated_paths": ["remote_fetch_execute", "supply_chain_persistence", "bulk_update_authority"],
+  "partial_paths": [],
+  "requires_abstention": true
+}

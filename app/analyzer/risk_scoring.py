@@ -31,7 +31,20 @@ def _supports_critical_external_transfer(inputs: DecisionInputs) -> bool:
     return (
         inputs.source.sensitivity == SensitivityTier.HIGH
         and _has_evidence_backed_external_sink(inputs)
+        and _has_confirmed_or_conservative_taint_sink(inputs)
     )
+
+
+def _has_confirmed_or_conservative_taint_sink(inputs: DecisionInputs) -> bool:
+    for event in inputs.normalized_events:
+        if event.get("event_type") != "taint_sink":
+            continue
+        metadata = event.get("metadata", {})
+        if metadata.get("evidence_level") not in {"confirmed", "conservative"}:
+            continue
+        if metadata.get("taint_ids"):
+            return True
+    return False
 
 
 def _supports_generated_artifact_external_transfer(inputs: DecisionInputs) -> bool:

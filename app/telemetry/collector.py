@@ -26,6 +26,10 @@ def load_runtime_events(path: Path) -> list[ToolCallEvent]:
                 event=record.get("event", ""),
                 status=payload.get("status"),
                 metadata=payload,
+                input_taint_ids=list(payload.get("input_taint_ids", [])),
+                output_taint_ids=list(payload.get("output_taint_ids", [])),
+                taint_evidence_level=payload.get("taint_evidence_level"),
+                taint_propagation_rule=payload.get("taint_propagation_rule"),
                 event_id=record.get("event_id"),
                 parent_event_id=record.get("parent_event_id"),
                 step_id=record.get("step_id"),
@@ -81,7 +85,10 @@ def build_data_flow_hints(
             source_detail=first_source.path,
             sink="network_connect",
             sink_detail=first_sink.address,
-            note="Potential source-to-sink flow. Use for future sensitive dataflow analysis.",
+            note=(
+                "candidate_dependency: sensitive read and network event co-occurred, "
+                "but no payload/file/tool taint propagation evidence confirms data flow."
+            ),
         )
     )
     return flows
@@ -97,5 +104,6 @@ def build_execution_report(execution: SandboxExecution) -> dict[str, Any]:
         "tool_calls": [event.to_dict() for event in execution.tool_calls],
         "llm_events": [event.to_dict() for event in execution.llm_events],
         "data_flows": [event.to_dict() for event in execution.data_flows],
+        "taint_events": [event.to_dict() for event in normalized_events if event.event_type.startswith("taint_") or event.event_type == "candidate_dependency"],
         "normalized_events": [event.to_dict() for event in normalized_events],
     }

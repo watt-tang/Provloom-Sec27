@@ -15,6 +15,7 @@ from app.analyzer.network_sink_resolution import (
     resolve_best_network_sink,
 )
 from app.runner.models import DataFlowEvent, FileEvent, LLMEvent, NetworkEvent, ProcessEvent, SandboxExecution, ToolCallEvent
+from app.taint.propagation import build_taint_events
 
 
 @dataclass
@@ -45,8 +46,9 @@ def build_normalized_events(execution: SandboxExecution) -> list[NormalizedEvent
     file_events = _normalize_file_events(execution, tool_events, llm_events)
     network_events = _normalize_network_events(execution, tool_events, llm_events)
     data_flow_events = _normalize_data_flow_events(execution, file_events, network_events)
+    taint_events = _normalize_taint_events(execution)
 
-    for group in (llm_events, tool_events, process_events, file_events, network_events, data_flow_events):
+    for group in (llm_events, tool_events, process_events, file_events, network_events, data_flow_events, taint_events):
         events.extend(group)
 
     events.sort(key=lambda item: (item.timestamp, item.event_id))
@@ -144,6 +146,10 @@ def _normalize_tool_events(
                 "tool_name": event.tool_name,
                 "tool_type": event.tool_type,
                 "status": event.status,
+                "input_taint_ids": list(event.input_taint_ids or event.metadata.get("input_taint_ids", [])),
+                "output_taint_ids": list(event.output_taint_ids or event.metadata.get("output_taint_ids", [])),
+                "taint_evidence_level": event.taint_evidence_level or event.metadata.get("taint_evidence_level"),
+                "taint_propagation_rule": event.taint_propagation_rule or event.metadata.get("taint_propagation_rule"),
                 **event.metadata,
             },
         )
@@ -271,11 +277,41 @@ def _normalize_data_flow_events(
                 "sink": event.sink,
                 "sink_detail": event.sink_detail,
                 "note": event.note,
+                "relation_type": "candidate_dependency" if "candidate_dependency" in event.note else "legacy_data_flow_hint",
+                "evidence_level": "candidate" if "candidate_dependency" in event.note else "unknown",
             },
         )
         event.event_id = event_id
         event.parent_event_id = parent_event_id
         normalized.append(normalized_event)
+    return normalized
+
+
+def _normalize_taint_events(execution: SandboxExecution) -> list[NormalizedEvent]:
+    normalized: list[NormalizedEvent] = []
+    for event in build_taint_events(execution):
+        metadata = dict(event.get("metadata", {}))
+        metadata.update({
+            "run_id": event.get("run_id"),
+            "tool_call_id": event.get("tool_call_id"),
+            "process_id": event.get("process_id"),
+            "taint_ids": list(event.get("taint_ids", [])),
+            "evidence_level": event.get("evidence_level", "unknown"),
+            "propagation_rule": event.get("propagation_rule", ""),
+            "source_event_ids": list(event.get("source_event_ids", [])),
+        })
+        normalized.append(
+            NormalizedEvent(
+                event_id=str(event.get("event_id") or _event_id("taint")),
+                timestamp=str(event.get("timestamp") or ""),
+                execution_id=execution.execution_id,
+                step_id=event.get("step_id"),
+                event_type=str(event.get("event_type") or "taint_event"),
+                source="taint",
+                parent_event_id=event.get("parent_event_id"),
+                metadata=metadata,
+            )
+        )
     return normalized
 
 

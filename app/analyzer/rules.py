@@ -94,7 +94,7 @@ def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_e
     if _has_sensitive_source_evidence(execution, interesting_files, skill_definition):
         detected.add("sensitive_file_read")
 
-    if _has_read_then_exfiltration(execution, interesting_files, interesting_network, skill_definition):
+    if _has_read_then_exfiltration(execution, interesting_files, interesting_network, skill_definition, normalized_events):
         detected.add("read_then_exfiltration")
 
     if execution.timed_out:
@@ -110,6 +110,7 @@ def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_e
             "process_event_count": len(interesting_processes),
             "tool_call_count": len(execution.tool_calls),
             "llm_event_count": len(execution.llm_events),
+            "taint_event_count": len(_taint_events(normalized_events)),
             "stdout_line_count": len([line for line in execution.stdout.splitlines() if line.strip()]),
             "stderr_line_count": len([line for line in execution.stderr.splitlines() if line.strip()]),
         },
@@ -643,13 +644,14 @@ def _has_read_then_exfiltration(
     files,
     network,
     skill_definition: SkillDefinition | None,
+    normalized_events: list[NormalizedEvent],
 ) -> bool:
-    sensitive_reads = [event for event in files if _is_sensitive_file_event(event.path, execution, skill_definition)]
-    if not sensitive_reads or not network:
-        return False
-    first_read = min(event.timestamp for event in sensitive_reads)
-    first_network = min(event.timestamp for event in network)
-    return first_read <= first_network
+    return any(
+        event.event_type == "taint_sink"
+        and str(event.metadata.get("evidence_level", "")) in {"confirmed", "conservative"}
+        and event.metadata.get("taint_ids")
+        for event in normalized_events
+    )
 
 
 def _augment_with_epg(
@@ -666,6 +668,7 @@ def _augment_with_epg(
         "tool_calls": [event.to_dict() for event in execution.tool_calls],
         "llm_events": [event.to_dict() for event in execution.llm_events],
         "data_flows": [event.to_dict() for event in execution.data_flows],
+        "taint_events": [event.to_dict() for event in normalized_events if event.event_type.startswith("taint_") or event.event_type == "candidate_dependency"],
     }
     normalized_path = persist_normalized_events(execution.artifacts_dir, normalized_events)
     graph = build_execution_provenance_graph(
@@ -722,7 +725,7 @@ def _infer_root_cause_detail(
         event.tool_type == "http_request"
         for event in execution.tool_calls
         if event.event == "start"
-    ) and source_assessment.get("sensitivity") in {"HIGH_SENSITIVITY", "MEDIUM_SENSITIVITY"}:
+    ) and source_assessment.get("sensitivity") in {"HIGH_SENSITIVITY", "MEDIUM_SENSITIVITY"} and "read_then_exfiltration" in detected_behaviors:
         return "overprivileged_tool_use"
     return "unknown"
 
@@ -888,6 +891,14 @@ def _network_event_label(event) -> str:
         or getattr(event, "address", NETWORK_UNKNOWN)
         or NETWORK_UNKNOWN
     )
+
+
+def _taint_events(normalized_events: list[NormalizedEvent]) -> list[NormalizedEvent]:
+    return [
+        event
+        for event in normalized_events
+        if event.event_type.startswith("taint_") or event.event_type == "candidate_dependency"
+    ]
 
 
 def _to_coarse_root_cause(root_cause_detail: str) -> str:
