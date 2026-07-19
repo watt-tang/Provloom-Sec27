@@ -1,0 +1,64 @@
+{
+  "max_file_size": 262144,
+  "max_total_size": 2097152,
+  "max_depth": 5,
+  "max_files": 160,
+  "ignore_patterns": [
+    ".git/**",
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    "vendor/**",
+    "__pycache__/**",
+    "artifacts/**",
+    "skillscan/**",
+    "skillscan_results/**",
+    "latex/**"
+  ],
+  "allowed_extensions": [
+    ".md",
+    ".txt",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".py",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".js",
+    ".ts",
+    ".ps1"
+  ],
+  "allowed_filenames": [
+    "SKILL.md",
+    "README",
+    "README.md",
+    "Dockerfile",
+    "Makefile",
+    "package.json",
+    "manifest.json",
+    "pyproject.toml",
+    "requirements.txt",
+    "setup.py",
+    "setup.cfg"
+  ],
+  "trusted_domains": [
+    "localhost",
+    "127.0.0.1",
+    "example.com"
+  ],
+  "protected_resource_patterns": [
+    "~/.ssh/**",
+    "~/.aws/**",
+    ".env",
+    "/etc/**",
+    "/root/**"
+  ],
+  "prompt_version": "provloom-static-action-extraction-v2",
+  "llm_enabled": false,
+  "llm_model": "offline-deterministic",
+  "llm_temperature": 0.0
+}

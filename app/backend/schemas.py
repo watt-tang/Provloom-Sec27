@@ -219,6 +219,19 @@ class AnalyzeSkillResponse:
     instruction_analysis_summary: dict[str, Any] = field(default_factory=dict)
     extraction_coverage: dict[str, Any] = field(default_factory=dict)
     abstention_reasons: list[str] = field(default_factory=list)
+    static_artifacts_v2: list[dict[str, Any]] = field(default_factory=list)
+    static_semantic_units: list[dict[str, Any]] = field(default_factory=list)
+    deterministic_mentions: list[dict[str, Any]] = field(default_factory=list)
+    extracted_actions: list[dict[str, Any]] = field(default_factory=list)
+    grounding_validation: list[dict[str, Any]] = field(default_factory=list)
+    resolved_entities: list[dict[str, Any]] = field(default_factory=list)
+    entity_resolutions: list[dict[str, Any]] = field(default_factory=list)
+    instruction_provenance_graph: dict[str, Any] = field(default_factory=dict)
+    static_chains: list[dict[str, Any]] = field(default_factory=list)
+    static_coverage: dict[str, Any] = field(default_factory=dict)
+    static_analysis_summary: dict[str, Any] = field(default_factory=dict)
+    llm_extraction_metadata: list[dict[str, Any]] = field(default_factory=list)
+    static_schema_version: str = ""
     schema_version: str = ""
     final_risk_level: str = ""
     final_label_reason: str = ""

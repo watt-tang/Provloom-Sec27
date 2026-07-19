@@ -5,6 +5,7 @@ from typing import Any
 
 from app.instruction.models import InstructionAnalysisResult, ValidatedInstructionPath
 from app.instruction.orchestrator import analyze_instruction_bundle
+from app.static.static_report import StaticAnalysisResult, analyze_static_bundle
 
 
 MAX_FILE_BYTES = 256 * 1024
@@ -13,7 +14,10 @@ MAX_TOTAL_BYTES = 1024 * 1024
 
 def analyze_instruction_chain(skill_root: str | Path, skill_file: str = "SKILL.md") -> dict[str, Any]:
     analysis = analyze_instruction_bundle(skill_root, skill_file)
-    return _compat_result(analysis)
+    result = _compat_result(analysis)
+    static_v2 = analyze_static_bundle(skill_root, skill_file)
+    result.update(_static_v2_fields(static_v2))
+    return result
 
 
 def apply_instruction_chain_decision(
@@ -89,6 +93,25 @@ def _compat_result(analysis: InstructionAnalysisResult) -> dict[str, Any]:
         "extraction_coverage": data["extraction_coverage"],
         "abstention_reasons": data["abstention_reasons"],
         "schema_version": analysis.schema_version,
+    }
+
+
+def _static_v2_fields(analysis: StaticAnalysisResult) -> dict[str, Any]:
+    data = analysis.to_dict()
+    return {
+        "static_artifacts_v2": data["static_artifacts_v2"],
+        "static_semantic_units": data["static_semantic_units"],
+        "deterministic_mentions": data["deterministic_mentions"],
+        "extracted_actions": data["extracted_actions"],
+        "grounding_validation": data["grounding_validation"],
+        "resolved_entities": data["resolved_entities"],
+        "entity_resolutions": data["entity_resolutions"],
+        "instruction_provenance_graph": data["instruction_provenance_graph"],
+        "static_chains": data["static_chains"],
+        "static_coverage": data["static_coverage"],
+        "static_analysis_summary": data["static_analysis_summary"],
+        "llm_extraction_metadata": data["llm_extraction_metadata"],
+        "static_schema_version": data["schema_version"],
     }
 
 
