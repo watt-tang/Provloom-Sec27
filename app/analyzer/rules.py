@@ -11,6 +11,7 @@ from app.analyzer.root_cause_v2 import infer_root_cause_v2
 from app.analyzer.decision_engine import evaluate_decision
 from app.analyzer.endpoint_semantics import endpoint_semantics, infer_endpoint_kind
 from app.backend.schemas import EvidenceEvent
+from app.dynamic.analyzer import DynamicRuntimeAnalyzer, persist_dynamic_analysis
 from app.graph.builder import build_execution_provenance_graph
 from app.graph.exporter import export_graph
 from app.runtime.skill_parser import SkillDefinition, load_skill_definition
@@ -69,6 +70,8 @@ def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_e
         skill_definition=skill_definition,
     )
     normalized_events = build_normalized_events(execution)
+    dynamic_result = DynamicRuntimeAnalyzer(skill_root=execution.skill_path).analyze_normalized_execution(execution, normalized_events)
+    persist_dynamic_analysis(dynamic_result, execution.artifacts_dir)
     interesting_files = _interesting_file_events(execution.file_events)
     interesting_network = _interesting_network_events(execution.network_events)
     interesting_processes = _interesting_process_events(execution.process_events)
@@ -94,7 +97,7 @@ def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_e
     if _has_sensitive_source_evidence(execution, interesting_files, skill_definition):
         detected.add("sensitive_file_read")
 
-    if _has_read_then_exfiltration(execution, interesting_files, interesting_network, skill_definition, normalized_events):
+    if _has_read_then_exfiltration(execution, interesting_files, interesting_network, skill_definition, normalized_events, dynamic_result):
         detected.add("read_then_exfiltration")
 
     if execution.timed_out:
@@ -145,6 +148,13 @@ def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_e
         "trigger_hits": list(execution.trigger_hits or []),
         "trigger_unexecuted": list(execution.trigger_unexecuted or []),
         "trigger_events_summary": dict(execution.trigger_events_summary or {}),
+        "runtime_events_v2": [event.to_dict() for event in dynamic_result.runtime_events],
+        "runtime_provenance_graph": dynamic_result.graph.to_dict(),
+        "runtime_chains": [chain.to_dict() for chain in dynamic_result.chains],
+        "runtime_coverage": dynamic_result.coverage.to_dict(),
+        "runtime_policy_violations": [violation.to_dict() for violation in dynamic_result.policy_violations],
+        "dynamic_analysis_summary": dynamic_result.summary(),
+        "taint_sources": list(dynamic_result.taint_sources),
     }
     if analysis_mode in {"rule_plus_epg", "epg_without_filtering", "epg_with_filtering"}:
         _augment_with_epg(
@@ -645,7 +655,16 @@ def _has_read_then_exfiltration(
     network,
     skill_definition: SkillDefinition | None,
     normalized_events: list[NormalizedEvent],
+    dynamic_result=None,
 ) -> bool:
+    if dynamic_result is not None:
+        if any(
+            chain.chain_type == "confidentiality"
+            and chain.evidence_level in {"confirmed", "conservative"}
+            and chain.taint_ids
+            for chain in dynamic_result.chains
+        ):
+            return True
     return any(
         event.event_type == "taint_sink"
         and str(event.metadata.get("evidence_level", "")) in {"confirmed", "conservative"}

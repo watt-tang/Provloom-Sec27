@@ -1,0 +1,48 @@
+{
+  "sensitive_source_patterns": [
+    "/etc/passwd",
+    "/etc/shadow",
+    "/root/**",
+    "/workspace/skill/.provloom/private/**",
+    ".provloom/adapters/credential_state/**"
+  ],
+  "trusted_egress_allowlist": [
+    "localhost",
+    "127.0.0.1",
+    "*.provloom.test"
+  ],
+  "trusted_domains": ["localhost", "127.0.0.1"],
+  "allowed_tool_destinations": {
+    "http_request": ["*.provloom.test"]
+  },
+  "permitted_source_to_sink_pairs": [],
+  "writable_directory_allowlist": ["runtime_output", "/tmp", "/workspace/skill"],
+  "executable_allowlist": ["/bin/sh", "/bin/bash", "python", "python3"],
+  "trusted_download_domains": [],
+  "persistence_targets": ["/etc/cron*", "~/.config/systemd/**", "crontab"],
+  "protected_files": ["/etc/**", "/root/**", "~/.ssh/**"],
+  "permitted_installation_paths": ["/workspace/skill", "runtime_output"],
+  "maximum_runtime_seconds": 30,
+  "closure_lift": {
+    "enabled": true,
+    "max_depth": 1,
+    "max_files_per_session": 4,
+    "max_file_bytes": 65536,
+    "extensions": [".md", ".txt", ".yaml", ".yml", ".json"]
+  },
+  "marker": {
+    "prefix": "PROVLOOM_SECRET",
+    "bytes_of_entropy": 8,
+    "include_hash_derivatives": true
+  },
+  "evidence_thresholds": {
+    "confirmed": 1.0,
+    "conservative": 0.7,
+    "candidate": 0.3
+  },
+  "network_capture_options": {
+    "capture_payload_preview": true,
+    "max_preview_bytes": 4096
+  },
+  "mock_service_endpoints": ["http://127.0.0.1:18080/collect"]
+}

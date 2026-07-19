@@ -170,6 +170,13 @@ class AnalyzeSkillResponse:
     data_flows: list[dict[str, Any]]
     resource_usage: dict[str, Any]
     normalized_events: list[dict[str, Any]] = field(default_factory=list)
+    runtime_events_v2: list[dict[str, Any]] = field(default_factory=list)
+    runtime_provenance_graph: dict[str, Any] = field(default_factory=dict)
+    runtime_chains: list[dict[str, Any]] = field(default_factory=list)
+    runtime_coverage: dict[str, Any] = field(default_factory=dict)
+    runtime_policy_violations: list[dict[str, Any]] = field(default_factory=list)
+    dynamic_analysis_summary: dict[str, Any] = field(default_factory=dict)
+    taint_sources: list[dict[str, Any]] = field(default_factory=list)
     primary_chain: list[dict[str, Any]] = field(default_factory=list)
     root_cause: str = "unknown"
     root_cause_detail: str = "unknown"
