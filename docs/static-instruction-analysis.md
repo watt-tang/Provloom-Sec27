@@ -17,7 +17,7 @@ The production path is:
 9. Deterministic Path Validator
 10. Static Explanation Report
 
-The default LLM adapter is deterministic/offline. It records prompt metadata and preserves the adapter boundary, but it does not call an external model unless a future adapter is configured.
+The default LLM adapter is enabled for OpenAI-compatible span-grounded semantic filtering. It reviews deterministic candidate actions and can suppress or re-modality actions before graph/path validation. The API key is read from `PROVLOOM_STATIC_LLM_API_KEY`; keys are not written to reports.
 
 ## Evidence Model
 
@@ -59,6 +59,7 @@ No closed static chain is not a safety verdict. Ignored files, unsupported artif
 
 ```bash
 python3 -m provloom static validate-config --config configs/static-analysis.example.json
+export PROVLOOM_STATIC_LLM_API_KEY=...
 python3 -m provloom static run /path/to/skill --run-id STATIC001 --config configs/static-analysis.example.json
 python3 -m provloom static artifacts STATIC001
 python3 -m provloom static actions STATIC001
@@ -90,4 +91,4 @@ The older instruction bundle analyzer remains available for historical benchmark
 
 ## Current Limits
 
-The implementation is not whole-program static analysis, binary decompilation, Semia SDL, verbalization-similarity validation, Datalog detection, or automatic malicious/benign classification. The default LLM adapter is intentionally offline and deterministic. Shell and language dataflow are conservative and limited to high-confidence patterns, simple references, and explicit evidence.
+The implementation is not whole-program static analysis, binary decompilation, Semia SDL, verbalization-similarity validation, Datalog detection, or automatic malicious/benign classification. The LLM adapter only filters span-grounded candidate actions; deterministic graph construction and path validation still decide chains. Shell and language dataflow are conservative and limited to high-confidence patterns, simple references, and explicit evidence.

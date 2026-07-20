@@ -111,6 +111,7 @@ def analyze_static_bundle(
         units = SemanticUnitParser().parse(loaded)
         mentions, deterministic_actions = DeterministicStaticExtractor().extract(units)
         llm_actions, llm_metadata = SpanGroundedLLMActionExtractor(cfg).extract(units, mentions)
+        deterministic_actions = _apply_llm_action_decisions(deterministic_actions, llm_metadata, cfg)
         actions = ActionNormalizer().normalize(_dedupe_actions(deterministic_actions + llm_actions))
         actions, validation = GroundingValidator().validate(actions, artifacts=loaded, units=units, mentions=mentions)
         entities, resolutions = EntityResolver().resolve(mentions, actions)
@@ -179,6 +180,42 @@ def _dedupe_actions(actions: list[StaticAction]) -> list[StaticAction]:
         action.action_id = f"A{len(result) + 1:04d}"
         result.append(action)
     return result
+
+
+def _apply_llm_action_decisions(
+    actions: list[StaticAction],
+    llm_metadata: list[dict[str, Any]],
+    config: StaticAnalysisConfig,
+) -> list[StaticAction]:
+    if not config.llm_enabled or not config.llm_filter_deterministic_actions:
+        return actions
+    decisions: dict[str, dict[str, Any]] = {}
+    for meta in llm_metadata:
+        if not str(meta.get("status", "")).startswith("llm_semantic_filter"):
+            continue
+        for decision in meta.get("action_decisions", []):
+            if isinstance(decision, dict) and decision.get("action_id"):
+                decisions[str(decision["action_id"])] = decision
+    if not decisions:
+        return actions
+    filtered: list[StaticAction] = []
+    for action in actions:
+        decision = decisions.get(action.action_id)
+        if decision is None:
+            filtered.append(action)
+            continue
+        action.metadata["llm_semantic_filter"] = {
+            "keep": bool(decision.get("keep", False)),
+            "reason": decision.get("reason", ""),
+        }
+        if not decision.get("keep", False):
+            continue
+        action.action_type = str(decision.get("action_type", action.action_type))
+        action.modality = str(decision.get("modality", action.modality))
+        action.extractor = "hybrid"
+        action.confidence = max(action.confidence, 0.9)
+        filtered.append(action)
+    return filtered
 
 
 def _coverage_states(
