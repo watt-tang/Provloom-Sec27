@@ -9,10 +9,12 @@ from app.analyzer.rules import analyze_static_skill, analyze_trace
 from app.backend.log_writer import ExecutionLogWriter
 from app.backend.schemas import AnalyzeSkillRequest, AnalyzeSkillResponse, TaskResponse
 from app.backend.task_store import TaskStore
+from app.dynamic.analyzer import DynamicRuntimeAnalyzer, persist_dynamic_analysis
 from app.reporting.risk_mapper import map_risk_profile
 from app.runtime.skill_parser import load_skill_definition, resolve_skill_target
 from app.runner.docker_runner import DockerRunner, DockerUnavailableError, SandboxRunError
 from app.telemetry.collector import build_execution_report
+from app.telemetry.normalizer import build_normalized_events
 
 runner = DockerRunner()
 task_store = TaskStore()
@@ -94,8 +96,11 @@ def _handle_analyze_skill(environ, start_response):
             network_policy=payload.network_policy,
             llm_config=payload.llm_config,
         )
-        report = analyze_trace(execution, analysis_mode=payload.analysis_mode)
-        telemetry_report = build_execution_report(execution)
+        normalized_events = build_normalized_events(execution)
+        dynamic_result = DynamicRuntimeAnalyzer(skill_root=execution.skill_path).analyze_execution(execution, normalized_events)
+        persist_dynamic_analysis(dynamic_result, execution.artifacts_dir)
+        report = analyze_trace(execution, analysis_mode=payload.analysis_mode, normalized_events=normalized_events, dynamic_result=dynamic_result)
+        telemetry_report = build_execution_report(execution, normalized_events=normalized_events, dynamic_result=dynamic_result)
         risk_profile = map_risk_profile(
             risk_score=report["risk_score"],
             detected_behaviors=report["detected_behaviors"],
@@ -137,6 +142,7 @@ def _handle_analyze_skill(environ, start_response):
             runtime_policy_violations=report.get("runtime_policy_violations", []),
             dynamic_analysis_summary=report.get("dynamic_analysis_summary", {}),
             taint_sources=report.get("taint_sources", []),
+            static_runtime_alignment=report.get("static_runtime_alignment", {}),
             resource_usage=execution.resource_usage.to_dict(),
             primary_chain=report.get("primary_chain", []),
             root_cause=report.get("root_cause", "unknown"),

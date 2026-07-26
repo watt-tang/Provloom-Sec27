@@ -11,7 +11,7 @@ from app.analyzer.root_cause_v2 import infer_root_cause_v2
 from app.analyzer.decision_engine import evaluate_decision
 from app.analyzer.endpoint_semantics import endpoint_semantics, infer_endpoint_kind
 from app.backend.schemas import EvidenceEvent
-from app.dynamic.analyzer import DynamicRuntimeAnalyzer, persist_dynamic_analysis
+from app.dynamic.analyzer import DynamicAnalysisResult, DynamicRuntimeAnalyzer, persist_dynamic_analysis
 from app.graph.builder import build_execution_provenance_graph
 from app.graph.exporter import export_graph
 from app.runtime.skill_parser import SkillDefinition, load_skill_definition
@@ -62,16 +62,23 @@ NOISY_FILE_PATHS = {
 NETWORK_UNKNOWN = "unknown"
 
 
-def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_epg") -> dict:
+def analyze_trace(
+    execution: SandboxExecution,
+    analysis_mode: str = "rule_plus_epg",
+    *,
+    normalized_events: list[NormalizedEvent] | None = None,
+    dynamic_result: DynamicAnalysisResult | None = None,
+) -> dict:
     skill_definition = _load_dynamic_skill_definition(execution)
     capability_profile = infer_capability_profile(
         skill_root=execution.skill_path,
         skill_file=execution.skill_file,
         skill_definition=skill_definition,
     )
-    normalized_events = build_normalized_events(execution)
-    dynamic_result = DynamicRuntimeAnalyzer(skill_root=execution.skill_path).analyze_normalized_execution(execution, normalized_events)
-    persist_dynamic_analysis(dynamic_result, execution.artifacts_dir)
+    normalized_events = normalized_events if normalized_events is not None else build_normalized_events(execution)
+    if dynamic_result is None:
+        dynamic_result = DynamicRuntimeAnalyzer(skill_root=execution.skill_path).analyze_execution(execution, normalized_events)
+        persist_dynamic_analysis(dynamic_result, execution.artifacts_dir)
     interesting_files = _interesting_file_events(execution.file_events)
     interesting_network = _interesting_network_events(execution.network_events)
     interesting_processes = _interesting_process_events(execution.process_events)
@@ -155,6 +162,7 @@ def analyze_trace(execution: SandboxExecution, analysis_mode: str = "rule_plus_e
         "runtime_policy_violations": [violation.to_dict() for violation in dynamic_result.policy_violations],
         "dynamic_analysis_summary": dynamic_result.summary(),
         "taint_sources": list(dynamic_result.taint_sources),
+        "static_runtime_alignment": dynamic_result.static_runtime_alignment or {},
     }
     if analysis_mode in {"rule_plus_epg", "epg_without_filtering", "epg_with_filtering"}:
         _augment_with_epg(
@@ -659,7 +667,7 @@ def _has_read_then_exfiltration(
 ) -> bool:
     if dynamic_result is not None:
         if any(
-            chain.chain_type == "confidentiality"
+            chain.chain_type == "confidentiality_confirmed"
             and chain.evidence_level in {"confirmed", "conservative"}
             and chain.taint_ids
             for chain in dynamic_result.chains

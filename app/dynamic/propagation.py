@@ -16,6 +16,8 @@ class FileTaint:
     taint_ids: set[str] = field(default_factory=set)
     evidence_level: str = "confirmed"
     last_event_id: str | None = None
+    evidence_strength: str = "exact_value"
+    carrier_type: str = "file_content"
 
 
 @dataclass
@@ -24,6 +26,7 @@ class ProcessInputTaint:
     evidence_level: str = "conservative"
     last_event_id: str | None = None
     direct_content_observed: bool = False
+    context_only: bool = True
 
 
 class RuntimeTaintPropagator:
@@ -42,7 +45,7 @@ class RuntimeTaintPropagator:
             self._enrich_from_markers(updated)
             self._apply_event_rule(updated)
             enriched.append(updated)
-        if not any(event.event_type in {"network_send", "file_upload"} and event.taint_ids for event in enriched):
+        if not any(_is_concrete_network_flow(event) for event in enriched):
             enriched.extend(self._candidate_dependencies(enriched))
         return sorted(enriched, key=lambda item: (item.timestamp, item.event_id))
 
@@ -50,7 +53,7 @@ class RuntimeTaintPropagator:
         if event.event_type == "sensitive_source":
             for taint_id in event.taint_ids:
                 if event.object_path:
-                    self.file_taint[event.object_path] = FileTaint({taint_id}, "confirmed", event.event_id)
+                    self.file_taint[event.object_path] = FileTaint({taint_id}, "confirmed", event.event_id, "exact_value")
             return
 
         if event.operation == "read" and event.object_type == "file":
@@ -84,14 +87,16 @@ class RuntimeTaintPropagator:
         path = event.object_path or ""
         if self._is_sensitive_source_path(path):
             source = self.registry.ensure_source_for_path(path, source_type="secret_file", timestamp=event.timestamp)
-            self._merge_taint(event, [source.taint_id], "confirmed", reason="sensitive_source_path")
-            self.file_taint[path] = FileTaint({source.taint_id}, "confirmed", event.event_id)
+            strength = "exact_value" if event.data_preview else "structured_relation"
+            self._merge_taint(event, [source.taint_id], "confirmed", reason="TAINT_SOURCE_PATH_READ", evidence_strength=strength, carrier_type="file_content", carrier_location=path)
+            self.file_taint[path] = FileTaint({source.taint_id}, "confirmed", event.event_id, strength)
         if path in self.file_taint:
             record = self.file_taint[path]
-            self._merge_taint(event, record.taint_ids, record.evidence_level, reason="read_tainted_file")
+            self._merge_taint(event, record.taint_ids, record.evidence_level, reason="TAINT_READ_TAINTED_FILE", evidence_strength=record.evidence_strength, carrier_type=record.carrier_type, carrier_location=path)
         if event.taint_ids:
             process = self._process_key(event.actor_id, event.process_id)
-            self.process_inputs[process] = ProcessInputTaint(set(event.taint_ids), event.evidence_level, event.event_id, bool(event.data_preview))
+            direct = bool(event.data_preview) or event.evidence_strength in {"exact_value", "encoded_value", "reconstructed_value"}
+            self.process_inputs[process] = ProcessInputTaint(set(event.taint_ids), event.evidence_level, event.event_id, direct, context_only=not direct)
             self.sensitive_read_events.append(event)
 
     def _handle_file_write(self, event: RuntimeEvent) -> None:
@@ -101,10 +106,9 @@ class RuntimeTaintPropagator:
         process = self._process_key(event.actor_id, event.process_id)
         process_taint = self.process_inputs.get(process)
         if event.taint_ids:
-            self.file_taint[path] = FileTaint(set(event.taint_ids), event.evidence_level, event.event_id)
+            self.file_taint[path] = FileTaint(set(event.taint_ids), event.evidence_level, event.event_id, event.evidence_strength, event.carrier_type)
         elif process_taint and event.metadata.get("output_from_tainted_input"):
-            self._merge_taint(event, process_taint.taint_ids, "conservative", reason="opaque_output_from_tainted_input")
-            self.file_taint[path] = FileTaint(set(event.taint_ids), "conservative", event.event_id)
+            self._add_context(event, process_taint.taint_ids, reason="CONTEXT_PROCESS_CONTACT", source_event_id=process_taint.last_event_id)
         else:
             self.file_taint.pop(path, None)
 
@@ -114,8 +118,8 @@ class RuntimeTaintPropagator:
         if not source_path or not dest_path or source_path not in self.file_taint:
             return
         record = self.file_taint[source_path]
-        self._merge_taint(event, record.taint_ids, record.evidence_level, reason=f"file_{event.operation}_inherits_taint")
-        self.file_taint[dest_path] = FileTaint(set(record.taint_ids), record.evidence_level, event.event_id)
+        self._merge_taint(event, record.taint_ids, record.evidence_level, reason=f"TAINT_FILE_{event.operation.upper()}_INHERITS", evidence_strength=record.evidence_strength, carrier_type="file_content", carrier_location=dest_path)
+        self.file_taint[dest_path] = FileTaint(set(record.taint_ids), record.evidence_level, event.event_id, record.evidence_strength)
 
     def _handle_process_exec(self, event: RuntimeEvent) -> None:
         argv_taint = set(event.taint_ids)
@@ -123,11 +127,15 @@ class RuntimeTaintPropagator:
             argv_taint.update(match.taint_id for match in self.registry.detect(event.metadata.get(key)))
         for path in _paths_from_metadata(event.metadata):
             if path in self.file_taint and event.metadata.get("passes_file_content"):
-                argv_taint.update(self.file_taint[path].taint_ids)
+                record = self.file_taint[path]
+                if record.evidence_strength in {"exact_value", "encoded_value", "reconstructed_value"}:
+                    argv_taint.update(record.taint_ids)
+                else:
+                    self._add_context(event, record.taint_ids, reason="CONTEXT_PROCESS_CONTACT", source_event_id=record.last_event_id)
         if argv_taint:
-            self._merge_taint(event, argv_taint, event.evidence_level if event.evidence_level != "unknown" else "confirmed", reason="tainted_process_input")
+            self._merge_taint(event, argv_taint, event.evidence_level if event.evidence_level != "unknown" else "confirmed", reason="TAINT_PROCESS_INPUT", evidence_strength=event.evidence_strength if event.evidence_strength != "unknown" else "exact_value", carrier_type=event.carrier_type if event.carrier_type != "unknown" else "process_argv", carrier_location=event.carrier_location or "argv/env/stdin")
             process = self._process_key(event.object_id or event.actor_id, event.process_id)
-            self.process_inputs[process] = ProcessInputTaint(set(event.taint_ids), event.evidence_level, event.event_id, bool(event.data_preview))
+            self.process_inputs[process] = ProcessInputTaint(set(event.taint_ids), event.evidence_level, event.event_id, bool(event.data_preview), context_only=False)
 
     def _handle_ipc(self, event: RuntimeEvent) -> None:
         if event.operation == "pipe":
@@ -135,18 +143,21 @@ class RuntimeTaintPropagator:
             target_process = self._process_key(str(event.metadata.get("target_process") or event.object_id), event.metadata.get("target_process_id"))
             source = self.process_inputs.get(source_process)
             if source and source.taint_ids:
-                level = "confirmed" if event.data_preview and event.taint_ids else "conservative"
-                self._merge_taint(event, source.taint_ids, level, reason="pipe_from_tainted_process")
-                self.process_inputs[target_process] = ProcessInputTaint(set(event.taint_ids), level, event.event_id, bool(event.data_preview))
+                if event.taint_ids and event.data_preview:
+                    self._merge_taint(event, source.taint_ids, "confirmed", reason="TAINT_PIPE_MARKER", evidence_strength="exact_value", carrier_type="pipe", carrier_location=str(event.object_id))
+                    self.process_inputs[target_process] = ProcessInputTaint(set(event.taint_ids), "confirmed", event.event_id, True, context_only=False)
+                else:
+                    self._add_context(event, source.taint_ids, reason="CONTEXT_PROCESS_CONTACT", source_event_id=source.last_event_id)
+                    self.process_inputs[target_process] = ProcessInputTaint(set(source.taint_ids), "candidate", event.event_id, False, context_only=True)
             return
         if event.taint_ids:
             process = self._process_key(event.actor_id, event.process_id)
-            self.process_inputs[process] = ProcessInputTaint(set(event.taint_ids), event.evidence_level, event.event_id, bool(event.data_preview))
+            self.process_inputs[process] = ProcessInputTaint(set(event.taint_ids), event.evidence_level, event.event_id, bool(event.data_preview), context_only=False)
 
     def _handle_tool_event(self, event: RuntimeEvent) -> None:
         tool_id = str(event.metadata.get("tool_id") or event.actor_id or event.object_id)
         for ref in event.metadata.get("input_taint_ids", []):
-            self._merge_taint(event, [str(ref)], "confirmed", reason="declared_tool_input_taint")
+            self._merge_taint(event, [str(ref)], "confirmed", reason="TAINT_TOOL_REFERENCE", evidence_strength="structured_relation", carrier_type="tool_argument", carrier_location=tool_id)
         if event.operation == "return":
             if event.taint_ids:
                 self.tool_outputs[tool_id].update(event.taint_ids)
@@ -157,15 +168,15 @@ class RuntimeTaintPropagator:
         upload_file = normalize_path(event.metadata.get("upload_file_path", ""))
         if upload_file and upload_file in self.file_taint:
             record = self.file_taint[upload_file]
-            self._merge_taint(event, record.taint_ids, record.evidence_level, reason="explicit_tainted_file_upload")
-        for key in ("body", "headers", "query", "socket_payload", "tool_arguments"):
+            self._merge_taint(event, record.taint_ids, record.evidence_level, reason="TAINT_EXPLICIT_FILE_UPLOAD", evidence_strength="explicit_file_identity", carrier_type="upload_file", carrier_location=upload_file)
+        for key in ("body", "headers", "query", "socket_payload", "tool_arguments", "json_body", "form", "multipart"):
             matches = self.registry.detect(event.metadata.get(key))
             if matches:
-                self._merge_marker_matches(event, matches)
+                self._merge_marker_matches(event, matches, carrier_type=_carrier_for_network_key(key), carrier_location=key)
         process = self._process_key(event.actor_id, event.process_id)
         process_taint = self.process_inputs.get(process)
         if not event.taint_ids and process_taint and event.metadata.get("opaque_payload"):
-            self._merge_taint(event, process_taint.taint_ids, "conservative", reason="opaque_process_payload_after_tainted_input")
+            self._add_context(event, process_taint.taint_ids, reason="CONTEXT_PROCESS_CONTACT", source_event_id=process_taint.last_event_id)
 
     def _enrich_from_markers(self, event: RuntimeEvent) -> None:
         matches = self.registry.detect(event.data_preview)
@@ -174,22 +185,76 @@ class RuntimeTaintPropagator:
         if matches:
             self._merge_marker_matches(event, matches)
 
-    def _merge_marker_matches(self, event: RuntimeEvent, matches: list[MarkerMatch]) -> None:
+    def _merge_marker_matches(self, event: RuntimeEvent, matches: list[MarkerMatch], *, carrier_type: str | None = None, carrier_location: str | None = None) -> None:
         for match in matches:
             event.metadata.setdefault("marker_matches", []).append(
-                {"taint_id": match.taint_id, "variant": match.variant_name, "derived": match.derived}
+                {"taint_id": match.taint_id, "variant": match.variant_name, "derived": match.derived, "carrier_type": carrier_type or event.carrier_type}
             )
             level = "conservative" if match.derived else "confirmed"
-            self._merge_taint(event, [match.taint_id], level, reason=f"marker_variant:{match.variant_name}")
+            strength = "hash_derived" if match.derived else ("exact_value" if match.variant_name == "raw" else "encoded_value")
+            rule_id = "TAINT_HASH_DERIVED" if match.derived else ("TAINT_EXACT_MARKER" if match.variant_name == "raw" else f"TAINT_{match.variant_name.upper()}_MARKER")
+            self._merge_taint(
+                event,
+                [match.taint_id],
+                level,
+                reason=rule_id,
+                evidence_strength=strength,
+                carrier_type=carrier_type,
+                carrier_location=carrier_location,
+                derived_from_hash=match.derived,
+                transformation=match.variant_name,
+            )
 
-    def _merge_taint(self, event: RuntimeEvent, taint_ids, level: str, *, reason: str) -> None:
+    def _merge_taint(
+        self,
+        event: RuntimeEvent,
+        taint_ids,
+        level: str,
+        *,
+        reason: str,
+        evidence_strength: str | None = None,
+        carrier_type: str | None = None,
+        carrier_location: str | None = None,
+        derived_from_hash: bool | None = None,
+        transformation: str | None = None,
+    ) -> None:
         current = set(event.taint_ids)
         current.update(str(item) for item in taint_ids if str(item))
         event.taint_ids = sorted(current)
         event.evidence_level = _strongest_level(event.evidence_level, level)
+        if evidence_strength:
+            event.evidence_strength = _strongest_strength(event.evidence_strength, evidence_strength)
+        if carrier_type:
+            event.carrier_type = carrier_type
+        if carrier_location:
+            event.carrier_location = carrier_location
+        if derived_from_hash:
+            event.derived_from_hash = True
+            event.metadata["derived_from_hash"] = True
+        if transformation:
+            event.metadata.setdefault("transformations", [])
+            if transformation not in event.metadata["transformations"]:
+                event.metadata["transformations"].append(transformation)
         event.metadata.setdefault("taint_reasons", [])
         if reason not in event.metadata["taint_reasons"]:
             event.metadata["taint_reasons"].append(reason)
+
+    def _add_context(self, event: RuntimeEvent, taint_ids, *, reason: str, source_event_id: str | None = None) -> None:
+        context_ids = sorted({str(item) for item in taint_ids if str(item)})
+        if not context_ids:
+            return
+        existing = set(event.metadata.get("context_taint_ids", []))
+        existing.update(context_ids)
+        event.metadata["context_taint_ids"] = sorted(existing)
+        event.metadata.setdefault("context_reasons", [])
+        if reason not in event.metadata["context_reasons"]:
+            event.metadata["context_reasons"].append(reason)
+        if source_event_id:
+            event.metadata.setdefault("context_source_event_ids", [])
+            if source_event_id not in event.metadata["context_source_event_ids"]:
+                event.metadata["context_source_event_ids"].append(source_event_id)
+        event.evidence_strength = _strongest_strength(event.evidence_strength, "process_context")
+        event.evidence_level = _strongest_level(event.evidence_level, "candidate")
 
     def _candidate_dependencies(self, events: list[RuntimeEvent]) -> list[RuntimeEvent]:
         if not self.sensitive_read_events:
@@ -217,8 +282,13 @@ class RuntimeTaintPropagator:
             evidence_level="candidate",
             raw_source="dynamic_analyzer",
             raw_reference=f"{first_read.event_id},{first_network.event_id}",
+            evidence_strength="temporal_cooccurrence",
+            observation_source="inferred_relation",
+            carrier_type="unknown",
+            instrumentation_visibility="payload_not_observed",
             metadata={
                 "reason": "sensitive_read_and_network_connect_without_payload_or_file_upload_evidence",
+                "candidate_rule_id": "CANDIDATE_READ_BEFORE_CONNECT",
                 "source_event_id": first_read.event_id,
                 "network_event_id": first_network.event_id,
             },
@@ -237,7 +307,7 @@ class RuntimeTaintPropagator:
 
     @staticmethod
     def _copy_event(event: RuntimeEvent) -> RuntimeEvent:
-        return RuntimeEvent(**event.to_dict())
+        return RuntimeEvent.from_dict(event.to_dict())
 
 
 def _paths_from_metadata(metadata: dict[str, Any]) -> list[str]:
@@ -256,3 +326,46 @@ def _strongest_level(current: str, incoming: str) -> str:
     current = current if current in order else "unknown"
     incoming = incoming if incoming in order else "unknown"
     return current if order[current] <= order[incoming] else incoming
+
+
+def _strongest_strength(current: str, incoming: str) -> str:
+    order = {
+        "exact_value": 0,
+        "encoded_value": 1,
+        "reconstructed_value": 2,
+        "structured_relation": 3,
+        "explicit_file_identity": 4,
+        "hash_derived": 5,
+        "process_context": 6,
+        "temporal_cooccurrence": 7,
+        "candidate": 8,
+        "unknown": 9,
+    }
+    current = current if current in order else "unknown"
+    incoming = incoming if incoming in order else "unknown"
+    return current if order[current] <= order[incoming] else incoming
+
+
+def _carrier_for_network_key(key: str) -> str:
+    return {
+        "body": "http_body",
+        "json_body": "http_body",
+        "headers": "http_header",
+        "query": "http_query",
+        "form": "http_form",
+        "multipart": "multipart_field",
+        "socket_payload": "socket_payload",
+        "tool_arguments": "tool_argument",
+    }.get(key, "unknown")
+
+
+def _is_concrete_network_flow(event: RuntimeEvent) -> bool:
+    if event.event_type not in {"network_send", "file_upload"} and event.operation not in {"send", "upload"}:
+        return False
+    if not event.taint_ids:
+        return False
+    if event.derived_from_hash or event.evidence_strength in {"hash_derived", "process_context", "temporal_cooccurrence", "candidate"}:
+        return False
+    if event.metadata.get("context_taint_ids") and not event.metadata.get("marker_matches") and not event.metadata.get("upload_file_path"):
+        return False
+    return True

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from app.runner.models import DataFlowEvent, FileEvent, LLMEvent, NetworkEvent, ProcessEvent, SandboxExecution, ToolCallEvent
-from app.dynamic.analyzer import DynamicRuntimeAnalyzer, persist_dynamic_analysis
+from app.dynamic.analyzer import DynamicAnalysisResult, DynamicRuntimeAnalyzer, persist_dynamic_analysis
 from app.telemetry.normalizer import build_normalized_events, persist_normalized_events
 
 
@@ -95,11 +95,17 @@ def build_data_flow_hints(
     return flows
 
 
-def build_execution_report(execution: SandboxExecution) -> dict[str, Any]:
-    normalized_events = build_normalized_events(execution)
+def build_execution_report(
+    execution: SandboxExecution,
+    *,
+    normalized_events: list[Any] | None = None,
+    dynamic_result: DynamicAnalysisResult | None = None,
+) -> dict[str, Any]:
+    normalized_events = normalized_events if normalized_events is not None else build_normalized_events(execution)
     persist_normalized_events(execution.artifacts_dir, normalized_events)
-    dynamic_result = DynamicRuntimeAnalyzer(skill_root=execution.skill_path).analyze_execution(execution)
-    persist_dynamic_analysis(dynamic_result, execution.artifacts_dir)
+    if dynamic_result is None:
+        dynamic_result = DynamicRuntimeAnalyzer(skill_root=execution.skill_path).analyze_execution(execution, normalized_events)
+        persist_dynamic_analysis(dynamic_result, execution.artifacts_dir)
     return {
         "file_events": [event.to_dict() for event in execution.file_events],
         "network_events": [event.to_dict() for event in execution.network_events],
@@ -116,4 +122,5 @@ def build_execution_report(execution: SandboxExecution) -> dict[str, Any]:
         "runtime_policy_violations": [violation.to_dict() for violation in dynamic_result.policy_violations],
         "dynamic_analysis_summary": dynamic_result.summary(),
         "taint_sources": dynamic_result.taint_sources,
+        "static_runtime_alignment": dynamic_result.static_runtime_alignment or {},
     }

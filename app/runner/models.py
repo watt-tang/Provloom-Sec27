@@ -71,6 +71,14 @@ class NetworkEvent:
     network_evidence_sources: list[str] = field(default_factory=list)
     original_target_candidates: list[str] = field(default_factory=list)
     selected_sink_reason: str | None = None
+    fd: str | None = None
+    byte_count: int | None = None
+    payload_preview: str | None = None
+    encrypted_payload_invisible: bool | None = None
+    network_evidence_level: str | None = None
+    carrier_type: str | None = None
+    carrier_location: str | None = None
+    instrumentation_visibility: str | None = None
     pid: str | None = None
     event_id: str | None = None
     parent_event_id: str | None = None

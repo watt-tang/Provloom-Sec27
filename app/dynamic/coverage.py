@@ -9,34 +9,63 @@ class CoverageAnalyzer:
         if timed_out or any(event.event_type == "timeout" for event in events):
             return CoverageReport("timeout", ["runtime timed out"], len(events), metadata={"exit_code": exit_code})
         if any(event.event_type == "analysis_error" for event in events):
-            return CoverageReport("analysis_error", ["analysis event stream contains an error"], len(events), metadata={"exit_code": exit_code})
+            return CoverageReport("execution_failed", ["analysis event stream contains an error"], len(events), metadata={"exit_code": exit_code, "legacy_coverage_state": "analysis_error"})
         if exit_code not in (0, None):
             return CoverageReport("execution_failed", [f"runtime exited with code {exit_code}"], len(events), metadata={"exit_code": exit_code})
 
         explicit = _explicit_state(events)
         if explicit:
-            return CoverageReport(explicit, [f"explicit coverage event: {explicit}"], len(events), metadata={"exit_code": exit_code})
+            return CoverageReport(_canonical_state(explicit), [f"explicit coverage event: {explicit}"], len(events), metadata={"exit_code": exit_code, "legacy_coverage_state": explicit})
 
-        if any(chain.evidence_level in {"confirmed", "conservative"} for chain in chains):
+        confirmed = [chain for chain in chains if chain.chain_type.endswith("_confirmed") and chain.evidence_level in {"confirmed", "conservative"}]
+        if confirmed:
             missing = sorted({point for chain in chains for point in chain.missing_observation_points})
-            state = "triggered_but_partially_observed" if missing else "triggered_and_observed"
-            return CoverageReport(state, ["runtime behavior observed with provenance chain"], len(events), missing_observations=missing)
+            state = "instrumentation_gap" if missing else "runtime_confirmed"
+            legacy = "triggered_but_partially_observed" if missing else "triggered_and_observed"
+            return CoverageReport(state, ["runtime behavior observed with canonical provenance chain"], len(events), missing_observations=missing, metadata={"legacy_coverage_state": legacy})
+
+        instrumentation_gaps = sorted(
+            {
+                str(event.instrumentation_visibility)
+                for event in events
+                if event.instrumentation_visibility not in {"", "observed", "payload_preview_observed"}
+            }
+            | {"encrypted_payload_invisible" for event in events if event.metadata.get("encrypted_payload_invisible")}
+            | {gap for chain in chains for gap in chain.instrumentation_gaps}
+        )
+        if instrumentation_gaps:
+            return CoverageReport(
+                "instrumentation_gap",
+                ["runtime path reached but key payload or carrier visibility is incomplete"],
+                len(events),
+                missing_observations=instrumentation_gaps,
+                metadata={"legacy_coverage_state": "triggered_but_partially_observed"},
+            )
 
         if any(event.event_type == "candidate_dependency" for event in events):
             return CoverageReport(
-                "triggered_but_partially_observed",
+                "insufficient_coverage",
                 ["candidate dependency observed without payload/file/tool propagation evidence"],
                 len(events),
                 missing_observations=["network_payload_or_upload"],
+                metadata={"legacy_coverage_state": "triggered_but_partially_observed"},
             )
 
         if any(event.event_type == "runtime_instruction_seen" for event in events):
-            return CoverageReport("instruction_seen_but_not_executed", ["runtime instruction artifact was seen but no follow-on execution was observed"], len(events))
+            return CoverageReport("insufficient_coverage", ["runtime instruction artifact was simulated but no real follow-on Agent/tool execution was observed"], len(events), metadata={"legacy_coverage_state": "instruction_seen_but_not_executed"})
 
         if not events:
-            return CoverageReport("not_triggered", ["no runtime events were observed"], 0)
+            return CoverageReport("path_not_triggered", ["no runtime events were observed"], 0, metadata={"legacy_coverage_state": "not_triggered"})
 
-        return CoverageReport("triggered_and_observed", ["runtime emitted events but no supported sensitive flow chain closed"], len(events))
+        if _target_reached_no_flow(events):
+            return CoverageReport(
+                "target_reached_no_flow",
+                ["target action and instrumentation were observed but no supported sensitive flow chain closed"],
+                len(events),
+                metadata={"legacy_coverage_state": "triggered_and_observed"},
+            )
+
+        return CoverageReport("insufficient_coverage", ["runtime emitted events but no canonical sensitive flow chain closed"], len(events), metadata={"legacy_coverage_state": "triggered_but_partially_observed"})
 
 
 def _explicit_state(events: list[RuntimeEvent]) -> str | None:
@@ -47,3 +76,26 @@ def _explicit_state(events: list[RuntimeEvent]) -> str | None:
         if event.event_type in COVERAGE_STATES:
             return event.event_type
     return None
+
+
+def _canonical_state(state: str) -> str:
+    return {
+        "not_triggered": "path_not_triggered",
+        "unsupported_tool": "unsupported_operation",
+        "unsupported_environment": "environment_missing",
+        "external_state_missing": "environment_missing",
+        "endpoint_unavailable": "sink_unavailable",
+        "analysis_error": "execution_failed",
+        "triggered_and_observed": "runtime_confirmed",
+        "triggered_but_partially_observed": "insufficient_coverage",
+        "instruction_seen_but_not_executed": "insufficient_coverage",
+    }.get(state, state)
+
+
+def _target_reached_no_flow(events: list[RuntimeEvent]) -> bool:
+    if not events:
+        return False
+    has_action = any(event.event_type.startswith(("tool_", "network_", "file_", "process_")) for event in events)
+    has_source_or_sink_context = any(event.event_type == "sensitive_source" or event.operation in {"read", "send", "upload", "connect"} for event in events)
+    instrumentation_complete = all(event.instrumentation_visibility in {"", "observed", "payload_preview_observed"} for event in events)
+    return has_action and has_source_or_sink_context and instrumentation_complete

@@ -13,6 +13,7 @@ from app.dynamic.analyzer import DynamicRuntimeAnalyzer, persist_dynamic_analysi
 from app.dynamic.config import DynamicAnalysisConfig
 from app.runner.docker_runner import DockerRunner
 from app.telemetry.collector import build_execution_report
+from app.telemetry.normalizer import build_normalized_events
 
 
 ARTIFACTS_ROOT = Path("artifacts/runs")
@@ -81,10 +82,11 @@ def _run(args) -> int:
         network_policy=args.network_policy,
         llm_config=LLMConfig(enabled=False),
     )
-    report = analyze_trace(execution, analysis_mode="rule_plus_epg")
-    telemetry = build_execution_report(execution)
-    dynamic_result = DynamicRuntimeAnalyzer(config=config, skill_root=execution.skill_path).analyze_execution(execution)
+    normalized_events = build_normalized_events(execution)
+    dynamic_result = DynamicRuntimeAnalyzer(config=config, skill_root=execution.skill_path).analyze_execution(execution, normalized_events)
     persist_dynamic_analysis(dynamic_result, execution.artifacts_dir)
+    report = analyze_trace(execution, analysis_mode="rule_plus_epg", normalized_events=normalized_events, dynamic_result=dynamic_result)
+    telemetry = build_execution_report(execution, normalized_events=normalized_events, dynamic_result=dynamic_result)
     output = {
         "run_id": run_id,
         "artifacts_dir": execution.artifacts_dir,

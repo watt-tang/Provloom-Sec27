@@ -4,9 +4,58 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
-SCHEMA_VERSION = "runtime-analysis-v2"
+SCHEMA_VERSION = "runtime-analysis-v3"
 EVIDENCE_ORDER = {"confirmed": 0, "conservative": 1, "candidate": 2, "unknown": 3}
 EVIDENCE_LEVELS = {"confirmed", "conservative", "candidate", "unknown"}
+EVIDENCE_STRENGTHS = {
+    "exact_value",
+    "encoded_value",
+    "reconstructed_value",
+    "structured_relation",
+    "explicit_file_identity",
+    "process_context",
+    "temporal_cooccurrence",
+    "hash_derived",
+    "candidate",
+    "unknown",
+}
+OBSERVATION_SOURCES = {
+    "runtime_wrapper",
+    "strace_syscall",
+    "synthetic_adapter",
+    "instruction_simulation",
+    "inferred_relation",
+    "static_alignment",
+}
+CARRIER_TYPES = {
+    "file_content",
+    "file_path",
+    "process_argv",
+    "process_env",
+    "stdin",
+    "stdout",
+    "stderr",
+    "pipe",
+    "tool_argument",
+    "tool_return",
+    "http_header",
+    "http_query",
+    "http_body",
+    "http_form",
+    "multipart_field",
+    "upload_file",
+    "socket_payload",
+    "llm_context",
+    "instruction_text",
+    "unknown",
+}
+NETWORK_EVIDENCE_LEVELS = {
+    "endpoint_observed",
+    "request_observed",
+    "tainted_payload_observed",
+    "tainted_payload_delivered",
+    "encrypted_payload_invisible",
+}
 
 
 @dataclass
@@ -31,12 +80,41 @@ class RuntimeEvent:
     evidence_level: str = "unknown"
     raw_source: str = "runtime_wrapper"
     raw_reference: str = ""
+    evidence_strength: str = "unknown"
+    observation_source: str = "runtime_wrapper"
+    carrier_type: str = "unknown"
+    carrier_location: str | None = None
+    derived_from_hash: bool = False
+    instrumentation_visibility: str = "observed"
+    raw_event_id: str | None = None
+    trace_file: str | None = None
+    trace_line: int | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["taint_ids"] = sorted({str(item) for item in self.taint_ids if str(item)})
         return payload
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "RuntimeEvent":
+        data = dict(payload or {})
+        known = set(cls.__dataclass_fields__)
+        metadata = dict(data.get("metadata", {}) or {})
+        for key in list(data):
+            if key not in known:
+                metadata[key] = data.pop(key)
+        data["metadata"] = metadata
+        data.setdefault("evidence_strength", "unknown")
+        data.setdefault("observation_source", _observation_source_from_raw(data.get("raw_source")))
+        data.setdefault("carrier_type", "unknown")
+        data.setdefault("carrier_location", None)
+        data.setdefault("derived_from_hash", bool(metadata.get("derived_from_hash")))
+        data.setdefault("instrumentation_visibility", metadata.get("instrumentation_visibility", "observed"))
+        data.setdefault("raw_event_id", data.get("raw_reference") or metadata.get("raw_event_id"))
+        data.setdefault("trace_file", metadata.get("trace_file"))
+        data.setdefault("trace_line", metadata.get("trace_line"))
+        return cls(**data)
 
 
 @dataclass
@@ -76,12 +154,22 @@ class RuntimeEdge:
     evidence_level: str = "unknown"
     confidence: float = 0.0
     reason: str = ""
+    evidence_strength: str = "unknown"
+    carrier_type: str = "unknown"
+    carrier_location: str | None = None
+    raw_references: list[str] = field(default_factory=list)
+    transformation: str | None = None
+    timestamp_start: float | None = None
+    timestamp_end: float | None = None
+    instrumentation_gaps: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["event_ids"] = sorted({item for item in self.event_ids if item})
         payload["taint_ids"] = sorted({item for item in self.taint_ids if item})
+        payload["raw_references"] = sorted({item for item in self.raw_references if item})
+        payload["instrumentation_gaps"] = sorted({item for item in self.instrumentation_gaps if item})
         return payload
 
 
@@ -138,6 +226,12 @@ class RuntimeChain:
     missing_observation_points: list[str] = field(default_factory=list)
     coverage_status: str = "triggered_and_observed"
     explanation: str = ""
+    evidence_strengths: list[str] = field(default_factory=list)
+    raw_references: list[str] = field(default_factory=list)
+    transformations: list[str] = field(default_factory=list)
+    instrumentation_gaps: list[str] = field(default_factory=list)
+    confidence: float = 0.0
+    minimality_score: float = 0.0
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -151,6 +245,31 @@ class CoverageReport:
     observed_event_count: int = 0
     expected_observations: list[str] = field(default_factory=list)
     missing_observations: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class RuntimeObligation:
+    obligation_id: str
+    description: str
+    skill_activated: bool = False
+    target_instruction_loaded: bool = False
+    target_action_reached: bool = False
+    source_available: bool | None = None
+    source_read: bool = False
+    intermediate_artifact_created: bool = False
+    sink_available: bool | None = None
+    request_attempted: bool = False
+    instrumentation_complete: bool = True
+    network_visibility: str = "unknown"
+    external_state_available: bool | None = None
+    required_tool_available: bool | None = None
+    user_confirmation_available: bool | None = None
+    termination_reason: str | None = None
+    evidence_event_ids: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -180,3 +299,16 @@ def merge_evidence_level(levels: list[str]) -> str:
 
 def confidence_for_evidence(level: str) -> float:
     return {"confirmed": 1.0, "conservative": 0.72, "candidate": 0.38}.get(level, 0.0)
+
+
+def _observation_source_from_raw(raw_source: Any) -> str:
+    raw = str(raw_source or "")
+    if raw.startswith("strace"):
+        return "strace_syscall"
+    if raw in {"taint", "dynamic_analyzer"}:
+        return "inferred_relation"
+    if raw.startswith("closure_lift"):
+        return "instruction_simulation"
+    if raw:
+        return "runtime_wrapper"
+    return "runtime_wrapper"

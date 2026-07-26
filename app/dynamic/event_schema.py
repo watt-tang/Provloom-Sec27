@@ -37,6 +37,18 @@ class RuntimeEventFactory:
             byte_count = len(str(data_preview).encode("utf-8"))
         taint_ids = sorted({str(item) for item in kwargs.pop("taint_ids", []) if str(item)})
         evidence_level = str(kwargs.pop("evidence_level", "unknown") or "unknown")
+        object_type = str(kwargs.pop("object_type", "value"))
+        raw_source = str(kwargs.pop("raw_source", "runtime_wrapper") or "runtime_wrapper")
+        raw_reference = str(kwargs.pop("raw_reference", "") or "")
+        evidence_strength = str(kwargs.pop("evidence_strength", metadata.get("evidence_strength", "unknown")) or "unknown")
+        observation_source = str(kwargs.pop("observation_source", metadata.get("observation_source") or _observation_source(raw_source)) or "runtime_wrapper")
+        carrier_type = str(kwargs.pop("carrier_type", metadata.get("carrier_type", "unknown")) or "unknown")
+        carrier_location = kwargs.pop("carrier_location", metadata.get("carrier_location"))
+        derived_from_hash = bool(kwargs.pop("derived_from_hash", metadata.get("derived_from_hash", False)))
+        instrumentation_visibility = str(kwargs.pop("instrumentation_visibility", metadata.get("instrumentation_visibility", "observed")) or "observed")
+        raw_event_id = kwargs.pop("raw_event_id", metadata.get("raw_event_id") or raw_reference or None)
+        trace_file = kwargs.pop("trace_file", metadata.get("trace_file"))
+        trace_line = kwargs.pop("trace_line", metadata.get("trace_line"))
         return RuntimeEvent(
             event_id=event_id,
             timestamp=float(kwargs.pop("timestamp", 0.0) or 0.0),
@@ -47,8 +59,8 @@ class RuntimeEventFactory:
             skill_id=str(kwargs.pop("skill_id", self.skill_id) or self.skill_id),
             actor_type=str(kwargs.pop("actor_type", "process")),
             actor_id=str(kwargs.pop("actor_id", "PROC0")),
-            object_type=str(kwargs.pop("object_type", "value")),
-            object_id=str(kwargs.pop("object_id", "")) or _object_id(kwargs.get("object_type", "value"), object_path, data_hash),
+            object_type=object_type,
+            object_id=str(kwargs.pop("object_id", "")) or _object_id(object_type, object_path, data_hash),
             object_path=object_path,
             operation=str(kwargs.pop("operation", "")),
             data_preview=data_preview,
@@ -56,8 +68,17 @@ class RuntimeEventFactory:
             byte_count=byte_count,
             taint_ids=taint_ids,
             evidence_level=evidence_level,
-            raw_source=str(kwargs.pop("raw_source", "runtime_wrapper")),
-            raw_reference=str(kwargs.pop("raw_reference", "")),
+            raw_source=raw_source,
+            raw_reference=raw_reference,
+            evidence_strength=evidence_strength,
+            observation_source=observation_source,
+            carrier_type=carrier_type,
+            carrier_location=carrier_location,
+            derived_from_hash=derived_from_hash,
+            instrumentation_visibility=instrumentation_visibility,
+            raw_event_id=raw_event_id,
+            trace_file=trace_file,
+            trace_line=trace_line,
             metadata={**_normalize_metadata_paths(metadata), **kwargs},
         )
 
@@ -101,6 +122,10 @@ def _convert_normalized_event(factory: RuntimeEventFactory, normalized: Normaliz
             object_id=f"FILE:{_normalize_runtime_path(meta.get('path'))}",
             object_path=meta.get("path"),
             operation=operation,
+            evidence_strength="structured_relation",
+            observation_source=_observation_source(normalized.source),
+            carrier_type="file_content" if operation in {"read", "write", "create"} else "file_path",
+            carrier_location=meta.get("path"),
             raw_source=normalized.source,
             raw_reference=raw_reference,
             metadata=meta,
@@ -108,6 +133,7 @@ def _convert_normalized_event(factory: RuntimeEventFactory, normalized: Normaliz
 
     if normalized.event_type == "network":
         operation = str(meta.get("action") or "connect")
+        evidence_strength, carrier_type, visibility = _network_event_evidence(meta, operation)
         return factory.create(
             timestamp=timestamp,
             event_type=f"network_{operation}",
@@ -118,6 +144,11 @@ def _convert_normalized_event(factory: RuntimeEventFactory, normalized: Normaliz
             object_id=f"NET:{meta.get('sink_url') or meta.get('address') or 'unknown'}",
             object_path=None,
             operation=operation,
+            evidence_strength=evidence_strength,
+            observation_source=_observation_source(normalized.source),
+            carrier_type=carrier_type,
+            carrier_location=meta.get("carrier_location") or meta.get("sink_url") or meta.get("address"),
+            instrumentation_visibility=visibility,
             raw_source=normalized.source,
             raw_reference=raw_reference,
             metadata=meta,
@@ -135,6 +166,10 @@ def _convert_normalized_event(factory: RuntimeEventFactory, normalized: Normaliz
             object_id=f"PROC:{pid or command or normalized.event_id}",
             operation="exec",
             data_preview=command,
+            evidence_strength="structured_relation",
+            observation_source=_observation_source(normalized.source),
+            carrier_type="process_argv",
+            carrier_location="argv",
             raw_source=normalized.source,
             raw_reference=raw_reference,
             metadata=meta,
@@ -145,6 +180,7 @@ def _convert_normalized_event(factory: RuntimeEventFactory, normalized: Normaliz
         event_kind = str(meta.get("event") or "invoke")
         operation = "invoke" if event_kind == "start" else "return"
         taint_ids = list(meta.get("input_taint_ids" if event_kind == "start" else "output_taint_ids", []))
+        carrier_type = _tool_carrier_type(meta, operation)
         return factory.create(
             timestamp=timestamp,
             event_type=f"tool_{operation}",
@@ -157,6 +193,10 @@ def _convert_normalized_event(factory: RuntimeEventFactory, normalized: Normaliz
             data_preview=json.dumps(meta.get("config", meta), ensure_ascii=False, sort_keys=True)[:4096],
             taint_ids=taint_ids,
             evidence_level=str(meta.get("taint_evidence_level") or "unknown"),
+            evidence_strength=str(meta.get("evidence_strength") or ("structured_relation" if taint_ids else "unknown")),
+            observation_source=_observation_source(normalized.source),
+            carrier_type=carrier_type,
+            carrier_location=meta.get("carrier_location") or meta.get("tool_name") or tool_id,
             raw_source=normalized.source,
             raw_reference=raw_reference,
             metadata=meta,
@@ -176,6 +216,10 @@ def _convert_normalized_event(factory: RuntimeEventFactory, normalized: Normaliz
             operation="source",
             taint_ids=list(meta.get("taint_ids", [])),
             evidence_level="confirmed",
+            evidence_strength="exact_value",
+            observation_source="inferred_relation",
+            carrier_type="file_content",
+            carrier_location=meta.get("source_object"),
             raw_source="taint",
             raw_reference=raw_reference,
             metadata={**meta, "source_label": label},
@@ -195,6 +239,10 @@ def _convert_normalized_event(factory: RuntimeEventFactory, normalized: Normaliz
             operation="derive",
             taint_ids=list(meta.get("taint_ids", [])),
             evidence_level=str(meta.get("evidence_level") or "conservative"),
+            evidence_strength=str(meta.get("evidence_strength") or "structured_relation"),
+            observation_source="inferred_relation",
+            carrier_type=str(meta.get("carrier_type") or "tool_return"),
+            carrier_location=str(meta.get("carrier_location") or target.get("path") or target.get("tool_id") or ""),
             raw_source="taint",
             raw_reference=raw_reference,
             metadata=meta,
@@ -212,6 +260,10 @@ def _convert_normalized_event(factory: RuntimeEventFactory, normalized: Normaliz
             operation="send",
             taint_ids=list(meta.get("taint_ids", [])),
             evidence_level=str(meta.get("evidence_level") or "confirmed"),
+            evidence_strength=str(meta.get("evidence_strength") or "structured_relation"),
+            observation_source="inferred_relation",
+            carrier_type=str(meta.get("carrier_type") or "http_body"),
+            carrier_location=str(meta.get("carrier_location") or meta.get("destination") or ""),
             raw_source="taint",
             raw_reference=raw_reference,
             metadata=meta,
@@ -229,6 +281,10 @@ def _convert_normalized_event(factory: RuntimeEventFactory, normalized: Normaliz
             operation="connect",
             taint_ids=list(meta.get("taint_ids", [])),
             evidence_level="candidate",
+            evidence_strength="temporal_cooccurrence",
+            observation_source="inferred_relation",
+            carrier_type="unknown",
+            instrumentation_visibility="payload_not_observed",
             raw_source="taint",
             raw_reference=raw_reference,
             metadata=meta,
@@ -281,3 +337,41 @@ def _object_id(object_type: Any, object_path: str | None, data_hash: str | None)
     if object_path:
         return f"{str(object_type).upper()}:{object_path}"
     return f"{str(object_type).upper()}:{(data_hash or 'unknown')[:16]}"
+
+
+def _observation_source(raw_source: str) -> str:
+    raw = str(raw_source or "")
+    if raw.startswith("strace"):
+        return "strace_syscall"
+    if raw in {"taint", "dynamic_analyzer"}:
+        return "inferred_relation"
+    if raw.startswith("closure_lift"):
+        return "instruction_simulation"
+    return "runtime_wrapper"
+
+
+def _network_event_evidence(metadata: dict[str, Any], operation: str) -> tuple[str, str, str]:
+    if metadata.get("encrypted_payload_invisible") or metadata.get("network_evidence_level") == "encrypted_payload_invisible":
+        metadata.setdefault("network_evidence_level", "encrypted_payload_invisible")
+        return "unknown", "socket_payload", "encrypted_payload_invisible"
+    if operation in {"send", "sendto", "sendmsg", "sendmmsg", "write"} and metadata.get("payload_preview"):
+        metadata.setdefault("network_evidence_level", "request_observed")
+        return "structured_relation", "socket_payload", "payload_preview_observed"
+    if operation == "connect":
+        metadata.setdefault("network_evidence_level", "endpoint_observed")
+        return "candidate", "unknown", "endpoint_only"
+    metadata.setdefault("network_evidence_level", "request_observed")
+    return "structured_relation", "unknown", "observed"
+
+
+def _tool_carrier_type(metadata: dict[str, Any], operation: str) -> str:
+    tool_type = str(metadata.get("tool_type") or "")
+    if tool_type == "http_request":
+        return "http_body" if operation == "invoke" else "tool_return"
+    if tool_type == "read_file":
+        return "file_content" if operation == "return" else "file_path"
+    if tool_type == "write_file":
+        return "file_content"
+    if tool_type == "run_command":
+        return "process_argv" if operation == "invoke" else "stdout"
+    return "tool_argument" if operation == "invoke" else "tool_return"

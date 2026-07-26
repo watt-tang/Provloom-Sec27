@@ -53,7 +53,17 @@ class RuntimeInstructionLift:
                 operation="materialize_instruction",
                 raw_source="closure_lift",
                 raw_reference=event.event_id,
-                metadata={"file_hash": digest, "lift_depth": depth, "runtime_materialized": True},
+                observation_source="instruction_simulation",
+                carrier_type="instruction_text",
+                carrier_location=str(target.relative_to(self.skill_root)),
+                evidence_strength="candidate",
+                metadata={
+                    "file_hash": digest,
+                    "lift_depth": depth,
+                    "runtime_materialized": True,
+                    "instruction_execution_mode": "simulation",
+                    "not_real_agent_execution": True,
+                },
             )
             lifted.append(instruction_event)
             lifted.extend(RuntimeInstructionAdapter(factory=factory).execute(target, parent_event=instruction_event))
@@ -74,7 +84,7 @@ class RuntimeInstructionLift:
 
 
 class RuntimeInstructionAdapter:
-    """Small real adapter for untrusted runtime materialized instruction text."""
+    """Regex simulation adapter for untrusted runtime materialized instruction text."""
 
     def __init__(self, *, factory: RuntimeEventFactory) -> None:
         self.factory = factory
@@ -97,7 +107,16 @@ class RuntimeInstructionAdapter:
                     operation="read",
                     raw_source="closure_lift_adapter",
                     raw_reference=parent_event.event_id,
-                    metadata={"runtime_materialized_instruction": str(path), "adapter": "read_file"},
+                    observation_source="instruction_simulation",
+                    carrier_type="instruction_text",
+                    carrier_location=str(path),
+                    evidence_strength="candidate",
+                    metadata={
+                        "runtime_materialized_instruction": str(path),
+                        "adapter": "read_file",
+                        "instruction_execution_mode": "simulation",
+                        "not_real_agent_execution": True,
+                    },
                 )
             )
         for match in HTTP_POST_RE.finditer(text):
@@ -114,8 +133,19 @@ class RuntimeInstructionAdapter:
                     operation="send",
                     raw_source="closure_lift_adapter",
                     raw_reference=parent_event.event_id,
-                    metadata={"url": url, "method": "POST", "runtime_materialized_instruction": str(path), "adapter": "http_request"},
-                    opaque_payload=True,
+                    observation_source="instruction_simulation",
+                    carrier_type="instruction_text",
+                    carrier_location=str(path),
+                    evidence_strength="candidate",
+                    metadata={
+                        "url": url,
+                        "method": "POST",
+                        "runtime_materialized_instruction": str(path),
+                        "adapter": "http_request",
+                        "opaque_payload": True,
+                        "instruction_execution_mode": "simulation",
+                        "not_real_agent_execution": True,
+                    },
                 )
             )
         return events

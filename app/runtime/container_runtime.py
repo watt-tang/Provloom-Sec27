@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -10,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlparse
 
 from app.runtime.llm_client import OpenAICompatibleClient
 from app.runtime.skill_parser import SkillAction, SkillDefinition, load_skill_definition
@@ -46,11 +47,13 @@ class SkillToolExecutor:
             base_config.update(overrides)
         input_taint = self._input_taint_from_config(base_config)
         resolved = _resolve_templates(base_config, self.context)
+        request_metadata = _http_request_metadata(resolved) if action.type == "http_request" else {}
         start_event_id = self._emit("tool_call", "start", {
             "tool_id": action.id,
             "tool_name": action.name,
             "tool_type": action.type,
             "config": resolved,
+            **request_metadata,
             "input_taint_ids": input_taint.serialize(),
             "output_taint_ids": [],
             "taint_evidence_level": TaintEvidenceLevel.CONFIRMED.value if not input_taint.is_empty() else TaintEvidenceLevel.UNKNOWN.value,
@@ -93,6 +96,7 @@ class SkillToolExecutor:
             "exit_code": result["exit_code"],
             "stdout_preview": result["stdout"][:200],
             "stderr_preview": result["stderr"][:200],
+            **({**request_metadata, "response_status": result.get("response_status"), "request_completed": result.get("status") == "success"} if action.type == "http_request" else {}),
             "input_taint_ids": input_taint.serialize(),
             "output_taint_ids": output_taint.serialize(),
             "taint_evidence_level": self._finish_evidence_level(action.type, input_taint, output_taint, resolved),
@@ -276,6 +280,7 @@ class SkillToolExecutor:
         request = urllib.request.Request(config["url"], method=method, data=data, headers=headers)
         with urllib.request.urlopen(request, timeout=int(config.get("timeout_seconds", 10))) as response:
             payload = response.read().decode("utf-8", errors="replace")
+            response_status = getattr(response, "status", None)
         if payload:
             sys.stdout.write(payload)
             sys.stdout.flush()
@@ -286,6 +291,7 @@ class SkillToolExecutor:
             "stderr": "",
             "url": config["url"],
             "method": method,
+            "response_status": response_status,
         }
 
     def _input_taint_from_config(self, config: dict[str, Any]) -> TaintSet:
@@ -399,6 +405,61 @@ class SkillToolExecutor:
             "http_request": "network_sink_rule",
             "run_command": "opaque_command_transform",
         }.get(tool_type, "opaque_tool_conservative")
+
+
+def _http_request_metadata(config: dict[str, Any]) -> dict[str, Any]:
+    url = str(config.get("url", ""))
+    parsed = urlparse(url)
+    method = str(config.get("method", "GET")).upper()
+    headers = config.get("headers", {}) if isinstance(config.get("headers", {}), dict) else {}
+    body = config.get("body")
+    query_fields = {key: _preview_value(value) for key, value in parse_qsl(parsed.query, keep_blank_values=True)}
+    body_kind = "none"
+    body_fields: dict[str, Any] = {}
+    if isinstance(body, str) and body:
+        body_kind = "raw"
+        stripped = body.strip()
+        if stripped.startswith("{"):
+            try:
+                parsed_body = json.loads(stripped)
+                if isinstance(parsed_body, dict):
+                    body_kind = "json"
+                    body_fields = {str(key): _preview_value(value) for key, value in parsed_body.items()}
+            except Exception:
+                body_kind = "raw"
+        elif "=" in body:
+            form_fields = parse_qsl(body, keep_blank_values=True)
+            if form_fields:
+                body_kind = "form"
+                body_fields = {key: _preview_value(value) for key, value in form_fields}
+    upload_file = config.get("upload_file_path") or config.get("file") or config.get("file_path")
+    header_fields = {str(key): _preview_value(value) for key, value in headers.items()}
+    return {
+        "request_attempted": True,
+        "request_completed": False,
+        "method": method,
+        "scheme": parsed.scheme or None,
+        "host": parsed.hostname,
+        "port": parsed.port,
+        "path": parsed.path or "/",
+        "query_fields": query_fields,
+        "header_fields": header_fields,
+        "body_kind": body_kind,
+        "body_fields": body_fields,
+        "upload_file_path": str(upload_file) if upload_file else None,
+        "network_evidence_level": "request_observed",
+        "carrier_type": "http_body" if body else ("http_query" if query_fields else "unknown"),
+        "carrier_location": "body" if body else ("query" if query_fields else None),
+    }
+
+
+def _preview_value(value: Any) -> dict[str, Any]:
+    text = str(value)
+    return {
+        "byte_count": len(text.encode("utf-8")),
+        "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "preview": text[:16],
+    }
 
 
 class ProvLoomSkillRuntime:

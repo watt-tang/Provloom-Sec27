@@ -14,13 +14,25 @@ def classify_http_sink(config: dict, taint_ids: TaintSet) -> dict:
     parsed = urlparse(url)
     has_query = bool(parsed.query and parse_qsl(parsed.query, keep_blank_values=True))
     has_body = config.get("body") not in (None, "")
+    headers = config.get("headers", {}) if isinstance(config.get("headers", {}), dict) else {}
+    has_auth_header = any(str(key).lower() in {"authorization", "cookie"} for key in headers)
     if taint_ids.is_empty():
         return {"is_sink": False, "sink_type": "none", "payload_size": 0, "payload_hash": ""}
+    if has_auth_header:
+        payload_size = sum(len(str(value).encode("utf-8")) for key, value in headers.items() if str(key).lower() in {"authorization", "cookie"})
+        return {
+            "is_sink": True,
+            "sink_type": "http_header",
+            "carrier_location": "headers.authorization",
+            "payload_size": payload_size,
+            "payload_hash": "",
+        }
     if method in BODY_METHODS and has_body:
         body = str(config.get("body", ""))
         return {
             "is_sink": True,
             "sink_type": "http_body",
+            "carrier_location": "body",
             "payload_size": len(body.encode("utf-8")),
             "payload_hash": "",
         }
@@ -28,6 +40,7 @@ def classify_http_sink(config: dict, taint_ids: TaintSet) -> dict:
         return {
             "is_sink": True,
             "sink_type": "http_query",
+            "carrier_location": "query",
             "payload_size": len(parsed.query.encode("utf-8")),
             "payload_hash": "",
         }

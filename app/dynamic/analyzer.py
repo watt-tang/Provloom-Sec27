@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from app.dynamic.alignment import StaticRuntimeAligner
 from app.dynamic.chain_recovery import ChainRecovery
 from app.dynamic.closure_lift import RuntimeInstructionLift
 from app.dynamic.config import DynamicAnalysisConfig
@@ -28,6 +29,7 @@ class DynamicAnalysisResult:
     coverage: CoverageReport
     policy_violations: list[PolicyViolation]
     taint_sources: list[dict[str, Any]]
+    static_runtime_alignment: dict[str, Any] | None = None
     schema_version: str = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
@@ -39,6 +41,7 @@ class DynamicAnalysisResult:
             "coverage": self.coverage.to_dict(),
             "policy_violations": [violation.to_dict() for violation in self.policy_violations],
             "taint_sources": list(self.taint_sources),
+            "static_runtime_alignment": self.static_runtime_alignment or {},
             "summary": self.summary(),
         }
 
@@ -55,9 +58,11 @@ class DynamicAnalysisResult:
             "chain_count_by_type": by_type,
             "coverage_state": self.coverage.coverage_state,
             "policy_violation_count": len(self.policy_violations),
-            "confirmed_confidentiality_flow_count": sum(1 for chain in self.chains if chain.chain_type == "confidentiality" and chain.evidence_level == "confirmed"),
-            "conservative_confidentiality_flow_count": sum(1 for chain in self.chains if chain.chain_type == "confidentiality" and chain.evidence_level == "conservative"),
+            "confirmed_confidentiality_flow_count": sum(1 for chain in self.chains if chain.chain_type == "confidentiality_confirmed" and chain.evidence_level == "confirmed"),
+            "conservative_confidentiality_flow_count": sum(1 for chain in self.chains if chain.chain_type == "confidentiality_confirmed" and chain.evidence_level == "conservative"),
             "candidate_confidentiality_flow_count": sum(1 for chain in self.chains if chain.chain_type == "confidentiality_candidate"),
+            "canonical_chain_schema": "v3",
+            "static_runtime_alignment_status": (self.static_runtime_alignment or {}).get("status", "unknown"),
         }
 
 
@@ -86,7 +91,8 @@ class DynamicRuntimeAnalyzer:
             registry = self.registry or TaintRegistry(run_id=session_id or "RUN", config=self.config.marker)
             graph = RuntimeGraphBuilder(session_id=session_id or "RUN").build([], registry.source_dicts())
             coverage = CoverageAnalyzer().analyze(events=[], chains=[], timed_out=timed_out, exit_code=exit_code)
-            return DynamicAnalysisResult([], graph, [], coverage, [], registry.source_dicts())
+            alignment = StaticRuntimeAligner().align(graph=graph, chains=[], coverage=coverage)
+            return DynamicAnalysisResult([], graph, [], coverage, [], registry.source_dicts(), alignment)
 
         session = session_id or events[0].session_id
         skill = skill_id or events[0].skill_id
@@ -99,10 +105,11 @@ class DynamicRuntimeAnalyzer:
         chains = ChainRecovery().recover(graph)
         coverage = CoverageAnalyzer().analyze(events=propagated, chains=chains, timed_out=timed_out, exit_code=exit_code)
         violations = PolicyEngine(self.config).evaluate(chains=chains, events=propagated)
-        return DynamicAnalysisResult(propagated, graph, chains, coverage, violations, registry.source_dicts(), schema_version=SCHEMA_VERSION)
+        alignment = StaticRuntimeAligner().align(graph=graph, chains=chains, coverage=coverage)
+        return DynamicAnalysisResult(propagated, graph, chains, coverage, violations, registry.source_dicts(), alignment, schema_version=SCHEMA_VERSION)
 
-    def analyze_execution(self, execution: SandboxExecution) -> DynamicAnalysisResult:
-        normalized = build_normalized_events(execution)
+    def analyze_execution(self, execution: SandboxExecution, normalized: list[NormalizedEvent] | None = None) -> DynamicAnalysisResult:
+        normalized = normalized if normalized is not None else build_normalized_events(execution)
         return self.analyze_normalized_execution(execution, normalized)
 
     def analyze_normalized_execution(

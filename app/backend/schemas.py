@@ -177,6 +177,7 @@ class AnalyzeSkillResponse:
     runtime_policy_violations: list[dict[str, Any]] = field(default_factory=list)
     dynamic_analysis_summary: dict[str, Any] = field(default_factory=dict)
     taint_sources: list[dict[str, Any]] = field(default_factory=list)
+    static_runtime_alignment: dict[str, Any] = field(default_factory=dict)
     primary_chain: list[dict[str, Any]] = field(default_factory=list)
     root_cause: str = "unknown"
     root_cause_detail: str = "unknown"

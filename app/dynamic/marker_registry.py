@@ -99,14 +99,12 @@ class TaintRegistry:
 
 def marker_variants(marker: str, *, include_hash_derivatives: bool = True) -> dict[str, str]:
     raw_bytes = marker.encode("utf-8")
-    mid = max(1, len(marker) // 2)
     variants = {
         "raw": marker,
         "base64": base64.b64encode(raw_bytes).decode("ascii"),
         "hex": raw_bytes.hex(),
         "url_encoded": urllib.parse.quote(marker, safe=""),
         "json_escaped": json.dumps(marker)[1:-1],
-        "split_concat": marker[:mid] + marker[mid:],
     }
     if include_hash_derivatives:
         variants["sha256"] = hashlib.sha256(raw_bytes).hexdigest()

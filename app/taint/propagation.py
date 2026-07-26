@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
+from urllib.parse import urlparse
 
 from app.runtime.skill_parser import SkillDefinition, load_skill_definition
 from app.runner.models import SandboxExecution, ToolCallEvent
@@ -171,8 +172,9 @@ class TaintPropagationAnalyzer:
         input_taint: TaintSet,
     ) -> None:
         body_taint = input_taint.union(self._input_taint_from_value(declared_config.get("body", "")))
+        header_taint = self._input_taint_from_value(declared_config.get("headers", {}))
         url_taint = self._input_taint_from_value(declared_config.get("url", ""))
-        sink_taint = body_taint.union(url_taint)
+        sink_taint = body_taint.union(url_taint).union(header_taint)
         self.state.set_action_output(event.tool_id, [])
         sink_config = {**declared_config, **config}
         sink = classify_http_sink(sink_config, sink_taint)
@@ -189,6 +191,13 @@ class TaintPropagationAnalyzer:
                 "method": str(sink_config.get("method", "GET")).upper(),
                 "payload_size": sink.get("payload_size", 0),
                 "payload_hash": sink.get("payload_hash", ""),
+                "carrier_type": str(sink.get("sink_type", "http_body")),
+                "carrier_location": str(sink.get("carrier_location") or sink.get("sink_type", "")),
+                "evidence_strength": "structured_relation",
+                "network_evidence_level": "tainted_payload_observed",
+                "headers": sink_config.get("headers", {}),
+                "query": str(urlparse(str(sink_config.get("url", ""))).query),
+                "body": sink_config.get("body", ""),
             },
         )
 

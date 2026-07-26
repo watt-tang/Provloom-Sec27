@@ -7,6 +7,15 @@ from typing import Any
 
 
 COVERAGE_STATES = {
+    "runtime_confirmed",
+    "target_reached_no_flow",
+    "path_not_triggered",
+    "source_unavailable",
+    "sink_unavailable",
+    "environment_missing",
+    "instrumentation_gap",
+    "unsupported_operation",
+    "insufficient_coverage",
     "triggered_and_observed",
     "triggered_but_partially_observed",
     "instruction_seen_but_not_executed",

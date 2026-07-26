@@ -23,12 +23,16 @@ class TraceParserNetworkResolutionTests(unittest.TestCase):
 
             artifacts = parse_trace_dir(Path(temp_dir))
 
-        self.assertEqual(len(artifacts.network), 1)
+        self.assertEqual(len(artifacts.network), 2)
         event = artifacts.network[0]
         self.assertEqual(event.raw_host, "10.255.255.254")
         self.assertEqual(event.raw_port, 53)
         self.assertEqual(event.original_domain, "api.deepseek.com")
         self.assertIn("dns", event.network_evidence_sources)
+        send_event = artifacts.network[1]
+        self.assertEqual(send_event.action, "sendmmsg")
+        self.assertEqual(send_event.network_evidence_level, "request_observed")
+        self.assertEqual(send_event.carrier_type, "socket_payload")
 
 
 if __name__ == "__main__":

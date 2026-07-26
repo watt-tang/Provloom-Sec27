@@ -19,7 +19,7 @@ def _fixture(test_name: str):
     return config, registry, source, factory
 
 
-def _chain_levels(result, chain_type: str = "confidentiality") -> set[str]:
+def _chain_levels(result, chain_type: str = "confidentiality_confirmed") -> set[str]:
     return {chain.evidence_level for chain in result.chains if chain.chain_type == chain_type}
 
 
@@ -34,7 +34,8 @@ class DynamicRuntimeAnalysisV2Tests(unittest.TestCase):
         result = analyze_runtime_events(events, config=config, registry=registry)
 
         self.assertIn("confirmed", _chain_levels(result))
-        self.assertEqual(result.coverage.coverage_state, "triggered_and_observed")
+        self.assertEqual(result.coverage.coverage_state, "runtime_confirmed")
+        self.assertEqual(result.coverage.metadata.get("legacy_coverage_state"), "triggered_and_observed")
 
     def test_benign_lookalike_sensitive_read_plus_public_connect_is_candidate_only(self) -> None:
         config, registry, source, ev = _fixture(self.id())
@@ -95,7 +96,7 @@ class DynamicRuntimeAnalysisV2Tests(unittest.TestCase):
         self.assertIn("confirmed", _chain_levels(result))
         self.assertIn(source.taint_id, result.chains[0].taint_ids)
 
-    def test_opaque_transformation_then_upload_is_conservative(self) -> None:
+    def test_opaque_transformation_then_upload_is_candidate_only(self) -> None:
         config, registry, source, ev = _fixture(self.id())
         events = [
             ev.create(timestamp=1, event_type="file_read", process_id=50, actor_type="process", actor_id="PROC:50", object_type="file", object_path="/secret/api_key", operation="read", data_preview=source.marker),
@@ -106,8 +107,8 @@ class DynamicRuntimeAnalysisV2Tests(unittest.TestCase):
 
         result = analyze_runtime_events(events, config=config, registry=registry)
 
-        self.assertIn("conservative", _chain_levels(result))
         self.assertNotIn("confirmed", _chain_levels(result))
+        self.assertTrue([chain for chain in result.chains if chain.chain_type == "confidentiality_candidate"])
 
     def test_unrelated_process_output_does_not_inherit_taint(self) -> None:
         config, registry, source, ev = _fixture(self.id())
@@ -132,7 +133,8 @@ class DynamicRuntimeAnalysisV2Tests(unittest.TestCase):
         result = analyze_runtime_events(events, config=config, registry=registry, skill_root=root)
 
         self.assertTrue([event for event in result.runtime_events if event.event_type == "runtime_instruction_seen"])
-        self.assertTrue([chain for chain in result.chains if chain.chain_type == "confidentiality" and chain.evidence_level == "conservative"])
+        self.assertFalse([chain for chain in result.chains if chain.chain_type == "confidentiality_confirmed"])
+        self.assertTrue([event for event in result.runtime_events if event.observation_source == "instruction_simulation"])
 
     def test_prompt_injection_against_analyzer_does_not_suppress_events(self) -> None:
         config, registry, source, ev = _fixture(self.id())
@@ -153,7 +155,8 @@ class DynamicRuntimeAnalysisV2Tests(unittest.TestCase):
 
         result = analyze_runtime_events(events, config=config, registry=registry)
 
-        self.assertEqual(result.coverage.coverage_state, "external_state_missing")
+        self.assertEqual(result.coverage.coverage_state, "environment_missing")
+        self.assertEqual(result.coverage.metadata.get("legacy_coverage_state"), "external_state_missing")
 
     def test_timeout_preserves_pre_timeout_evidence(self) -> None:
         config, registry, source, ev = _fixture(self.id())

@@ -104,9 +104,9 @@ def _summary(
         "confidence_label": confidence_label(confidence),
         "abstention_reasons": list(abstentions),
         "hybrid_alignment_status": "coexisting_evidence",
-        "aligned_entities": [],
-        "aligned_operations": [],
-        "alignment_confidence": 0.0,
+        "aligned_entities": _alignment_key_summary(entities),
+        "aligned_operations": _alignment_key_summary(actions),
+        "alignment_confidence": confidence,
     }
 
 
@@ -147,3 +147,24 @@ def _path_sort_key(path: ValidatedInstructionPath) -> tuple[int, int, str]:
     }.get(path.path_type, 9)
     completeness = {"closed": 0, "candidate": 1, "partial": 2, "insufficient": 3}.get(path.completeness, 9)
     return (severity, completeness, path.path_id)
+
+
+def _alignment_key_summary(items) -> list[dict[str, Any]]:
+    summary: list[dict[str, Any]] = []
+    for item in items:
+        keys = getattr(item, "alignment_keys", {}) or getattr(item, "runtime_alignment_keys", {}) or {}
+        if not keys and hasattr(item, "attributes"):
+            keys = getattr(item, "attributes", {}) or {}
+        key = keys.get("alignment_key") or keys.get("normalized_path") or keys.get("domain") or keys.get("command")
+        if not key:
+            continue
+        item_id = getattr(item, "entity_id", None) or getattr(item, "action_id", None) or getattr(item, "id", None) or str(key)
+        summary.append({"id": str(item_id), "alignment_key": str(key), "key_type": _alignment_key_type(keys)})
+    return summary
+
+
+def _alignment_key_type(keys: dict[str, Any]) -> str:
+    for key in ("normalized_path", "domain", "command", "tool", "alignment_key"):
+        if keys.get(key):
+            return key
+    return "unknown"

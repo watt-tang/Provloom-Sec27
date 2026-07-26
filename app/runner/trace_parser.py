@@ -16,6 +16,9 @@ TLS_SNI_RE = re.compile(r"(?:sni|server_name)[=: ]+(?P<host>[A-Za-z0-9._-]+)", r
 URL_RE = re.compile(r"https?://[^\s'\"<>]+")
 IP_PORT_RE = re.compile(r"\b(?P<host>(?:\d{1,3}\.){3}\d{1,3})(?::(?P<port>\d{1,5}))\b")
 CALL_FD_RE = re.compile(r"^(?P<call>[a-zA-Z0-9_]+)\((?P<fd>\d+)")
+RETURN_FD_RE = re.compile(r"\)\s+=\s+(?P<fd>\d+)")
+RETURN_INT_RE = re.compile(r"=\s+(?P<value>-?\d+)")
+SEND_CALLS = ("send(", "sendto(", "sendmsg(", "sendmmsg(")
 
 
 def parse_trace_dir(trace_dir: Path) -> TraceArtifacts:
@@ -23,10 +26,12 @@ def parse_trace_dir(trace_dir: Path) -> TraceArtifacts:
     for trace_file in sorted(trace_dir.glob("trace.log*")):
         pid = trace_file.name.split(".")[-1] if "." in trace_file.name else None
         dns_events_by_fd: dict[str, NetworkEvent] = {}
+        fd_table: dict[str, dict[str, object]] = {}
         for line in trace_file.read_text(encoding="utf-8", errors="replace").splitlines():
             body = _extract_trace_body(line)
             _enrich_dns_event_from_line(body=body, dns_events_by_fd=dns_events_by_fd)
-            parsed = _parse_line(line=line, pid=pid)
+            _update_fd_table_from_line(body, fd_table)
+            parsed = _parse_line(line=line, pid=pid, fd_table=fd_table)
             if not parsed:
                 continue
             category, event, body = parsed
@@ -37,7 +42,7 @@ def parse_trace_dir(trace_dir: Path) -> TraceArtifacts:
                 fd = _extract_fd(body)
                 if fd is not None and event.port == 53:
                     dns_events_by_fd[fd] = event
-                elif fd is not None:
+                elif fd is not None and event.action == "connect":
                     dns_events_by_fd.pop(fd, None)
             elif category == "process":
                 artifacts.processes.append(event)
@@ -46,7 +51,7 @@ def parse_trace_dir(trace_dir: Path) -> TraceArtifacts:
     return artifacts
 
 
-def _parse_line(line: str, pid: str | None):
+def _parse_line(line: str, pid: str | None, fd_table: dict[str, dict[str, object]] | None = None):
     match = TRACE_RE.match(line.strip())
     if not match:
         return None
@@ -60,7 +65,20 @@ def _parse_line(line: str, pid: str | None):
     if body.startswith(("execve(", "clone(", "clone3(", "vfork(", "fork(")):
         return "process", _parse_process(timestamp, body, pid), body
     if body.startswith("connect("):
-        return "network", _parse_network(timestamp, body, pid), body
+        event = _parse_network(timestamp, body, pid)
+        if event.fd:
+            fd_table = fd_table if fd_table is not None else {}
+            fd_table.setdefault(event.fd, {})["endpoint"] = event
+            fd_table[event.fd]["kind"] = "socket"
+        return "network", event, body
+    if body.startswith(SEND_CALLS):
+        event = _parse_network_send(timestamp, body, pid, fd_table or {})
+        if event is not None:
+            return "network", event, body
+    if body.startswith("write("):
+        event = _parse_socket_write(timestamp, body, pid, fd_table or {})
+        if event is not None:
+            return "network", event, body
     return None
 
 
@@ -125,8 +143,53 @@ def _parse_network(timestamp: str, body: str, pid: str | None) -> NetworkEvent:
         raw_address=address,
         raw_host=host,
         raw_port=port,
+        fd=_extract_fd(body),
+        network_evidence_level="endpoint_observed",
+        instrumentation_visibility="endpoint_only",
         pid=pid,
     )
+
+
+def _parse_network_send(timestamp: str, body: str, pid: str | None, fd_table: dict[str, dict[str, object]]) -> NetworkEvent | None:
+    fd = _extract_fd(body)
+    endpoint = _endpoint_for_fd(fd, fd_table)
+    host = endpoint.host if endpoint else None
+    port = endpoint.port if endpoint else None
+    payload = _extract_payload_preview(body)
+    encrypted = _is_encrypted_payload(port=port, payload_preview=payload)
+    address = _build_address(host=host, port=port)
+    action = body.split("(", 1)[0]
+    byte_count = _extract_byte_count(body)
+    return NetworkEvent(
+        timestamp=timestamp,
+        address=address,
+        action=action,
+        raw=body,
+        host=host,
+        port=port,
+        display_label=_build_display_label(host=host, port=port),
+        endpoint_kind="ip_port" if host else "unknown",
+        endpoint_source="trace_fd_table" if endpoint else "trace_send",
+        raw_address=address,
+        raw_host=host,
+        raw_port=port,
+        fd=fd,
+        byte_count=byte_count,
+        payload_preview=payload if not encrypted else None,
+        encrypted_payload_invisible=encrypted,
+        network_evidence_level="encrypted_payload_invisible" if encrypted else ("request_observed" if payload else "endpoint_observed"),
+        carrier_type="socket_payload",
+        carrier_location=f"fd:{fd}" if fd is not None else None,
+        instrumentation_visibility="encrypted_payload_invisible" if encrypted else ("payload_preview_observed" if payload else "endpoint_only"),
+        pid=pid,
+    )
+
+
+def _parse_socket_write(timestamp: str, body: str, pid: str | None, fd_table: dict[str, dict[str, object]]) -> NetworkEvent | None:
+    fd = _extract_fd(body)
+    if fd is None or fd_table.get(fd, {}).get("kind") != "socket":
+        return None
+    return _parse_network_send(timestamp, body, pid, fd_table)
 
 
 def _extract_first_string(text: str) -> str:
@@ -153,6 +216,61 @@ def _extract_fd(body: str) -> str | None:
     if not match:
         return None
     return match.group("fd")
+
+
+def _endpoint_for_fd(fd: str | None, fd_table: dict[str, dict[str, object]]) -> NetworkEvent | None:
+    if fd is None:
+        return None
+    endpoint = fd_table.get(fd, {}).get("endpoint")
+    return endpoint if isinstance(endpoint, NetworkEvent) else None
+
+
+def _update_fd_table_from_line(body: str | None, fd_table: dict[str, dict[str, object]]) -> None:
+    if not body:
+        return
+    if body.startswith("socket("):
+        match = RETURN_INT_RE.search(body)
+        if match and int(match.group("value")) >= 0:
+            fd_table[match.group("value")] = {"kind": "socket"}
+        return
+    if body.startswith(("dup(", "dup2(", "dup3(")):
+        source_fd = _extract_fd(body)
+        match = RETURN_INT_RE.search(body)
+        if source_fd is not None and match and int(match.group("value")) >= 0:
+            fd_table[match.group("value")] = dict(fd_table.get(source_fd, {"kind": "unknown"}))
+        return
+    if body.startswith("close("):
+        fd = _extract_fd(body)
+        if fd is not None:
+            fd_table.pop(fd, None)
+
+
+def _extract_payload_preview(body: str) -> str | None:
+    strings = STRING_RE.findall(body)
+    if not strings:
+        return None
+    try:
+        decoded = codecs.decode(strings[0], "unicode_escape")
+    except Exception:
+        decoded = strings[0]
+    preview = "".join(ch if 32 <= ord(ch) < 127 or ch in "\r\n\t" else "." for ch in decoded)
+    return preview[:4096] or None
+
+
+def _extract_byte_count(body: str) -> int | None:
+    match = RETURN_INT_RE.search(body)
+    if not match:
+        return None
+    value = int(match.group("value"))
+    return value if value >= 0 else None
+
+
+def _is_encrypted_payload(*, port: int | None, payload_preview: str | None) -> bool:
+    if port == 443:
+        return True
+    if not payload_preview:
+        return False
+    return payload_preview.startswith(("\x16\x03", "\x17\x03"))
 
 
 def _enrich_dns_event_from_line(body: str | None, dns_events_by_fd: dict[str, NetworkEvent]) -> None:
