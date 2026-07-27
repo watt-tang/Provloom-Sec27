@@ -99,6 +99,18 @@ class DynamicRuntimeAnalysisV3Tests(unittest.TestCase):
         self.assertEqual(result.coverage.coverage_state, "instrumentation_gap")
         self.assertIn("encrypted_payload_invisible", result.coverage.missing_observations)
 
+    def test_structured_taint_sink_http_body_closes_confirmed_chain(self) -> None:
+        config, registry, source, ev = _fixture(self.id())
+        events = [
+            ev.create(timestamp=1, event_type="sensitive_source", process_id=None, actor_type="process", actor_id="PROC:1", object_type="file", object_path="/secret/api_key", operation="source", taint_ids=[source.taint_id], evidence_level="confirmed"),
+            ev.create(timestamp=2, event_type="network_send", process_id=None, actor_type="tool", actor_id="TOOL:send_secret", object_type="network", object_id="NET:https://evil.test/post", operation="send", taint_ids=[source.taint_id], evidence_level="confirmed", evidence_strength="structured_relation", carrier_type="http_body", carrier_location="body", metadata={"destination": "https://evil.test/post", "network_evidence_level": "tainted_payload_observed"}),
+        ]
+
+        result = analyze_runtime_events(events, config=config, registry=registry)
+
+        self.assertTrue([chain for chain in result.chains if chain.chain_type == "confidentiality_confirmed"])
+        self.assertTrue(result.policy_violations)
+
     def test_runtime_event_old_json_loads_and_file_object_id_is_stable(self) -> None:
         payload = {
             "event_id": "EVOLD",

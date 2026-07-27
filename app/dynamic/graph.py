@@ -85,11 +85,11 @@ class RuntimeGraphBuilder:
             self._edge(source_node, actor, "HAS_PROCESS_CONTEXT", event, "process had prior contact with sensitive source")
 
         if event.object_type == "network":
-            if event.metadata.get("marker_matches"):
+            if event.metadata.get("marker_matches") or _has_structured_tainted_carrier(event):
                 for taint_id in event.taint_ids:
                     source_node = self._node(f"source:{taint_id}", "SensitiveSource", taint_id, {"taint_id": taint_id})
                     data_node = self._data_node(event, taint_id, obj)
-                    self._edge(source_node, data_node, "DERIVES", event, "marker variant directly observed in network carrier")
+                    self._edge(source_node, data_node, "DERIVES", event, "taint observed in structured network carrier")
                     self._edge(data_node, obj, "SENDS", event, "tainted carrier sent to network endpoint")
             elif event.metadata.get("context_taint_ids") or (event.metadata.get("opaque_payload") and not event.metadata.get("upload_file_path")):
                 for taint_id in event.metadata.get("context_taint_ids", event.taint_ids):
@@ -240,3 +240,11 @@ def _instrumentation_gaps(event: RuntimeEvent) -> list[str]:
     if event.metadata.get("encrypted_payload_invisible"):
         gaps.append("encrypted_payload_invisible")
     return sorted(set(gaps))
+
+
+def _has_structured_tainted_carrier(event: RuntimeEvent) -> bool:
+    if not event.taint_ids:
+        return False
+    if event.derived_from_hash or event.evidence_strength in {"hash_derived", "process_context", "temporal_cooccurrence", "candidate", "unknown"}:
+        return False
+    return event.carrier_type in {"http_header", "http_query", "http_body", "http_form", "multipart_field", "socket_payload", "upload_file"}
