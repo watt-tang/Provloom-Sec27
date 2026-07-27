@@ -41,18 +41,21 @@ class SkillToolExecutor:
         overrides: dict[str, Any] | None = None,
         step_id: str | None = None,
         parent_event_id: str | None = None,
+        extra_input_taint_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         base_config = dict(action.config)
         if overrides:
             base_config.update(overrides)
         input_taint = self._input_taint_from_config(base_config)
+        input_taint = input_taint.union(extra_input_taint_ids or [])
         resolved = _resolve_templates(base_config, self.context)
         request_metadata = _http_request_metadata(resolved) if action.type == "http_request" else {}
+        request_metadata = _redact_http_request_metadata(request_metadata, input_taint)
         start_event_id = self._emit("tool_call", "start", {
             "tool_id": action.id,
             "tool_name": action.name,
             "tool_type": action.type,
-            "config": resolved,
+            "config": _redact_config(resolved, input_taint),
             **request_metadata,
             "input_taint_ids": input_taint.serialize(),
             "output_taint_ids": [],
@@ -88,13 +91,15 @@ class SkillToolExecutor:
         )
         result["_taint_ids"] = output_taint.serialize()
         self.context.setdefault("_taint", {}).setdefault("actions", {})[action.id] = output_taint.serialize()
+        stdout_preview, stdout_privacy = _privacy_preserving_preview(result["stdout"], output_taint)
         self._emit("tool_call", "finish", {
             "tool_id": action.id,
             "tool_name": action.name,
             "tool_type": action.type,
             "status": result["status"],
             "exit_code": result["exit_code"],
-            "stdout_preview": result["stdout"][:200],
+            "stdout_preview": stdout_preview,
+            **stdout_privacy,
             "stderr_preview": result["stderr"][:200],
             **({**request_metadata, "response_status": result.get("response_status"), "request_completed": result.get("status") == "success"} if action.type == "http_request" else {}),
             "input_taint_ids": input_taint.serialize(),
@@ -217,10 +222,11 @@ class SkillToolExecutor:
         }
 
     def _read_file(self, config: dict[str, Any]) -> dict[str, Any]:
-        path = Path(config["path"])
+        path = _skill_path(self.skill_root, config["path"])
         content = path.read_text(encoding="utf-8")
-        sys.stdout.write(content)
-        sys.stdout.flush()
+        if self._source_registry.match_path(str(config["path"])) is None:
+            sys.stdout.write(content)
+            sys.stdout.flush()
         return {
             "status": "success",
             "exit_code": 0,
@@ -230,7 +236,7 @@ class SkillToolExecutor:
         }
 
     def _write_file(self, config: dict[str, Any]) -> dict[str, Any]:
-        path = Path(config["path"])
+        path = _skill_path(self.skill_root, config["path"])
         path.parent.mkdir(parents=True, exist_ok=True)
         mode = "a" if config.get("append") else "w"
         content = config.get("content", "")
@@ -453,6 +459,90 @@ def _http_request_metadata(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _privacy_preserving_preview(value: str, taint: TaintSet) -> tuple[str, dict[str, Any]]:
+    if taint.is_empty():
+        return value[:200], {"stdout_plaintext_stored": True}
+    taint_ids = taint.serialize()
+    return (
+        f"[TAINTED_STDOUT:{','.join(taint_ids)}]",
+        {
+            "stdout_plaintext_stored": False,
+            "stdout_byte_count": len(value.encode("utf-8")),
+            "stdout_sha256": hashlib.sha256(value.encode("utf-8")).hexdigest(),
+            "stdout_redaction": "tainted_output",
+        },
+    )
+
+
+def _privacy_preserving_text_preview(value: str, taint_ids: list[str]) -> tuple[str, dict[str, Any]]:
+    if not taint_ids:
+        return value[:400], {"plaintext_stored": True}
+    return (
+        f"[TAINTED_TEXT:{','.join(taint_ids)}]",
+        {
+            "plaintext_stored": False,
+            "content_byte_count": len(value.encode("utf-8")),
+            "content_sha256": hashlib.sha256(value.encode("utf-8")).hexdigest(),
+            "content_redaction": "tainted_text",
+        },
+    )
+
+
+def _redact_config(config: dict[str, Any], taint: TaintSet) -> dict[str, Any]:
+    if taint.is_empty():
+        return config
+    preserved_keys = {"url", "method", "path", "timeout_seconds", "append", "shell", "upload_file_path", "file", "file_path"}
+    redacted: dict[str, Any] = {}
+    for key, value in config.items():
+        redacted[key] = value if key in preserved_keys else _redact_value(value)
+    return redacted
+
+
+def _redact_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _redact_value(sub_value) for key, sub_value in value.items()}
+    if isinstance(value, list):
+        return [_redact_value(item) for item in value]
+    if isinstance(value, str):
+        return {
+            "redacted": "[TAINTED_VALUE]",
+            "byte_count": len(value.encode("utf-8")),
+            "sha256": hashlib.sha256(value.encode("utf-8")).hexdigest(),
+            "plaintext_stored": False,
+        }
+    return value
+
+
+def _redact_http_request_metadata(metadata: dict[str, Any], taint: TaintSet) -> dict[str, Any]:
+    if taint.is_empty():
+        return metadata
+    redacted = dict(metadata)
+    for key in ("query_fields", "header_fields", "body_fields"):
+        fields = redacted.get(key)
+        if isinstance(fields, dict):
+            redacted[key] = {
+                field: _redact_field_preview(value)
+                for field, value in fields.items()
+            }
+    redacted["plaintext_stored"] = False
+    return redacted
+
+
+def _redact_field_preview(value: Any) -> Any:
+    if not isinstance(value, dict):
+        return value
+    redacted = dict(value)
+    if "preview" in redacted:
+        redacted["preview"] = "[TAINTED_VALUE]"
+    redacted["plaintext_stored"] = False
+    return redacted
+
+
+def _skill_path(skill_root: Path, path: Any) -> Path:
+    candidate = Path(str(path))
+    return candidate if candidate.is_absolute() else skill_root / candidate
+
+
 def _preview_value(value: Any) -> dict[str, Any]:
     text = str(value)
     return {
@@ -568,6 +658,8 @@ class LLMAgentSkillRuntime:
         self._emit = emit_func
         self.llm_config = llm_config
         self.tool_catalog = executor.get_tool_catalog(definition.actions)
+        self._message_taint_ids: dict[int, list[str]] = {}
+        self._tainted_text_by_id: dict[str, str] = {}
         self.client = OpenAICompatibleClient(
             base_url=llm_config["base_url"],
             api_key=llm_config["api_key"],
@@ -586,6 +678,7 @@ class LLMAgentSkillRuntime:
 
         for step in range(1, max_steps + 1):
             step_id = f"step-{step}"
+            llm_context_metadata = self._llm_context_metadata(messages)
             request_event_id = self._emit("llm", "request", {
                 "step": step,
                 "provider": self.llm_config.get("provider", "openai-compatible"),
@@ -593,11 +686,15 @@ class LLMAgentSkillRuntime:
                 "base_url": self.client.base_url,
                 "endpoint_host": urlparse(self.client.base_url).hostname,
                 "message_count": len(messages),
+                **llm_context_metadata,
             }, step_id=step_id)
             response = self.client.chat(messages)
+            response_taint_ids = self._taint_ids_in_value(response.content)
+            content_preview, content_privacy = _privacy_preserving_text_preview(response.content, response_taint_ids)
             self._emit("llm", "response", {
                 "step": step,
-                "content_preview": response.content[:400],
+                "content_preview": content_preview,
+                **content_privacy,
             }, step_id=step_id, parent_event_id=request_event_id)
 
             parsed = _extract_json_object(response.content)
@@ -605,6 +702,8 @@ class LLMAgentSkillRuntime:
             action_name = action.get("tool", "finish")
             arguments = action.get("arguments", {}) or {}
             messages.append({"role": "assistant", "content": response.content})
+            if response_taint_ids:
+                self._message_taint_ids[len(messages) - 1] = response_taint_ids
 
             if action_name == "finish":
                 final_message = parsed.get("message", "")
@@ -618,6 +717,7 @@ class LLMAgentSkillRuntime:
                 arguments,
                 step_id=step_id,
                 parent_event_id=request_event_id,
+                extra_input_taint_ids=self._taint_ids_in_value(arguments),
             )
             self.context["actions"][tool_key] = result
             last_exit_code = result["exit_code"]
@@ -632,6 +732,12 @@ class LLMAgentSkillRuntime:
                 ensure_ascii=False,
             )
             messages.append({"role": "user", "content": f"Tool result:\n{observation}"})
+            if result.get("_taint_ids"):
+                result_taint_ids = sorted({str(item) for item in result.get("_taint_ids", []) if str(item)})
+                self._message_taint_ids[len(messages) - 1] = result_taint_ids
+                for taint_id in result_taint_ids:
+                    if result.get("stdout"):
+                        self._tainted_text_by_id[taint_id] = str(result.get("stdout"))
 
             if result["exit_code"] != 0 and not skill_action.continue_on_error:
                 return result["exit_code"]
@@ -650,6 +756,7 @@ class LLMAgentSkillRuntime:
         arguments: dict[str, Any],
         step_id: str | None = None,
         parent_event_id: str | None = None,
+        extra_input_taint_ids: list[str] | None = None,
     ) -> tuple[dict[str, Any], str, SkillAction]:
         action = self._find_action(tool_id)
         if action is not None:
@@ -659,6 +766,7 @@ class LLMAgentSkillRuntime:
                     overrides=arguments,
                     step_id=step_id,
                     parent_event_id=parent_event_id,
+                    extra_input_taint_ids=extra_input_taint_ids,
                 ),
                 action.id,
                 action,
@@ -681,6 +789,56 @@ class LLMAgentSkillRuntime:
                 virtual_action,
             )
         raise RuntimeError(f"Unknown tool requested by model: {tool_id}")
+
+    def _taint_ids_in_value(self, value: Any) -> list[str]:
+        serialized = _stringify_message_content(value)
+        ids = [
+            taint_id
+            for taint_id, text in self._tainted_text_by_id.items()
+            if text and text in serialized
+        ]
+        return sorted(set(ids))
+
+    def _llm_context_metadata(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+        observations: list[dict[str, Any]] = []
+        taint_ids: set[str] = set()
+        for index, message in enumerate(messages):
+            ids = sorted({str(item) for item in self._message_taint_ids.get(index, []) if str(item)})
+            if not ids:
+                continue
+            text = _stringify_message_content(message.get("content"))
+            location = f"messages[{index}].content"
+            taint_ids.update(ids)
+            observations.append(
+                {
+                    "carrier_location": location,
+                    "role": str(message.get("role", "")),
+                    "taint_ids": ids,
+                    "content_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                    "byte_count": len(text.encode("utf-8")),
+                    "redacted_preview": f"[TOOL_RESULT_WITH_TAINT:{','.join(ids)}]",
+                    "plaintext_stored": False,
+                }
+            )
+        ids = sorted(taint_ids)
+        if not ids:
+            return {
+                "taint_ids": [],
+                "llm_context_observations": [],
+                "plaintext_stored": False,
+                "network_evidence_level": "request_observed",
+            }
+        return {
+            "taint_ids": ids,
+            "evidence_level": "confirmed",
+            "evidence_strength": "structured_relation",
+            "carrier_type": "llm_context",
+            "carrier_location": observations[0]["carrier_location"],
+            "llm_context_observations": observations,
+            "plaintext_stored": False,
+            "network_evidence_level": "tainted_payload_observed",
+            "instrumentation_visibility": "observed",
+        }
 
     def _system_prompt(self) -> str:
         return (
@@ -750,7 +908,12 @@ def _paths_from_config(config: dict[str, Any]) -> list[str]:
         for token in value.replace("\\", "/").split():
             cleaned = token.strip("\"'{}[](),")
             normalized = normalize_path(cleaned)
-            if normalized.startswith(("/etc/", "/root/", "/proc/", "/sys/", "/var/run/")) or "credential_state/" in normalized or normalized.startswith(("runtime_output/", "public/")):
+            if (
+                normalized.startswith(("/etc/", "/root/", "/proc/", "/sys/", "/var/run/"))
+                or "credential_state/" in normalized
+                or ".provloom/private/" in normalized
+                or normalized.startswith(("runtime_output/", "public/", ".provloom/private/"))
+            ):
                 paths.add(normalized)
     return sorted(paths)
 
@@ -766,6 +929,17 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     if start == -1 or end == -1 or end <= start:
         raise RuntimeError(f"LLM response is not valid JSON: {text}")
     return json.loads(candidate[start:end + 1])
+
+
+def _stringify_message_content(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True)
+    except TypeError:
+        return str(value)
 
 
 def main() -> int:

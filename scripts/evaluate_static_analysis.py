@@ -66,6 +66,8 @@ def _evaluate_sample(sample: dict[str, Any], config: StaticAnalysisConfig, ablat
     pred_chains = {(chain.get("chain_type"), chain.get("status")) for chain in payload.get("static_chains", [])}
     closed_expected = any(status == "closed" for _, status in gold_chains)
     closed_predicted = any(chain.get("status") == "closed" for chain in payload.get("static_chains", []))
+    violation_expected = bool(sample.get("expected_violation", closed_expected))
+    violation_predicted = any(chain.get("alert_status") == "violation" for chain in payload.get("static_chains", []))
     return {
         "sample_id": sample.get("sample_id", sample["skill_path"]),
         "action_prf": _prf(pred_actions, gold_actions),
@@ -79,7 +81,9 @@ def _evaluate_sample(sample: dict[str, Any], config: StaticAnalysisConfig, ablat
         "edge_prf": _prf(pred_edges, gold_edges),
         "complete_chain_recall": 1.0 if gold_chains and gold_chains <= pred_chains else 0.0 if gold_chains else None,
         "chain_precision": _chain_precision(pred_chains, gold_chains),
-        "false_closure": 1.0 if closed_predicted and not closed_expected else 0.0,
+        "false_closure": 1.0 if violation_predicted and not violation_expected else 0.0,
+        "closed_capability_predicted": closed_predicted,
+        "violation_predicted": violation_predicted,
         "evidence_span_accuracy": _evidence_span_accuracy(payload),
         "exact_span_grounding_rate": _grounding_rate(payload),
         "unresolved_entity_rate": _unresolved_rate(payload),

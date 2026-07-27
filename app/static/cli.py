@@ -89,6 +89,8 @@ def _run(args) -> int:
                 "artifacts_dir": str(output_dir),
                 "review_priority": result.static_analysis_summary.get("review_priority", "informational"),
                 "chain_status_counts": result.static_analysis_summary.get("chain_status_counts", {}),
+                "alert_status_counts": result.static_analysis_summary.get("alert_status_counts", {}),
+                "violation_static_chain_count": result.static_analysis_summary.get("violation_static_chain_count", 0),
                 "coverage_states": result.static_coverage.states,
                 "static_chain_count": len(result.static_chains),
             },

@@ -247,4 +247,4 @@ def _has_structured_tainted_carrier(event: RuntimeEvent) -> bool:
         return False
     if event.derived_from_hash or event.evidence_strength in {"hash_derived", "process_context", "temporal_cooccurrence", "candidate", "unknown"}:
         return False
-    return event.carrier_type in {"http_header", "http_query", "http_body", "http_form", "multipart_field", "socket_payload", "upload_file"}
+    return event.carrier_type in {"http_header", "http_query", "http_body", "http_form", "multipart_field", "socket_payload", "upload_file", "llm_context"}

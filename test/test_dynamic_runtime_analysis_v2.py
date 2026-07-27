@@ -37,7 +37,7 @@ class DynamicRuntimeAnalysisV2Tests(unittest.TestCase):
         self.assertEqual(result.coverage.coverage_state, "runtime_confirmed")
         self.assertEqual(result.coverage.metadata.get("legacy_coverage_state"), "triggered_and_observed")
 
-    def test_benign_lookalike_sensitive_read_plus_public_connect_is_candidate_only(self) -> None:
+    def test_benign_lookalike_sensitive_read_plus_public_connect_does_not_create_candidate(self) -> None:
         config, registry, source, ev = _fixture(self.id())
         events = [
             ev.create(timestamp=1, event_type="file_read", process_id=11, actor_type="process", actor_id="PROC:11", object_type="file", object_path="/secret/api_key", operation="read", data_preview=source.marker),
@@ -47,7 +47,7 @@ class DynamicRuntimeAnalysisV2Tests(unittest.TestCase):
         result = analyze_runtime_events(events, config=config, registry=registry)
 
         self.assertNotIn("confirmed", _chain_levels(result))
-        self.assertTrue([chain for chain in result.chains if chain.chain_type == "confidentiality_candidate"])
+        self.assertFalse([chain for chain in result.chains if chain.chain_type == "confidentiality_candidate"])
 
     def test_file_relay_uploads_tainted_temp_file_as_confirmed(self) -> None:
         config, registry, source, ev = _fixture(self.id())

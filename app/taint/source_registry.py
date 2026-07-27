@@ -10,11 +10,13 @@ from typing import Any
 DEFAULT_SOURCE_PATHS = (
     "/etc/passwd",
     "/etc/shadow",
-    "/etc/hosts",
     "/root/**",
     "/proc/**",
     "/sys/**",
     "/var/run/**",
+    ".provloom/private/**",
+    "/workspace/skill/.provloom/private/**",
+    "/workspace/.provloom/private/**",
     ".provloom/adapters/credential_state/**",
     "/workspace/skill/.provloom/adapters/credential_state/**",
     "/workspace/.provloom/adapters/credential_state/**",
@@ -47,6 +49,10 @@ class SourceRegistry:
     ) -> None:
         self.source_paths = tuple(source_paths or self._paths_from_env() or DEFAULT_SOURCE_PATHS)
         self.source_types = {
+            "public": "public",
+            "public_system_configuration": "public",
+            "low": "low",
+            "medium": "medium",
             "credential": "critical",
             "private_input": "high",
             "sensitive_file": "high",
@@ -65,6 +71,14 @@ class SourceRegistry:
                 sensitivity=self.source_types.get("credential", "critical"),
                 normalized_path=normalized,
                 metadata={"matcher": "synthetic_credential"},
+            )
+
+        if ".provloom/private/" in normalized or normalized.startswith(".provloom/private/"):
+            return SourceMatch(
+                source_type="private_input",
+                sensitivity=self.source_types.get("private_input", "high"),
+                normalized_path=normalized,
+                metadata={"matcher": "private_input"},
             )
 
         if any(_glob_match(normalized, pattern) for pattern in self.source_paths):

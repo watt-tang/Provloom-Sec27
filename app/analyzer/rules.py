@@ -11,6 +11,8 @@ from app.analyzer.root_cause_v2 import infer_root_cause_v2
 from app.analyzer.decision_engine import evaluate_decision
 from app.analyzer.endpoint_semantics import endpoint_semantics, infer_endpoint_kind
 from app.backend.schemas import EvidenceEvent
+from app.dynamic.alignment import StaticRuntimeAligner
+from app.dynamic.assessment import apply_canonical_assessment, assess_dynamic_result
 from app.dynamic.analyzer import DynamicAnalysisResult, DynamicRuntimeAnalyzer, persist_dynamic_analysis
 from app.graph.builder import build_execution_provenance_graph
 from app.graph.exporter import export_graph
@@ -68,6 +70,7 @@ def analyze_trace(
     *,
     normalized_events: list[NormalizedEvent] | None = None,
     dynamic_result: DynamicAnalysisResult | None = None,
+    static_result=None,
 ) -> dict:
     skill_definition = _load_dynamic_skill_definition(execution)
     capability_profile = infer_capability_profile(
@@ -76,9 +79,24 @@ def analyze_trace(
         skill_definition=skill_definition,
     )
     normalized_events = normalized_events if normalized_events is not None else build_normalized_events(execution)
+    dynamic_result_was_provided = dynamic_result is not None
     if dynamic_result is None:
-        dynamic_result = DynamicRuntimeAnalyzer(skill_root=execution.skill_path).analyze_execution(execution, normalized_events)
+        dynamic_result = DynamicRuntimeAnalyzer(skill_root=execution.skill_path).analyze_execution(
+            execution,
+            normalized_events,
+            static_result=static_result,
+        )
         persist_dynamic_analysis(dynamic_result, execution.artifacts_dir)
+    elif static_result is not None:
+        alignment_summary = (dynamic_result.static_runtime_alignment or {}).get("summary", {})
+        if int(alignment_summary.get("static_item_count", 0) or 0) == 0:
+            dynamic_result.static_runtime_alignment = StaticRuntimeAligner().align(
+                graph=dynamic_result.graph,
+                chains=dynamic_result.chains,
+                coverage=dynamic_result.coverage,
+                static_result=static_result,
+            )
+            persist_dynamic_analysis(dynamic_result, execution.artifacts_dir)
     interesting_files = _interesting_file_events(execution.file_events)
     interesting_network = _interesting_network_events(execution.network_events)
     interesting_processes = _interesting_process_events(execution.process_events)
@@ -110,6 +128,7 @@ def analyze_trace(
     if execution.timed_out:
         detected.add("execution_timeout")
 
+    static_payload = static_result.to_dict() if hasattr(static_result, "to_dict") else (static_result if isinstance(static_result, dict) else {})
     result = {
         "risk_score": 0,
         "detected_behaviors": sorted(detected),
@@ -163,7 +182,24 @@ def analyze_trace(
         "dynamic_analysis_summary": dynamic_result.summary(),
         "taint_sources": list(dynamic_result.taint_sources),
         "static_runtime_alignment": dynamic_result.static_runtime_alignment or {},
+        "unified_explanation": _build_unified_explanation(static_payload, dynamic_result),
     }
+    if static_payload:
+        result.update({
+            "static_artifacts_v2": static_payload.get("static_artifacts_v2", []),
+            "static_semantic_units": static_payload.get("static_semantic_units", []),
+            "deterministic_mentions": static_payload.get("deterministic_mentions", []),
+            "extracted_actions": static_payload.get("extracted_actions", []),
+            "grounding_validation": static_payload.get("grounding_validation", []),
+            "resolved_entities": static_payload.get("resolved_entities", []),
+            "entity_resolutions": static_payload.get("entity_resolutions", []),
+            "instruction_provenance_graph": static_payload.get("instruction_provenance_graph", {}),
+            "static_chains": static_payload.get("static_chains", []),
+            "static_coverage": static_payload.get("static_coverage", {}),
+            "static_analysis_summary": static_payload.get("static_analysis_summary", {}),
+            "llm_extraction_metadata": static_payload.get("llm_extraction_metadata", []),
+            "static_schema_version": static_payload.get("schema_version", ""),
+        })
     if analysis_mode in {"rule_plus_epg", "epg_without_filtering", "epg_with_filtering"}:
         _augment_with_epg(
             execution,
@@ -190,6 +226,9 @@ def analyze_trace(
     result["decision_evidence"] = decision.evidence_bundle
     result["source_assessment"] = decision.evidence_bundle.get("source_assessment", {})
     result["sink_assessment"] = decision.evidence_bundle.get("sink_assessment", {})
+    assessment = assess_dynamic_result(dynamic_result)
+    if dynamic_result_was_provided or _dynamic_assessment_requires_top_level_override(dynamic_result, assessment):
+        apply_canonical_assessment(result, assessment)
 
     legacy_profile = map_risk_profile(
         risk_score=int(result["risk_score"]),
@@ -251,6 +290,29 @@ def analyze_trace(
         dynamic_chain_observed=bool(result.get("primary_chain")),
     )
     return result
+
+
+def _build_unified_explanation(static_payload: dict, dynamic_result: DynamicAnalysisResult) -> dict:
+    canonical = assess_dynamic_result(dynamic_result)
+    alignment = dynamic_result.static_runtime_alignment or {}
+    records = alignment.get("alignment_records", [])
+    contradictions = alignment.get("contradictions", [])
+    return {
+        "schema_version": "unified-explanation-v1",
+        "static_summary": static_payload.get("static_analysis_summary", {}) if static_payload else {},
+        "runtime_summary": dynamic_result.summary(),
+        "alignments": records,
+        "contradictions": contradictions,
+        "instruction_only_paths": static_payload.get("static_chains", []) if static_payload and not records else [],
+        "runtime_only_paths": [record for record in records if record.get("status") == "runtime_only"],
+        "aligned_paths": [record for record in records if record.get("status") in {"aligned", "partially_aligned"}],
+        "coverage": dynamic_result.coverage.to_dict(),
+        "canonical_assessment": canonical.to_dict(),
+        "policy": {
+            "violation_count": len(dynamic_result.policy_violations),
+            "violations": [violation.to_dict() for violation in dynamic_result.policy_violations],
+        },
+    }
 
 
 def analyze_static_skill(skill_definition, analysis_mode: str = "static_only") -> dict:
@@ -926,6 +988,18 @@ def _taint_events(normalized_events: list[NormalizedEvent]) -> list[NormalizedEv
         for event in normalized_events
         if event.event_type.startswith("taint_") or event.event_type == "candidate_dependency"
     ]
+
+
+def _dynamic_assessment_requires_top_level_override(dynamic_result: DynamicAnalysisResult, assessment) -> bool:
+    if assessment.status in {"violation_confirmed", "review_required"}:
+        return True
+    if dynamic_result.policy_violations:
+        return True
+    if any(chain.chain_type == "confidentiality_candidate" for chain in dynamic_result.chains):
+        return True
+    if dynamic_result.coverage.coverage_state in {"instrumentation_gap", "insufficient_coverage"}:
+        return True
+    return False
 
 
 def _to_coarse_root_cause(root_cause_detail: str) -> str:

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from app.dynamic.alignment import StaticRuntimeAligner
+from app.dynamic.assessment import assess_dynamic_result
 from app.dynamic.chain_recovery import ChainRecovery
 from app.dynamic.closure_lift import RuntimeInstructionLift
 from app.dynamic.config import DynamicAnalysisConfig
@@ -33,6 +34,7 @@ class DynamicAnalysisResult:
     schema_version: str = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
+        assessment = assess_dynamic_result(self)
         return {
             "schema_version": self.schema_version,
             "runtime_events": [event.to_dict() for event in self.runtime_events],
@@ -42,6 +44,14 @@ class DynamicAnalysisResult:
             "policy_violations": [violation.to_dict() for violation in self.policy_violations],
             "taint_sources": list(self.taint_sources),
             "static_runtime_alignment": self.static_runtime_alignment or {},
+            "canonical_assessment": assessment.to_dict(),
+            "canonical_risk_score": assessment.canonical_risk_score,
+            "canonical_final_decision": assessment.canonical_final_decision,
+            "needs_review": assessment.needs_review,
+            "policy_violation_count": assessment.policy_violation_count,
+            "confirmed_chain_count": assessment.confirmed_chain_count,
+            "candidate_chain_count": assessment.candidate_chain_count,
+            "coverage_state": assessment.coverage_state,
             "summary": self.summary(),
         }
 
@@ -86,12 +96,13 @@ class DynamicRuntimeAnalyzer:
         skill_id: str | None = None,
         timed_out: bool = False,
         exit_code: int | None = 0,
+        static_result: Any | None = None,
     ) -> DynamicAnalysisResult:
         if not events:
             registry = self.registry or TaintRegistry(run_id=session_id or "RUN", config=self.config.marker)
             graph = RuntimeGraphBuilder(session_id=session_id or "RUN").build([], registry.source_dicts())
             coverage = CoverageAnalyzer().analyze(events=[], chains=[], timed_out=timed_out, exit_code=exit_code)
-            alignment = StaticRuntimeAligner().align(graph=graph, chains=[], coverage=coverage)
+            alignment = StaticRuntimeAligner().align(graph=graph, chains=[], coverage=coverage, static_result=static_result)
             return DynamicAnalysisResult([], graph, [], coverage, [], registry.source_dicts(), alignment)
 
         session = session_id or events[0].session_id
@@ -105,17 +116,25 @@ class DynamicRuntimeAnalyzer:
         chains = ChainRecovery().recover(graph)
         coverage = CoverageAnalyzer().analyze(events=propagated, chains=chains, timed_out=timed_out, exit_code=exit_code)
         violations = PolicyEngine(self.config).evaluate(chains=chains, events=propagated)
-        alignment = StaticRuntimeAligner().align(graph=graph, chains=chains, coverage=coverage)
+        alignment = StaticRuntimeAligner().align(graph=graph, chains=chains, coverage=coverage, static_result=static_result)
         return DynamicAnalysisResult(propagated, graph, chains, coverage, violations, registry.source_dicts(), alignment, schema_version=SCHEMA_VERSION)
 
-    def analyze_execution(self, execution: SandboxExecution, normalized: list[NormalizedEvent] | None = None) -> DynamicAnalysisResult:
+    def analyze_execution(
+        self,
+        execution: SandboxExecution,
+        normalized: list[NormalizedEvent] | None = None,
+        *,
+        static_result: Any | None = None,
+    ) -> DynamicAnalysisResult:
         normalized = normalized if normalized is not None else build_normalized_events(execution)
-        return self.analyze_normalized_execution(execution, normalized)
+        return self.analyze_normalized_execution(execution, normalized, static_result=static_result)
 
     def analyze_normalized_execution(
         self,
         execution: SandboxExecution,
         normalized: list[NormalizedEvent],
+        *,
+        static_result: Any | None = None,
     ) -> DynamicAnalysisResult:
         runtime_events = runtime_events_from_normalized(
             normalized,
@@ -128,6 +147,7 @@ class DynamicRuntimeAnalyzer:
             skill_id=Path(execution.skill_path).name,
             timed_out=execution.timed_out,
             exit_code=execution.exit_code,
+            static_result=static_result,
         )
 
 
@@ -137,8 +157,9 @@ def analyze_runtime_events(
     config: DynamicAnalysisConfig | None = None,
     registry: TaintRegistry | None = None,
     skill_root: str | Path | None = None,
+    static_result: Any | None = None,
 ) -> DynamicAnalysisResult:
-    return DynamicRuntimeAnalyzer(config=config, registry=registry, skill_root=skill_root).analyze(events)
+    return DynamicRuntimeAnalyzer(config=config, registry=registry, skill_root=skill_root).analyze(events, static_result=static_result)
 
 
 def persist_dynamic_analysis(result: DynamicAnalysisResult, artifacts_dir: str | Path) -> dict[str, Path]:

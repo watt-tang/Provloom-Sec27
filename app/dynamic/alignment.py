@@ -17,6 +17,7 @@ class AlignmentRecord:
     score: float = 0.0
     reason: str = ""
     supporting_ids: list[str] = field(default_factory=list)
+    supporting_event_ids: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -113,7 +114,9 @@ def _extract_runtime_items(graph: RuntimeProvenanceGraph) -> list[dict[str, Any]
             items.append({"id": node.node_id, "kind": "file", "key": key, "label": node.label})
         elif node.node_type == "NetworkEndpoint":
             parsed = urlparse(str(node.label).replace("NET:", ""))
-            key = parsed.hostname or str(node.metadata.get("sink_domain") or node.metadata.get("host") or node.label)
+            host = parsed.hostname or str(node.metadata.get("sink_domain") or node.metadata.get("host") or node.label)
+            path = parsed.path if parsed.hostname and parsed.path not in {"", "/"} else ""
+            key = f"{host}{path}"
             items.append({"id": node.node_id, "kind": "endpoint", "key": key.lower(), "label": node.label})
         elif node.node_type in {"ToolInvocation", "Process"}:
             key = str(node.metadata.get("tool_id") or node.metadata.get("command") or node.label)
@@ -130,15 +133,69 @@ def _extract_static_items(static_result: Any | None) -> list[dict[str, Any]]:
     if not isinstance(payload, dict):
         return []
     items: list[dict[str, Any]] = []
-    for group, kind in (("entities", "entity"), ("actions", "action")):
+    for group, kind in (
+        ("entities", "entity"),
+        ("resolved_entities", "entity"),
+        ("actions", "action"),
+        ("extracted_actions", "action"),
+    ):
         for item in payload.get(group, []) or []:
             if not isinstance(item, dict):
                 continue
-            alignment_keys = item.get("alignment_keys") or item.get("runtime_alignment_keys") or item.get("attributes", {})
-            key = alignment_keys.get("alignment_key") or alignment_keys.get("normalized_path") or alignment_keys.get("domain") or item.get("canonical") or item.get("value") or item.get("name")
-            if key:
-                items.append({"id": str(item.get("entity_id") or item.get("action_id") or item.get("id") or key), "kind": kind, "key": _normalize_key(str(key)), "raw": item})
-    return items
+            for key in _static_alignment_keys(item, kind):
+                items.append(
+                    {
+                        "id": str(item.get("entity_id") or item.get("action_id") or item.get("id") or key),
+                        "kind": kind,
+                        "key": _normalize_key(str(key)),
+                        "raw": item,
+                    }
+                )
+    for mention in payload.get("deterministic_mentions", []) or []:
+        if not isinstance(mention, dict):
+            continue
+        value = mention.get("normalized_value") or mention.get("raw_value")
+        if not value:
+            continue
+        mention_type = str(mention.get("mention_type") or "mention")
+        kind = "endpoint" if mention_type in {"url", "domain"} else "entity"
+        items.append(
+            {
+                "id": str(mention.get("mention_id") or value),
+                "kind": kind,
+                "key": _normalize_key(str(value)),
+                "raw": mention,
+            }
+        )
+    deduped: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for item in items:
+        marker = (item["id"], item["kind"], item["key"])
+        if marker in seen:
+            continue
+        seen.add(marker)
+        deduped.append(item)
+    return deduped
+
+
+def _static_alignment_keys(item: dict[str, Any], kind: str) -> list[str]:
+    keys: list[str] = []
+    alignment_keys = item.get("alignment_keys") or item.get("runtime_alignment_keys") or item.get("attributes", {})
+    if isinstance(alignment_keys, dict):
+        for field in ("alignment_key", "normalized_path", "path", "domain", "url", "endpoint", "command", "tool"):
+            value = alignment_keys.get(field)
+            if value:
+                keys.append(str(value))
+    for field in ("canonical", "canonical_value", "value", "name", "raw_verb", "action_type"):
+        value = item.get(field)
+        if value:
+            keys.append(str(value))
+    if kind == "action":
+        for field in ("object_mentions", "source_mentions", "destination_mentions", "tool_mentions"):
+            for value in item.get(field, []) or []:
+                if value:
+                    keys.append(str(value))
+    return keys
 
 
 def _best_match(runtime_item: dict[str, Any], static_items: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -178,7 +235,18 @@ def _contradictions(static_items: list[dict[str, Any]], runtime_items: list[dict
             )
         )
     runtime_endpoints = [item for item in runtime_items if item["kind"] == "endpoint"]
+    static_url_endpoints = [item for item in static_items if item["kind"] == "endpoint" and "/" in item["key"].rstrip("/")]
     for endpoint in runtime_endpoints:
+        if static_url_endpoints and not any(_endpoint_url_match(endpoint["key"], item["key"]) for item in static_url_endpoints):
+            contradictions.append(
+                RuntimeContradiction(
+                    contradiction_type="declared_official_endpoint_runtime_unrelated_endpoint",
+                    runtime_edge_id=endpoint["id"],
+                    reason="runtime endpoint path did not align with any statically declared URL endpoint",
+                    supporting_ids=[endpoint["id"]] + [item["id"] for item in static_url_endpoints],
+                )
+            )
+            continue
         if static_keys and not _best_match(endpoint, static_items):
             contradictions.append(
                 RuntimeContradiction(
@@ -222,4 +290,14 @@ def _path_suffix_match(left: str, right: str) -> bool:
 def _domain_match(left: str, right: str) -> bool:
     left_host = left.split("/", 1)[0]
     right_host = right.split("/", 1)[0]
-    return left_host == right_host or left_host.endswith("." + right_host) or right_host.endswith("." + left_host)
+    if left_host == right_host:
+        left_has_path = "/" in left.rstrip("/")
+        right_has_path = "/" in right.rstrip("/")
+        if left_has_path or right_has_path:
+            return left.rstrip("/") == right.rstrip("/")
+        return True
+    return left_host.endswith("." + right_host) or right_host.endswith("." + left_host)
+
+
+def _endpoint_url_match(left: str, right: str) -> bool:
+    return left.rstrip("/").lower() == right.rstrip("/").lower()

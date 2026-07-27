@@ -12,6 +12,7 @@ from app.backend.schemas import LLMConfig
 from app.dynamic.analyzer import DynamicRuntimeAnalyzer, persist_dynamic_analysis
 from app.dynamic.config import DynamicAnalysisConfig
 from app.runner.docker_runner import DockerRunner
+from app.static.static_report import analyze_static_bundle
 from app.telemetry.collector import build_execution_report
 from app.telemetry.normalizer import build_normalized_events
 
@@ -82,11 +83,27 @@ def _run(args) -> int:
         network_policy=args.network_policy,
         llm_config=LLMConfig(enabled=False),
     )
+    static_result = analyze_static_bundle(execution.skill_path, execution.skill_file)
     normalized_events = build_normalized_events(execution)
-    dynamic_result = DynamicRuntimeAnalyzer(config=config, skill_root=execution.skill_path).analyze_execution(execution, normalized_events)
+    dynamic_result = DynamicRuntimeAnalyzer(config=config, skill_root=execution.skill_path).analyze_execution(
+        execution,
+        normalized_events,
+        static_result=static_result,
+    )
     persist_dynamic_analysis(dynamic_result, execution.artifacts_dir)
-    report = analyze_trace(execution, analysis_mode="rule_plus_epg", normalized_events=normalized_events, dynamic_result=dynamic_result)
-    telemetry = build_execution_report(execution, normalized_events=normalized_events, dynamic_result=dynamic_result)
+    report = analyze_trace(
+        execution,
+        analysis_mode="rule_plus_epg",
+        normalized_events=normalized_events,
+        dynamic_result=dynamic_result,
+        static_result=static_result,
+    )
+    telemetry = build_execution_report(
+        execution,
+        normalized_events=normalized_events,
+        dynamic_result=dynamic_result,
+        static_result=static_result,
+    )
     output = {
         "run_id": run_id,
         "artifacts_dir": execution.artifacts_dir,
@@ -94,6 +111,8 @@ def _run(args) -> int:
         "timed_out": execution.timed_out,
         "coverage": dynamic_result.coverage.to_dict(),
         "dynamic_summary": dynamic_result.summary(),
+        "static_runtime_alignment": dynamic_result.static_runtime_alignment or {},
+        "unified_explanation": report.get("unified_explanation", {}),
         "legacy_review_priority": report.get("final_decision"),
         "trace_summary": report.get("trace_summary"),
         "telemetry_event_count": len(telemetry.get("normalized_events", [])),

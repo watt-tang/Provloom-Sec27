@@ -13,6 +13,20 @@ EXECUTION_TERMINALS = {"EXEC"}
 PERSISTENCE_TERMINALS = {"PERSIST", "MATERIALIZE_INSTRUCTION"}
 WEAK_EDGE_TYPES = {"CONNECT", "CO_OCCURS", "HAS_PROCESS_CONTEXT"}
 DISALLOWED_CONFIRMED_STRENGTHS = {"hash_derived", "process_context", "temporal_cooccurrence", "candidate", "unknown"}
+POTENTIAL_CANDIDATE_CARRIERS = {
+    "llm_context",
+    "http_header",
+    "http_query",
+    "http_body",
+    "http_form",
+    "multipart_field",
+    "upload_file",
+    "process_argv",
+    "process_env",
+    "stdin",
+    "socket_payload",
+    "tool_argument",
+}
 
 
 class ChainRecovery:
@@ -20,8 +34,17 @@ class ChainRecovery:
         node_by_id = {node.node_id: node for node in graph.nodes}
         edges = graph.edges
         chains: list[RuntimeChain] = []
-        chains.extend(self._recover_by_terminal(graph, node_by_id, edges, "confidentiality_confirmed", CONFIDENTIALITY_TERMINALS, {"NetworkEndpoint"}))
-        chains.extend(self._recover_by_terminal(graph, node_by_id, edges, "confidentiality_candidate", {"CONNECT", "CO_OCCURS", "HAS_PROCESS_CONTEXT"} | LEGACY_CONFIDENTIALITY_TERMINALS, {"NetworkEndpoint", "Process"}))
+        confirmed_confidentiality = self._recover_by_terminal(graph, node_by_id, edges, "confidentiality_confirmed", CONFIDENTIALITY_TERMINALS, {"NetworkEndpoint"})
+        chains.extend(confirmed_confidentiality)
+        candidate_confidentiality = self._recover_by_terminal(
+            graph,
+            node_by_id,
+            edges,
+            "confidentiality_candidate",
+            {"CONNECT", "CO_OCCURS", "HAS_PROCESS_CONTEXT"} | LEGACY_CONFIDENTIALITY_TERMINALS,
+            {"NetworkEndpoint", "Process"},
+        )
+        chains.extend(_drop_confirmed_subsumed_candidates(candidate_confidentiality, confirmed_confidentiality))
         chains.extend(self._recover_execution(graph, node_by_id, edges))
         chains.extend(self._recover_by_terminal(graph, node_by_id, edges, "persistence_confirmed", PERSISTENCE_TERMINALS, {"PersistenceTarget"}))
         chains.extend(self._recover_by_terminal(graph, node_by_id, edges, "instruction_simulated", {"MATERIALIZE_INSTRUCTION"}, {"RuntimeInstruction"}))
@@ -57,6 +80,8 @@ class ChainRecovery:
                 if chain_type == "confidentiality_confirmed" and not _is_confirmable_confidentiality(path_edges):
                     continue
                 if chain_type == "confidentiality_candidate" and _is_confirmable_confidentiality(path_edges):
+                    continue
+                if chain_type == "confidentiality_candidate" and not _has_candidate_carrier(path_edges):
                     continue
                 chain = _chain_from_edges(chain_type, source.node_id, terminal.target_node, path_edges, node_by_id)
                 if chain:
@@ -216,6 +241,48 @@ def _dedupe_chains(chains: list[RuntimeChain]) -> list[RuntimeChain]:
     return result
 
 
+def _drop_confirmed_subsumed_candidates(candidates: list[RuntimeChain], confirmed: list[RuntimeChain]) -> list[RuntimeChain]:
+    if not confirmed:
+        return candidates
+    confirmed_keys = {
+        (
+            chain.source,
+            chain.sink,
+            frozenset(chain.taint_ids),
+            frozenset(chain.metadata.get("carrier_types", [])),
+        )
+        for chain in confirmed
+    }
+    result: list[RuntimeChain] = []
+    for candidate in candidates:
+        candidate_key = (
+            candidate.source,
+            candidate.sink,
+            frozenset(candidate.taint_ids),
+            frozenset(candidate.metadata.get("carrier_types", [])),
+        )
+        if candidate_key in confirmed_keys:
+            continue
+        if any(_candidate_subsumed_by_confirmed(candidate, chain) for chain in confirmed):
+            continue
+        result.append(candidate)
+    return result
+
+
+def _candidate_subsumed_by_confirmed(candidate: RuntimeChain, confirmed: RuntimeChain) -> bool:
+    if candidate.sink != confirmed.sink:
+        return False
+    if candidate.source != confirmed.source:
+        return True
+    candidate_taints = set(candidate.taint_ids)
+    confirmed_taints = set(confirmed.taint_ids)
+    if candidate_taints and confirmed_taints and not candidate_taints <= confirmed_taints:
+        return False
+    candidate_carriers = set(candidate.metadata.get("carrier_types", []))
+    confirmed_carriers = set(confirmed.metadata.get("carrier_types", []))
+    return bool(candidate_carriers & confirmed_carriers)
+
+
 def _is_confirmable_confidentiality(path_edges: list[RuntimeEdge]) -> bool:
     if not path_edges or path_edges[-1].edge_type not in CONFIDENTIALITY_TERMINALS:
         return False
@@ -229,7 +296,15 @@ def _is_confirmable_confidentiality(path_edges: list[RuntimeEdge]) -> bool:
         return False
     if any(event.get("observation_source") == "instruction_simulation" for edge in path_edges for event in edge.metadata.get("events", [])):
         return False
-    return any(edge.edge_type in CONFIDENTIALITY_TERMINALS and edge.carrier_type in {"http_header", "http_query", "http_body", "http_form", "multipart_field", "socket_payload", "upload_file"} for edge in path_edges)
+    return any(edge.edge_type in CONFIDENTIALITY_TERMINALS and edge.carrier_type in {"http_header", "http_query", "http_body", "http_form", "multipart_field", "socket_payload", "upload_file", "llm_context"} for edge in path_edges)
+
+
+def _has_candidate_carrier(path_edges: list[RuntimeEdge]) -> bool:
+    return any(
+        edge.carrier_type in POTENTIAL_CANDIDATE_CARRIERS
+        and edge.evidence_strength not in {"process_context", "temporal_cooccurrence", "candidate", "unknown"}
+        for edge in path_edges
+    )
 
 
 def _legacy_chain_type(chain_type: str) -> str:

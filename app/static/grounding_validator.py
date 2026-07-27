@@ -41,8 +41,11 @@ class GroundingValidator:
                         status = "partially_grounded"
                         notes.append(f"missing_mention:{mention_id}")
                     elif mention.unit_id != unit.unit_id:
-                        status = "partially_grounded"
-                        notes.append(f"mention_outside_evidence_unit:{mention_id}")
+                        if action.extractor == "deterministic_flow":
+                            notes.append(f"deterministic_flow_cross_unit_mention:{mention_id}")
+                        else:
+                            status = "partially_grounded"
+                            notes.append(f"mention_outside_evidence_unit:{mention_id}")
             action.grounding_status = status
             action.validation_notes = sorted(set(action.validation_notes + notes))
             reports.append({"action_id": action.action_id, "grounding_status": status, "validation_notes": action.validation_notes})

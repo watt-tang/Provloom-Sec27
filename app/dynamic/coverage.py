@@ -33,7 +33,7 @@ class CoverageAnalyzer:
             | {"encrypted_payload_invisible" for event in events if event.metadata.get("encrypted_payload_invisible")}
             | {gap for chain in chains for gap in chain.instrumentation_gaps}
         )
-        if instrumentation_gaps:
+        if instrumentation_gaps and (chains or _has_tainted_sink_visibility_gap(events)):
             return CoverageReport(
                 "instrumentation_gap",
                 ["runtime path reached but key payload or carrier visibility is incomplete"],
@@ -96,6 +96,23 @@ def _target_reached_no_flow(events: list[RuntimeEvent]) -> bool:
     if not events:
         return False
     has_action = any(event.event_type.startswith(("tool_", "network_", "file_", "process_")) for event in events)
-    has_source_or_sink_context = any(event.event_type == "sensitive_source" or event.operation in {"read", "send", "upload", "connect"} for event in events)
-    instrumentation_complete = all(event.instrumentation_visibility in {"", "observed", "payload_preview_observed"} for event in events)
-    return has_action and has_source_or_sink_context and instrumentation_complete
+    instrumentation_complete = all(
+        event.instrumentation_visibility in {"", "observed", "payload_preview_observed", "endpoint_only"}
+        for event in events
+    )
+    return has_action and instrumentation_complete
+
+
+def _has_tainted_sink_visibility_gap(events: list[RuntimeEvent]) -> bool:
+    sink_operations = {"send", "upload", "connect"}
+    for event in events:
+        if event.operation in {"send", "upload"} and event.metadata.get("encrypted_payload_invisible"):
+            return True
+        if not event.taint_ids:
+            continue
+        if event.object_type == "network" or event.operation in sink_operations:
+            if event.instrumentation_visibility not in {"", "observed", "payload_preview_observed"}:
+                return True
+            if event.metadata.get("encrypted_payload_invisible"):
+                return True
+    return False

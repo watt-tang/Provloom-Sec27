@@ -72,7 +72,7 @@ class StaticAnalysisResult:
         for chain in self.static_chains:
             lines.extend(
                 [
-                    f"- `{chain.chain_id}` `{chain.chain_type}` status=`{chain.status}` priority=`{chain.review_priority}`",
+                    f"- `{chain.chain_id}` `{chain.chain_type}` status=`{chain.status}` capability=`{chain.capability_type}` policy=`{chain.policy_status}` alert=`{chain.alert_status}` priority=`{chain.review_priority}`",
                     f"  Evidence units: {', '.join(chain.evidence_unit_ids) or 'none'}",
                     f"  Explanation: {chain.explanation}",
                 ]
@@ -263,16 +263,34 @@ def _summary(
     strongest = max(chains, key=lambda chain: priority_order.get(chain.review_priority, 0), default=None)
     statuses: dict[str, int] = {}
     priorities: dict[str, int] = {}
+    capabilities: dict[str, int] = {}
+    policies: dict[str, int] = {}
+    alerts: dict[str, int] = {}
+    review_reasons: dict[str, int] = {}
     for chain in chains:
         statuses[chain.status] = statuses.get(chain.status, 0) + 1
         priorities[chain.review_priority] = priorities.get(chain.review_priority, 0) + 1
+        capabilities[chain.capability_type] = capabilities.get(chain.capability_type, 0) + 1
+        policies[chain.policy_status] = policies.get(chain.policy_status, 0) + 1
+        alerts[chain.alert_status] = alerts.get(chain.alert_status, 0) + 1
+        if chain.review_reason and chain.review_reason != "not_applicable":
+            review_reasons[chain.review_reason] = review_reasons.get(chain.review_reason, 0) + 1
     return {
         "schema_version": STATIC_SCHEMA_VERSION,
         "review_priority": strongest.review_priority if strongest else "informational",
         "priority_reasons": strongest.priority_reasons if strongest else ["No validated static chain was formed; this is not a safety verdict."],
         "closed_static_chain_count": statuses.get("closed", 0),
+        "violation_static_chain_count": alerts.get("violation", 0),
         "chain_status_counts": statuses,
+        "capability_type_counts": capabilities,
+        "policy_status_counts": policies,
+        "alert_status_counts": alerts,
+        "review_reason_counts": review_reasons,
         "review_priority_counts": priorities,
+        "raw_candidate_chain_count": chains[0].raw_candidate_chain_count if chains else 0,
+        "canonical_chain_count": len(chains),
+        "duplicate_suppressed_count": sum(chain.duplicate_suppressed_count for chain in chains),
+        "output_detection_semantics": "binary policy detection must use alert_status=violation, not status=closed",
         "action_count": len(actions),
         "entity_count": len(entities),
         "graph_summary": graph.summary(),

@@ -13,6 +13,7 @@ from app.dynamic.analyzer import DynamicRuntimeAnalyzer, persist_dynamic_analysi
 from app.reporting.risk_mapper import map_risk_profile
 from app.runtime.skill_parser import load_skill_definition, resolve_skill_target
 from app.runner.docker_runner import DockerRunner, DockerUnavailableError, SandboxRunError
+from app.static.static_report import analyze_static_bundle
 from app.telemetry.collector import build_execution_report
 from app.telemetry.normalizer import build_normalized_events
 
@@ -96,11 +97,27 @@ def _handle_analyze_skill(environ, start_response):
             network_policy=payload.network_policy,
             llm_config=payload.llm_config,
         )
+        static_result = analyze_static_bundle(execution.skill_path, execution.skill_file)
         normalized_events = build_normalized_events(execution)
-        dynamic_result = DynamicRuntimeAnalyzer(skill_root=execution.skill_path).analyze_execution(execution, normalized_events)
+        dynamic_result = DynamicRuntimeAnalyzer(skill_root=execution.skill_path).analyze_execution(
+            execution,
+            normalized_events,
+            static_result=static_result,
+        )
         persist_dynamic_analysis(dynamic_result, execution.artifacts_dir)
-        report = analyze_trace(execution, analysis_mode=payload.analysis_mode, normalized_events=normalized_events, dynamic_result=dynamic_result)
-        telemetry_report = build_execution_report(execution, normalized_events=normalized_events, dynamic_result=dynamic_result)
+        report = analyze_trace(
+            execution,
+            analysis_mode=payload.analysis_mode,
+            normalized_events=normalized_events,
+            dynamic_result=dynamic_result,
+            static_result=static_result,
+        )
+        telemetry_report = build_execution_report(
+            execution,
+            normalized_events=normalized_events,
+            dynamic_result=dynamic_result,
+            static_result=static_result,
+        )
         risk_profile = map_risk_profile(
             risk_score=report["risk_score"],
             detected_behaviors=report["detected_behaviors"],
@@ -143,6 +160,20 @@ def _handle_analyze_skill(environ, start_response):
             dynamic_analysis_summary=report.get("dynamic_analysis_summary", {}),
             taint_sources=report.get("taint_sources", []),
             static_runtime_alignment=report.get("static_runtime_alignment", {}),
+            unified_explanation=report.get("unified_explanation", {}),
+            canonical_assessment=report.get("canonical_assessment", {}),
+            canonical_final_decision=report.get("canonical_final_decision", report.get("final_decision", "unknown")),
+            canonical_risk_score=int(report.get("canonical_risk_score", report.get("risk_score", 0)) or 0),
+            legacy_final_decision=report.get("legacy_final_decision", "unknown"),
+            legacy_risk_score=int(report.get("legacy_risk_score", 0) or 0),
+            needs_review=bool(report.get("needs_review", False)),
+            policy_violation_count=int(report.get("policy_violation_count", 0) or 0),
+            confirmed_chain_count=int(report.get("confirmed_chain_count", 0) or 0),
+            candidate_chain_count=int(report.get("candidate_chain_count", 0) or 0),
+            coverage_state=report.get("coverage_state", "unknown"),
+            instrumentation_gaps=report.get("instrumentation_gaps", []),
+            consistency_status=report.get("consistency_status", "unknown"),
+            consistency_errors=report.get("consistency_errors", []),
             resource_usage=execution.resource_usage.to_dict(),
             primary_chain=report.get("primary_chain", []),
             root_cause=report.get("root_cause", "unknown"),
@@ -342,6 +373,20 @@ def _build_static_response(
         runtime_policy_violations=[],
         dynamic_analysis_summary={},
         taint_sources=[],
+        unified_explanation=report.get("unified_explanation", {}),
+        canonical_assessment=report.get("canonical_assessment", {}),
+        canonical_final_decision=report.get("canonical_final_decision", report.get("final_decision", "unknown")),
+        canonical_risk_score=int(report.get("canonical_risk_score", report.get("risk_score", 0)) or 0),
+        legacy_final_decision=report.get("legacy_final_decision", "unknown"),
+        legacy_risk_score=int(report.get("legacy_risk_score", 0) or 0),
+        needs_review=bool(report.get("needs_review", False)),
+        policy_violation_count=int(report.get("policy_violation_count", 0) or 0),
+        confirmed_chain_count=int(report.get("confirmed_chain_count", 0) or 0),
+        candidate_chain_count=int(report.get("candidate_chain_count", 0) or 0),
+        coverage_state=report.get("coverage_state", "unknown"),
+        instrumentation_gaps=report.get("instrumentation_gaps", []),
+        consistency_status=report.get("consistency_status", "unknown"),
+        consistency_errors=report.get("consistency_errors", []),
         primary_chain=report.get("primary_chain", []),
         root_cause=report.get("root_cause", "unknown"),
         root_cause_detail=report.get("root_cause_detail", "unknown"),

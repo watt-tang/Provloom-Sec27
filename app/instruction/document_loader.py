@@ -146,6 +146,8 @@ class DocumentLoader:
             return False
         if len(rel.parts) > self.config.max_depth + 1:
             return False
+        if rel.parts[:2] == (".provloom", "private"):
+            return False
         if any(part in self.config.ignore_dirs for part in rel.parts[:-1]):
             return False
         name = path.name

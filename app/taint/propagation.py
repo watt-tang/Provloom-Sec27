@@ -14,7 +14,7 @@ from app.taint.source_registry import SourceRegistry, normalize_path
 from app.taint.state import TaintState
 
 ACTION_STDOUT_RE = re.compile(r"actions\.([A-Za-z0-9_-]+)\.stdout")
-PATH_RE = re.compile(r"(/etc/[^\s\"']+|/root/[^\s\"']+|/proc/[^\s\"']+|/sys/[^\s\"']+|/var/run/[^\s\"']+|runtime_output/[^\s\"']+|public/[^\s\"']+|\.provloom/adapters/credential_state/[^\s\"']+)")
+PATH_RE = re.compile(r"(/etc/[^\s\"']+|/root/[^\s\"']+|/proc/[^\s\"']+|/sys/[^\s\"']+|/var/run/[^\s\"']+|runtime_output/[^\s\"']+|public/[^\s\"']+|\.provloom/private/[^\s\"']+|\.provloom/adapters/credential_state/[^\s\"']+)")
 REDIRECT_RE = re.compile(r">\s*([^\s\"']+)")
 URL_RE = re.compile(r"https?://[^\s'\"<>]+")
 
@@ -75,6 +75,8 @@ class TaintPropagationAnalyzer:
             match = self.registry.match_path(event.path)
             if match is None:
                 continue
+            if not _is_confidential_sensitivity(match.sensitivity):
+                continue
             label = self._ensure_source_label(
                 path=match.normalized_path,
                 source_type=match.source_type,
@@ -115,6 +117,9 @@ class TaintPropagationAnalyzer:
         match = self.registry.match_path(path)
         file_taint = self.state.taint_for_file(path)
         if match is not None:
+            if not _is_confidential_sensitivity(match.sensitivity):
+                self.state.set_action_output(event.tool_id, file_taint)
+                return
             label = self._ensure_source_label(
                 path=match.normalized_path,
                 source_type=match.source_type,
@@ -207,6 +212,8 @@ class TaintPropagationAnalyzer:
         for path in _paths_in_value(command):
             match = self.registry.match_path(path)
             if match is not None:
+                if not _is_confidential_sensitivity(match.sensitivity):
+                    continue
                 label = self._ensure_source_label(
                     path=match.normalized_path,
                     source_type=match.source_type,
@@ -264,7 +271,14 @@ class TaintPropagationAnalyzer:
         if not source_events or not self.execution.network_events:
             return
         first_source = source_events[0]
-        first_network = sorted(self.execution.network_events, key=lambda item: (item.timestamp, item.event_id or ""))[0]
+        candidate_networks = [
+            event
+            for event in sorted(self.execution.network_events, key=lambda item: (item.timestamp, item.event_id or ""))
+            if _network_has_potential_source_carrier(event)
+        ]
+        if not candidate_networks:
+            return
+        first_network = candidate_networks[0]
         if first_source["timestamp"] > first_network.timestamp:
             return
         self.events.append(
@@ -487,6 +501,19 @@ def _paths_in_value(value: Any) -> list[str]:
     return sorted(set(PATH_RE.findall(_serialize(value))))
 
 
+def _network_has_potential_source_carrier(event) -> bool:
+    carrier = str(getattr(event, "carrier_type", "") or "")
+    visibility = str(getattr(event, "instrumentation_visibility", "") or "")
+    evidence_level = str(getattr(event, "network_evidence_level", "") or "")
+    if carrier in {"http_header", "http_body", "http_query", "http_form", "multipart", "upload_file", "socket_payload", "llm_context"}:
+        return True
+    if getattr(event, "payload_preview", None):
+        return True
+    if evidence_level in {"request_observed", "tainted_payload_observed", "tainted_payload_delivered"}:
+        return True
+    return visibility in {"payload_preview_observed", "encrypted_payload_invisible"}
+
+
 def _serialize(value: Any) -> str:
     if isinstance(value, str):
         return value
@@ -509,6 +536,10 @@ def _first_url(command: str) -> str:
 def _command_has_network_body_sink(command: str) -> bool:
     lower = command.lower()
     return any(tool in lower for tool in ("curl ", "wget ")) and any(token in lower for token in ("-d ", "--data", "--upload-file", "-f ", "@-"))
+
+
+def _is_confidential_sensitivity(value: str) -> bool:
+    return str(value or "").lower() in {"medium", "high", "critical"}
 
 
 def collect_action_refs(value: Any) -> list[str]:

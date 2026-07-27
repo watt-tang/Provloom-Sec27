@@ -74,6 +74,8 @@ class PolicyEngine:
             return True
         if chain.sink and self._is_trusted_sink(chain.sink):
             return True
+        if self._is_trusted_llm_context(chain_events):
+            return True
         if self._is_trusted_authentication(chain, chain_events):
             return True
         return self._is_permitted_pair(chain)
@@ -96,6 +98,19 @@ class PolicyEngine:
         if not auth_events:
             return False
         return bool(chain.sink and self._is_trusted_sink(chain.sink))
+
+    def _is_trusted_llm_context(self, events: list[RuntimeEvent]) -> bool:
+        llm_events = [event for event in events if event.carrier_type == "llm_context"]
+        if not llm_events:
+            return False
+        for event in llm_events:
+            provider = str(event.metadata.get("provider") or event.metadata.get("llm_provider_name") or "").lower()
+            host = str(event.metadata.get("endpoint_host") or "").lower()
+            if provider and any(fnmatch.fnmatch(provider, pattern.lower()) for pattern in self.config.trusted_llm_providers):
+                return True
+            if host and any(fnmatch.fnmatch(host, pattern.lower()) for pattern in self.config.trusted_llm_provider_domains):
+                return True
+        return False
 
     def _is_permitted_pair(self, chain: RuntimeChain) -> bool:
         if not chain.source or not chain.sink:

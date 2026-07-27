@@ -51,7 +51,7 @@ class EntityResolver:
             a = mention_to_entity.get(action.source_mentions[0])
             b = mention_to_entity.get(action.destination_mentions[0])
             if a and b:
-                results.append(_resolution(len(results), a, b, "downloaded_as", "deterministic", [action.evidence.unit_id if action.evidence else ""], 0.95, "confirmed"))
+                results.append(_resolution(len(results), a, b, "downloaded_as", "deterministic", [action.evidence.unit_id if action.evidence else ""], 0.95, "confirmed", "strong"))
         return results
 
     def _archive_extract_resolutions(self, actions: list[StaticAction], mention_to_entity: dict[str, str]) -> list[EntityResolution]:
@@ -67,7 +67,7 @@ class EntityResolver:
                 for mention_id in action.object_mentions:
                     target = mention_to_entity.get(mention_id)
                     if target and target != last_archive:
-                        results.append(_resolution(1000 + len(results), last_archive, target, "extracts_to", "deterministic", [action.evidence.unit_id if action.evidence else ""], 0.8, "probable"))
+                        results.append(_resolution(1000 + len(results), last_archive, target, "extracts_to", "deterministic", [action.evidence.unit_id if action.evidence else ""], 0.8, "probable", "strong"))
         return results
 
     def _pronoun_resolutions(self, actions: list[StaticAction], entities: list[StaticEntity]) -> list[EntityResolution]:
@@ -79,7 +79,7 @@ class EntityResolver:
             text = action.evidence.exact_text.lower() if action.evidence else ""
             if any(term in text for term in {"it", "downloaded script", "the updater", "the archive"}):
                 action.metadata.setdefault("coreference_entity_id", last_artifact.entity_id)
-                results.append(_resolution(2000 + len(results), last_artifact.entity_id, last_artifact.entity_id, "refers_to", "deterministic_coreference", [action.evidence.unit_id if action.evidence else ""], 0.66, "probable"))
+                results.append(_resolution(2000 + len(results), last_artifact.entity_id, last_artifact.entity_id, "refers_to", "deterministic_coreference", [action.evidence.unit_id if action.evidence else ""], 0.66, "probable", "medium"))
         return results
 
     def _basename_conflicts(self, entities: list[StaticEntity], mention_by_id: dict[str, Mention]) -> list[EntityResolution]:
@@ -99,7 +99,7 @@ class EntityResolver:
                 entity.resolution_status = "ambiguous"
                 entity.confidence = min(entity.confidence, 0.55)
             units = sorted({mention_by_id[m].unit_id for e in group for m in e.mentions if m in mention_by_id})
-            results.append(_resolution(3000 + len(results), group[0].entity_id, group[1].entity_id, "same_basename_conflict", "deterministic_conflict", units, 0.35, "rejected"))
+            results.append(_resolution(3000 + len(results), group[0].entity_id, group[1].entity_id, "same_basename_conflict", "deterministic_conflict", units, 0.35, "rejected", "weak"))
         return results
 
 
@@ -149,5 +149,15 @@ def _alignment_keys(entity_type: str, value: str) -> dict:
     return {}
 
 
-def _resolution(index: int, a: str, b: str, relation: str, method: str, units: list[str], confidence: float, status: str) -> EntityResolution:
-    return EntityResolution(f"R{index + 1:04d}", a, b, relation, method, [u for u in units if u], confidence, status)
+def _resolution(index: int, a: str, b: str, relation: str, method: str, units: list[str], confidence: float, status: str, strength: str) -> EntityResolution:
+    return EntityResolution(
+        f"R{index + 1:04d}",
+        a,
+        b,
+        relation,
+        method,
+        [u for u in units if u],
+        confidence,
+        status,
+        {"resolution_strength": strength, "ambiguities": [] if status != "rejected" else ["basename_conflict"]},
+    )

@@ -126,16 +126,17 @@ class InstructionGraphBuilderV2:
                 "resolved" if resolution.status == "confirmed" else "uncertain" if resolution.status == "uncertain" else "inferred",
                 resolution.confidence,
                 f"Entity resolution {resolution.relation} via {resolution.method}.",
+                resolution.metadata,
             )
         return InstructionProvenanceGraph(list(nodes.values()), list(edges.values()))
 
-    def _edge(self, edges: dict[str, StaticGraphEdge], source: str, target: str, edge_type: str, units: list[str], actions: list[str], resolutions: list[str], level: str, confidence: float, reason: str) -> None:
+    def _edge(self, edges: dict[str, StaticGraphEdge], source: str, target: str, edge_type: str, units: list[str], actions: list[str], resolutions: list[str], level: str, confidence: float, reason: str, metadata: dict[str, Any] | None = None) -> None:
         if not source or not target or source == target:
             return
         edge_id = _edge_id(source, target, edge_type, actions, resolutions)
         if edge_id in edges:
             return
-        edges[edge_id] = StaticGraphEdge(edge_id, source, target, edge_type, [u for u in units if u], actions, resolutions, level, confidence, reason)
+        edges[edge_id] = StaticGraphEdge(edge_id, source, target, edge_type, [u for u in units if u], actions, resolutions, level, confidence, reason, metadata or {})
 
 
 def _edge_id(*parts) -> str:

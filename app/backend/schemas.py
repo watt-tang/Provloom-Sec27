@@ -178,6 +178,20 @@ class AnalyzeSkillResponse:
     dynamic_analysis_summary: dict[str, Any] = field(default_factory=dict)
     taint_sources: list[dict[str, Any]] = field(default_factory=list)
     static_runtime_alignment: dict[str, Any] = field(default_factory=dict)
+    unified_explanation: dict[str, Any] = field(default_factory=dict)
+    canonical_assessment: dict[str, Any] = field(default_factory=dict)
+    canonical_final_decision: str = "unknown"
+    canonical_risk_score: int = 0
+    legacy_final_decision: str = "unknown"
+    legacy_risk_score: int = 0
+    needs_review: bool = False
+    policy_violation_count: int = 0
+    confirmed_chain_count: int = 0
+    candidate_chain_count: int = 0
+    coverage_state: str = "unknown"
+    instrumentation_gaps: list[str] = field(default_factory=list)
+    consistency_status: str = "unknown"
+    consistency_errors: list[str] = field(default_factory=list)
     primary_chain: list[dict[str, Any]] = field(default_factory=list)
     root_cause: str = "unknown"
     root_cause_detail: str = "unknown"

@@ -60,7 +60,7 @@ class DynamicRuntimeAnalysisV3Tests(unittest.TestCase):
         result = analyze_runtime_events(events, config=config, registry=registry)
 
         self.assertFalse([chain for chain in result.chains if chain.chain_type == "confidentiality_confirmed"])
-        self.assertTrue([chain for chain in result.chains if chain.chain_type == "confidentiality_candidate"])
+        self.assertFalse([chain for chain in result.chains if chain.chain_type == "confidentiality_candidate"])
 
     def test_hash_only_flow_is_not_original_secret_exfiltration(self) -> None:
         config, registry, source, ev = _fixture(self.id())

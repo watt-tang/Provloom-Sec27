@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -32,7 +33,10 @@ class NormalizedEvent:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        if self.event_type == "network":
+            payload["metadata"] = _redact_network_payload_metadata(payload.get("metadata", {}))
+        return payload
 
 
 def build_normalized_events(execution: SandboxExecution) -> list[NormalizedEvent]:
@@ -513,6 +517,30 @@ def _derive_step_id(step: Any) -> str | None:
     if step in (None, ""):
         return None
     return f"step-{step}"
+
+
+def _redact_network_payload_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    redacted = dict(metadata or {})
+    if isinstance(redacted.get("payload_preview"), str) and redacted["payload_preview"]:
+        redacted["payload_preview"] = _redacted_text(redacted["payload_preview"])
+        if isinstance(redacted.get("raw"), str) and redacted["raw"]:
+            redacted["raw"] = _redacted_text(redacted["raw"])
+    elif (
+        (redacted.get("byte_count") or str(redacted.get("action", "")).lower() in {"send", "sendto", "write"})
+        and isinstance(redacted.get("raw"), str)
+        and redacted["raw"]
+    ):
+        redacted["raw"] = _redacted_text(redacted["raw"])
+    return redacted
+
+
+def _redacted_text(value: str) -> dict[str, Any]:
+    return {
+        "redacted": "[PAYLOAD_PREVIEW_REDACTED]",
+        "byte_count": len(value.encode("utf-8")),
+        "sha256": hashlib.sha256(value.encode("utf-8")).hexdigest(),
+        "plaintext_stored": False,
+    }
 
 
 def _event_id(prefix: str) -> str:

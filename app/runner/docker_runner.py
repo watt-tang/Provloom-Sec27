@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 import threading
 import time
 import uuid
+import hashlib
 from pathlib import Path
 from threading import Lock
 from shlex import quote
@@ -38,9 +40,16 @@ class DockerRunner:
         image_name: str = "skill-runtime-sandbox:latest",
         dockerfile_dir: str = "docker/sandbox",
         artifacts_root: str = "artifacts/runs",
+        *,
+        force_rebuild: bool = False,
+        build_timeout_seconds: int = 600,
+        reuse_existing_image: bool = True,
     ) -> None:
         self.image_name = image_name
         self.dockerfile_dir = Path(dockerfile_dir)
+        self.force_rebuild = force_rebuild
+        self.build_timeout_seconds = int(build_timeout_seconds)
+        self.reuse_existing_image = reuse_existing_image
         # Docker bind mounts require absolute host paths for reproducible benchmark runs.
         self.artifacts_root = Path(artifacts_root).resolve()
         self.artifacts_root.mkdir(parents=True, exist_ok=True)
@@ -222,6 +231,7 @@ class DockerRunner:
             stdout = self._read_text(artifacts_dir / "stdout.log")
             stderr = self._read_text(artifacts_dir / "stderr.log")
             trace_artifacts = parse_trace_dir(artifacts_dir)
+            self._sanitize_trace_payload_artifacts(artifacts_dir)
             tool_calls = load_runtime_events(artifacts_dir / "runtime-events.jsonl")
             llm_events = load_llm_events(artifacts_dir / "runtime-events.jsonl")
 
@@ -303,7 +313,7 @@ class DockerRunner:
 
     def _build_image(self) -> None:
         with self._build_lock:
-            if self._image_built:
+            if self._image_built and not self.force_rebuild:
                 return
             # Reuse an existing local image to keep benchmark reruns stable.
             inspect_result = subprocess.run(
@@ -312,9 +322,11 @@ class DockerRunner:
                 capture_output=True,
                 check=False,
             )
-            if inspect_result.returncode == 0:
+            if inspect_result.returncode == 0 and self.reuse_existing_image and not self.force_rebuild:
                 self._image_built = True
                 return
+            source_fingerprint = self._source_fingerprint()
+            build_timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             cmd = [
                 "docker",
                 "build",
@@ -328,19 +340,42 @@ class DockerRunner:
                 f"HTTPS_PROXY={os.environ.get('HTTPS_PROXY', '')}",
                 "--build-arg",
                 f"NO_PROXY={os.environ.get('NO_PROXY', '')}",
+                "--build-arg",
+                f"IMAGE_TAG={self.image_name}",
+                "--build-arg",
+                f"SOURCE_FINGERPRINT={source_fingerprint}",
+                "--build-arg",
+                f"BUILD_TIMESTAMP={build_timestamp}",
+                "--build-arg",
+                "DYNAMIC_ANALYSIS_VERSION=3.0",
                 "-f",
                 str(self.dockerfile_dir / "Dockerfile"),
                 ".",
             ]
-            result = subprocess.run(cmd, text=True, capture_output=True, check=False)
+            try:
+                result = subprocess.run(
+                    cmd,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    timeout=self.build_timeout_seconds,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise SandboxRunError(
+                    f"Timed out after {self.build_timeout_seconds}s while building sandbox image "
+                    f"{self.image_name}. Check Docker daemon, build context size, and apt network access."
+                ) from exc
             if result.returncode != 0:
-                raise SandboxRunError(f"Failed to build sandbox image: {result.stderr.strip()}")
+                combined = "\n".join(part for part in [result.stdout, result.stderr] if part).strip()
+                tail = "\n".join(combined.splitlines()[-80:])
+                raise SandboxRunError(f"Failed to build sandbox image {self.image_name}:\n{tail}")
             self._image_built = True
 
     def _build_runner_script(self, skill_file: str, timeout_seconds: int) -> str:
         skill_file_quoted = quote(skill_file)
         return f"""
 set -eu
+cp /opt/skill_sandbox/runtime-build-info.json /artifacts/runtime-build-info.json 2>/dev/null || true
 cd /workspace/skill
 TIMED_OUT=0
 EXIT_CODE=0
@@ -355,6 +390,31 @@ fi
 printf '{{"exit_code": %s, "timed_out": %s}}' "$EXIT_CODE" "$TIMED_OUT" > /artifacts/meta.json
 exit 0
 """.strip()
+
+    def _source_fingerprint(self) -> str:
+        paths = [
+            Path("app/dynamic"),
+            Path("app/runtime/container_runtime.py"),
+            Path("app/runner/trace_parser.py"),
+        ]
+        digest = hashlib.sha256()
+        for root in paths:
+            if root.is_file():
+                self._hash_file(digest, root)
+                continue
+            if not root.exists():
+                digest.update(f"missing:{root}\n".encode("utf-8"))
+                continue
+            for path in sorted(item for item in root.rglob("*") if item.is_file()):
+                self._hash_file(digest, path)
+        return digest.hexdigest()
+
+    @staticmethod
+    def _hash_file(digest: "hashlib._Hash", path: Path) -> None:
+        digest.update(str(path).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
 
     def _force_cleanup(self, container_name: str) -> None:
         subprocess.run(
@@ -375,6 +435,22 @@ exit 0
             return
         payload["api_key"] = "***redacted***" if payload.get("api_key") else ""
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _sanitize_trace_payload_artifacts(self, artifacts_dir: Path) -> None:
+        patterns = [
+            re.compile(r"sk-[A-Za-z0-9_-]{16,}"),
+            re.compile(r"(?:PROVLOOM_SECRET|PROBE_SECRET_MARKER)[A-Za-z0-9_:-]*"),
+        ]
+        for path in artifacts_dir.glob("trace.log*"):
+            try:
+                text = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            redacted = text
+            for pattern in patterns:
+                redacted = pattern.sub("***redacted***", redacted)
+            if redacted != text:
+                path.write_text(redacted, encoding="utf-8")
 
     def _collect_resource_usage(
         self,

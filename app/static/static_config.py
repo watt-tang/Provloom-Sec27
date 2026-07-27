@@ -13,16 +13,28 @@ class StaticAnalysisConfig:
     max_total_size: int = 2 * 1024 * 1024
     max_depth: int = 5
     max_files: int = 160
-    ignore_patterns: list[str] = field(default_factory=lambda: [".git/**", "node_modules/**", "dist/**", "build/**", "vendor/**", "__pycache__/**", "artifacts/**", "skillscan/**", "skillscan_results/**"])
+    ignore_patterns: list[str] = field(default_factory=lambda: [
+        ".git/**",
+        ".provloom/private/**",
+        ".provloom/adapters/credential_state/**",
+        "node_modules/**",
+        "dist/**",
+        "build/**",
+        "vendor/**",
+        "__pycache__/**",
+        "artifacts/**",
+        "skillscan/**",
+        "skillscan_results/**",
+    ])
     allowed_extensions: list[str] = field(default_factory=lambda: [".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".py", ".sh", ".bash", ".zsh", ".js", ".ts", ".ps1"])
     allowed_filenames: list[str] = field(default_factory=lambda: ["SKILL.md", "README", "README.md", "Dockerfile", "Makefile", "package.json", "manifest.json", "pyproject.toml", "requirements.txt", "setup.py", "setup.cfg"])
     trusted_domains: list[str] = field(default_factory=lambda: ["localhost", "127.0.0.1"])
     protected_resource_patterns: list[str] = field(default_factory=lambda: ["~/.ssh/**", "~/.aws/**", ".env", "/etc/**", "/root/**"])
     prompt_version: str = "provloom-static-action-extraction-v2"
-    llm_enabled: bool = True
+    llm_enabled: bool = False
     llm_base_url: str = "https://api.siliconflow.com/v1"
     llm_api_key: str = field(default_factory=lambda: os.environ.get("PROVLOOM_STATIC_LLM_API_KEY", ""))
-    llm_model: str = "deepseek-ai/DeepSeek-V4-Pro"
+    llm_model: str = "offline-deterministic"
     llm_temperature: float = 0.0
     llm_request_timeout_seconds: int = 45
     llm_max_candidate_actions: int = 16

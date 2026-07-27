@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -94,6 +95,8 @@ class RuntimeEvent:
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["taint_ids"] = sorted({str(item) for item in self.taint_ids if str(item)})
+        if payload["taint_ids"] or _is_network_payload_event(payload):
+            payload = _redact_tainted_payload(payload)
         return payload
 
     @classmethod
@@ -140,7 +143,9 @@ class RuntimeNode:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        payload["metadata"] = _redact_sensitive_metadata(payload.get("metadata", {}))
+        return payload
 
 
 @dataclass
@@ -170,6 +175,7 @@ class RuntimeEdge:
         payload["taint_ids"] = sorted({item for item in self.taint_ids if item})
         payload["raw_references"] = sorted({item for item in self.raw_references if item})
         payload["instrumentation_gaps"] = sorted({item for item in self.instrumentation_gaps if item})
+        payload["metadata"] = _redact_sensitive_metadata(payload.get("metadata", {}))
         return payload
 
 
@@ -312,3 +318,51 @@ def _observation_source_from_raw(raw_source: Any) -> str:
     if raw:
         return "runtime_wrapper"
     return "runtime_wrapper"
+
+
+def _redact_tainted_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    redacted = dict(payload)
+    if isinstance(redacted.get("data_preview"), str) and redacted["data_preview"]:
+        redacted["data_preview"] = _redacted_text(redacted["data_preview"])
+    redacted["metadata"] = _redact_sensitive_metadata(redacted.get("metadata", {}))
+    return redacted
+
+
+def _is_network_payload_event(payload: dict[str, Any]) -> bool:
+    metadata = payload.get("metadata", {}) or {}
+    return (
+        payload.get("object_type") == "network"
+        and payload.get("operation") in {"send", "sendto", "upload", "write"}
+        and (metadata.get("payload_preview") or metadata.get("raw"))
+    )
+
+
+def _redact_sensitive_metadata(value: Any) -> Any:
+    sensitive_keys = {"raw", "payload_preview", "stdout_preview", "content_preview", "body", "authorization", "cookie"}
+    if isinstance(value, dict):
+        result: dict[str, Any] = {}
+        for key, sub_value in value.items():
+            lowered = str(key).lower()
+            if lowered in {"plaintext_stored", "stdout_plaintext_stored"}:
+                result[key] = False
+            elif lowered in sensitive_keys and isinstance(sub_value, str) and sub_value:
+                result[key] = _redacted_text(sub_value)
+                if lowered == "stdout_preview":
+                    result["stdout_plaintext_stored"] = False
+                else:
+                    result["plaintext_stored"] = False
+            else:
+                result[key] = _redact_sensitive_metadata(sub_value)
+        return result
+    if isinstance(value, list):
+        return [_redact_sensitive_metadata(item) for item in value]
+    return value
+
+
+def _redacted_text(value: str) -> dict[str, Any]:
+    return {
+        "redacted": "[TAINTED_VALUE]",
+        "byte_count": len(value.encode("utf-8")),
+        "sha256": hashlib.sha256(value.encode("utf-8")).hexdigest(),
+        "plaintext_stored": False,
+    }

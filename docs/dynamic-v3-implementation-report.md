@@ -93,7 +93,7 @@ Final verification:
 - `python3 -m unittest discover -s test -p 'test_static_analysis_v2.py'`: 53 passed
 - `python3 -m compileall app test`: passed
 
-Docker/e2e tests were not executed in this round.
+Docker/e2e tests were executed in the final validation round with the official image `skill-runtime-sandbox:dynamic-v3`.
 
 ## Compatibility
 
@@ -112,7 +112,25 @@ Legacy chain names are preserved in `chain.metadata.legacy_chain_type`, while ca
 ## Next Steps
 
 1. Add Docker e2e tests with local mock HTTP sink, curl HTTP/HTTPS, subprocess writes, file upload, timeout, and unavailable endpoint.
-2. Add optional static result input to the dynamic analyzer and API so alignment can run with full static v2 context.
+2. Reduce static-runtime alignment noise from interpreter/library runtime-only nodes.
 3. Persist raw trace file and line numbers from trace parser into `RuntimeEvent.trace_file` and `trace_line`.
 4. Add stronger artifact identity checks for download-execute chains.
 5. Replace legacy EPG augmentation as a decision input with canonical v3 chain summaries.
+
+## Official-Image Final E2E
+
+Earlier source-mounted E2E results were preliminary only. Final validation used the rebuilt official image:
+
+- Image: `skill-runtime-sandbox:dynamic-v3`
+- Image id: `sha256:b8f114fa58cfe522a45c5e07d0b86bb53a15de1d8a301f983e21e849dcbcaabb`
+- Fingerprint: `71c962d5de631e79d96696cd503ef9f2f088ebc4090fd3386edee0e2f0196178`
+- Source-mounted runtime: false
+
+Final carrier probes:
+
+- `secret_read_no_llm_prompt`: no flow, benign
+- `secret_marker_into_llm_prompt`: confirmed trusted `llm_context`, benign
+- `secret_trusted_authorization_header`: confirmed trusted `http_header`, benign
+- `secret_untrusted_json_body`: confirmed untrusted `http_body`, malicious
+
+Static v2 result is now passed into API, CLI, telemetry/report, and Dynamic alignment. `unified_explanation` is emitted alongside raw static and dynamic artifacts.

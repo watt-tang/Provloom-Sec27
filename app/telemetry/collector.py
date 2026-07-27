@@ -5,7 +5,9 @@ from pathlib import Path
 from typing import Any
 
 from app.runner.models import DataFlowEvent, FileEvent, LLMEvent, NetworkEvent, ProcessEvent, SandboxExecution, ToolCallEvent
+from app.dynamic.assessment import assess_dynamic_result
 from app.dynamic.analyzer import DynamicAnalysisResult, DynamicRuntimeAnalyzer, persist_dynamic_analysis
+from app.taint.source_registry import SourceRegistry
 from app.telemetry.normalizer import build_normalized_events, persist_normalized_events
 
 
@@ -68,11 +70,11 @@ def build_data_flow_hints(
     tool_calls: list[ToolCallEvent],
 ) -> list[DataFlowEvent]:
     flows: list[DataFlowEvent] = []
+    registry = SourceRegistry()
     sensitive_reads = [
         event
         for event in file_events
-        if event.path.startswith(("/etc/", "/root/", "/proc/", "/sys/"))
-        or ".provloom/adapters/credential_state/" in event.path
+        if _is_confidential_source_path(registry, event.path)
     ]
     if not sensitive_reads or not network_events:
         return flows
@@ -95,17 +97,28 @@ def build_data_flow_hints(
     return flows
 
 
+def _is_confidential_source_path(registry: SourceRegistry, path: str) -> bool:
+    match = registry.match_path(path)
+    return bool(match and str(match.sensitivity).lower() in {"medium", "high", "critical"})
+
+
 def build_execution_report(
     execution: SandboxExecution,
     *,
     normalized_events: list[Any] | None = None,
     dynamic_result: DynamicAnalysisResult | None = None,
+    static_result: Any | None = None,
 ) -> dict[str, Any]:
     normalized_events = normalized_events if normalized_events is not None else build_normalized_events(execution)
     persist_normalized_events(execution.artifacts_dir, normalized_events)
     if dynamic_result is None:
-        dynamic_result = DynamicRuntimeAnalyzer(skill_root=execution.skill_path).analyze_execution(execution, normalized_events)
+        dynamic_result = DynamicRuntimeAnalyzer(skill_root=execution.skill_path).analyze_execution(
+            execution,
+            normalized_events,
+            static_result=static_result,
+        )
         persist_dynamic_analysis(dynamic_result, execution.artifacts_dir)
+    canonical = assess_dynamic_result(dynamic_result)
     return {
         "file_events": [event.to_dict() for event in execution.file_events],
         "network_events": [event.to_dict() for event in execution.network_events],
@@ -123,4 +136,13 @@ def build_execution_report(
         "dynamic_analysis_summary": dynamic_result.summary(),
         "taint_sources": dynamic_result.taint_sources,
         "static_runtime_alignment": dynamic_result.static_runtime_alignment or {},
+        "canonical_assessment": canonical.to_dict(),
+        "canonical_risk_score": canonical.canonical_risk_score,
+        "canonical_final_decision": canonical.canonical_final_decision,
+        "needs_review": canonical.needs_review,
+        "policy_violation_count": canonical.policy_violation_count,
+        "confirmed_chain_count": canonical.confirmed_chain_count,
+        "candidate_chain_count": canonical.candidate_chain_count,
+        "coverage_state": canonical.coverage_state,
+        "instrumentation_gaps": list(canonical.instrumentation_gaps),
     }

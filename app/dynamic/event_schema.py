@@ -202,6 +202,37 @@ def _convert_normalized_event(factory: RuntimeEventFactory, normalized: Normaliz
             metadata=meta,
         )
 
+    if normalized.event_type == "llm_step":
+        event_kind = str(meta.get("event") or "")
+        taint_ids = list(meta.get("taint_ids", []))
+        if event_kind != "request" or not taint_ids:
+            return None
+        base_url = str(meta.get("base_url") or "")
+        return factory.create(
+            timestamp=timestamp,
+            event_type="llm_request",
+            process_id=pid,
+            actor_type="agent",
+            actor_id=actor_id,
+            object_type="network",
+            object_id=f"NET:{base_url or meta.get('endpoint_host') or 'unknown'}",
+            operation="send",
+            taint_ids=taint_ids,
+            evidence_level=str(meta.get("evidence_level") or "confirmed"),
+            evidence_strength=str(meta.get("evidence_strength") or "structured_relation"),
+            observation_source="runtime_wrapper",
+            carrier_type=str(meta.get("carrier_type") or "llm_context"),
+            carrier_location=str(meta.get("carrier_location") or "messages"),
+            instrumentation_visibility=str(meta.get("instrumentation_visibility") or "observed"),
+            raw_source=normalized.source,
+            raw_reference=raw_reference,
+            metadata={
+                **meta,
+                "destination": base_url,
+                "network_evidence_level": meta.get("network_evidence_level", "tainted_payload_observed"),
+            },
+        )
+
     if normalized.event_type == "taint_source":
         label = meta.get("label", {})
         return factory.create(

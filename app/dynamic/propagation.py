@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import fnmatch
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from app.dynamic.config import DynamicAnalysisConfig
@@ -259,7 +259,12 @@ class RuntimeTaintPropagator:
     def _candidate_dependencies(self, events: list[RuntimeEvent]) -> list[RuntimeEvent]:
         if not self.sensitive_read_events:
             return []
-        network_events = [event for event in events if event.event_type == "network_connect" or event.operation == "connect"]
+        network_events = [
+            event
+            for event in events
+            if (event.event_type == "network_connect" or event.operation == "connect")
+            and _has_potential_source_carrier(event)
+        ]
         if not network_events:
             return []
         first_read = self.sensitive_read_events[0]
@@ -307,7 +312,7 @@ class RuntimeTaintPropagator:
 
     @staticmethod
     def _copy_event(event: RuntimeEvent) -> RuntimeEvent:
-        return RuntimeEvent.from_dict(event.to_dict())
+        return replace(event, taint_ids=list(event.taint_ids), metadata=dict(event.metadata))
 
 
 def _paths_from_metadata(metadata: dict[str, Any]) -> list[str]:
@@ -369,3 +374,20 @@ def _is_concrete_network_flow(event: RuntimeEvent) -> bool:
     if event.metadata.get("context_taint_ids") and not event.metadata.get("marker_matches") and not event.metadata.get("upload_file_path"):
         return False
     return True
+
+
+def _has_potential_source_carrier(event: RuntimeEvent) -> bool:
+    return event.carrier_type in {
+        "llm_context",
+        "http_header",
+        "http_query",
+        "http_body",
+        "http_form",
+        "multipart_field",
+        "upload_file",
+        "process_argv",
+        "process_env",
+        "stdin",
+        "socket_payload",
+        "tool_argument",
+    } and event.instrumentation_visibility not in {"endpoint_only", "payload_not_observed"}

@@ -111,6 +111,48 @@ Credential carrier classification:
 
 Trusted domains, egress allowlist, permitted source/sink pairs, executable allowlist, persistence targets, protected files, and installation path allowlists remain config-driven.
 
+## CanonicalAssessment Decision Bridge
+
+Dynamic v3 is the canonical source for dynamic conclusions. `app.dynamic.assessment.CanonicalAssessment` maps `DynamicAnalysisResult` into the top-level compatibility fields:
+
+- `violation_confirmed`: at least one Dynamic v3 policy violation. Top-level `final_decision` is `malicious`, `risk_score` is at least the current violation threshold (`80`), and `triggered_factors` includes `dynamic_v3_policy_violation`.
+- `no_violation_observed`: no policy violation, no candidate chain, no instrumentation gap, and coverage is a completed no-flow or permitted-flow state. Top-level `final_decision` is `benign`.
+- `review_required`: candidate chains, instrumentation gaps, insufficient coverage, payload-not-observed states, instruction simulation-only paths, or hash-derived-only flows. Top-level `final_decision` is `needs_review` and is never `benign`.
+- `execution_incomplete`: timeout, crash, path-not-triggered, missing environment/source/sink, or unsupported operation without an already confirmed violation. Top-level `final_decision` is `needs_review`.
+
+Legacy scoring still runs for compatibility. Its outputs are preserved as `legacy_risk_score` and `legacy_final_decision`, while unprefixed `risk_score` and `final_decision` are overwritten from canonical Dynamic v3. Reports and API responses also expose `canonical_assessment`, `canonical_risk_score`, `canonical_final_decision`, `needs_review`, `policy_violation_count`, `confirmed_chain_count`, `candidate_chain_count`, `coverage_state`, `instrumentation_gaps`, and `consistency_status`.
+
+Permanent consistency invariants:
+
+- `policy_violation_count > 0` implies `final_decision != benign`.
+- `policy_violation_count > 0` implies `risk_score >= 80`.
+- `instrumentation_gap` cannot be reported as benign.
+- `target_reached_no_flow` with zero violation and zero candidate chain can be benign.
+- Trusted authentication and trusted LLM service flows can be confirmed data flows without becoming policy violations.
+
+## LLM Context Carrier Telemetry
+
+`LLMAgentSkillRuntime` inspects taint metadata immediately before each LLM request is sent. When a prior tainted tool result is included in `messages`, the runtime emits request metadata that is normalized into a v3 `llm_request` event with:
+
+- `carrier_type=llm_context`
+- `carrier_location=messages[i].content`
+- `evidence_level=confirmed`
+- `evidence_strength=structured_relation`
+- `network_evidence_level=tainted_payload_observed`
+- provider, model, endpoint host, and destination metadata
+
+The telemetry intentionally does not persist plaintext secrets, full prompts, or API keys. It stores taint ids, message role, carrier location, content SHA-256, byte count, a structural redacted preview such as `[TOOL_RESULT_WITH_TAINT:T001]`, and `plaintext_stored=false`.
+
+Tainted tool stdout, LLM response previews, HTTP request configs, syscall payload previews, and raw syscall strings are redacted in persisted RuntimeEvent/report JSON. The analyzer keeps raw values only in memory while matching carriers and then serializes byte counts and SHA-256 hashes.
+
+LLM providers are typed sinks. Providers/domains in `trusted_llm_providers` or `trusted_llm_provider_domains` are permitted for `llm_context` flows unless a stricter source/sink policy denies them. Unknown or untrusted LLM providers receive normal confidentiality policy evaluation.
+
+## Candidate Pollution Controls
+
+`process_context + endpoint_only` is not sufficient to form a source-to-sink confidentiality candidate. Candidate recovery now requires at least one source-related potential carrier, such as `llm_context`, `http_header`, `http_body`, `http_query`, `http_form`, `multipart`, `upload_file`, `argv`, `stdin`, `socket_payload`, or `tool_argument`.
+
+The shared `SourceRegistry` distinguishes sensitivity levels (`public`, `low`, `medium`, `high`, `critical`). Only confidential sources at least `medium` participate in confidentiality taint propagation. `/etc/hosts` is not a high-sensitivity source. Private benchmark inputs under `.provloom/private/**` and credential adapter state remain confidential sources.
+
 ## Static-Dynamic Alignment
 
 `StaticRuntimeAligner` produces alignment records for runtime file, endpoint, action, and data nodes. With static input it matches exact normalized paths, URL/domain keys, path suffixes, and command/tool basenames. Without static input, DynamicResult reports runtime-only items rather than empty alignment.
@@ -152,3 +194,16 @@ Docker e2e tests were not added in this round.
 ## Non-Goals
 
 This version intentionally does not implement eBPF, FUSE, TLS MITM, byte-level DIFT, compression/encryption reversal, or real recursive Agent execution.
+
+## Dynamic v3 Freeze
+
+Dynamic v3 is frozen as `ProvLoom Dynamic v3`, semantic profile `evidence-graded-carrier-aware`, canonical assessment version `1.0`, alignment version `1.0`.
+
+Final official-image validation used `skill-runtime-sandbox:dynamic-v3` with image id `sha256:b8f114fa58cfe522a45c5e07d0b86bb53a15de1d8a301f983e21e849dcbcaabb` and runtime fingerprint `71c962d5de631e79d96696cd503ef9f2f088ebc4090fd3386edee0e2f0196178`.
+
+Permanent regression artifacts:
+
+- `artifacts/runs/dynamic-carrier-probes/carrier-probe-official-image-v3-rollup.json`
+- `artifacts/runs/static-dynamic-alignment-probes/alignment-probe-official-image-v3-rollup.json`
+
+The report primary status is `canonical_assessment.status`. `final_decision` and `risk_score` remain compatibility mappings. Source-mounted preliminary E2E results are superseded by the official-image final E2E results.

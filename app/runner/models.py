@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -86,7 +87,18 @@ class NetworkEvent:
     source: str = "strace"
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        if isinstance(payload.get("payload_preview"), str) and payload["payload_preview"]:
+            payload["payload_preview"] = _redacted_text(payload["payload_preview"])
+            if isinstance(payload.get("raw"), str) and payload["raw"]:
+                payload["raw"] = _redacted_text(payload["raw"])
+        elif (
+            (payload.get("byte_count") or str(payload.get("action", "")).lower() in {"send", "sendto", "write"})
+            and isinstance(payload.get("raw"), str)
+            and payload["raw"]
+        ):
+            payload["raw"] = _redacted_text(payload["raw"])
+        return payload
 
 
 @dataclass
@@ -163,6 +175,15 @@ class TraceArtifacts:
     network: list[NetworkEvent] = field(default_factory=list)
     processes: list[ProcessEvent] = field(default_factory=list)
     timeline: list[dict[str, Any]] = field(default_factory=list)
+
+
+def _redacted_text(value: str) -> dict[str, Any]:
+    return {
+        "redacted": "[PAYLOAD_PREVIEW_REDACTED]",
+        "byte_count": len(value.encode("utf-8")),
+        "sha256": hashlib.sha256(value.encode("utf-8")).hexdigest(),
+        "plaintext_stored": False,
+    }
 
 
 @dataclass
