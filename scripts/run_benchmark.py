@@ -16,11 +16,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.analyzer.rules import analyze_static_skill, analyze_trace
+from app.analysis.pipeline import ExecutionConfig, analyze_skill_bundle
 from app.backend.schemas import LLMConfig
-from app.runner.docker_runner import DockerRunner
+from app.runner.docker_runner import DEFAULT_SANDBOX_IMAGE, DockerRunner
 from app.runtime.skill_parser import load_skill_definition, resolve_skill_target
-from app.telemetry.collector import build_execution_report
 
 BASELINES = ["static_only", "rule_only", "rule_plus_epg", "epg_with_filtering"]
 HIGH_RISK_BEHAVIORS = {"sensitive_file_read", "read_then_exfiltration"}
@@ -47,6 +46,7 @@ def main() -> int:
     parser.add_argument("--analysis-mode", choices=BASELINES + ["all"], default="all")
     parser.add_argument("--timeout-seconds", default=30, type=int)
     parser.add_argument("--network-policy", default="default", choices=["default", "disabled"])
+    parser.add_argument("--image-name", default=DEFAULT_SANDBOX_IMAGE)
     args = parser.parse_args()
 
     datasets_root = Path(args.datasets_root).resolve()
@@ -55,7 +55,7 @@ def main() -> int:
     cases = discover_cases(datasets_root)
     modes = BASELINES if args.analysis_mode == "all" else [args.analysis_mode]
 
-    runner = DockerRunner()
+    runner = build_runner(args.image_name)
     baseline_results: dict[str, dict[str, Any]] = {}
     csv_rows: list[dict[str, Any]] = []
 
@@ -84,12 +84,17 @@ def main() -> int:
         "datasets_root": str(datasets_root),
         "baseline_order": modes,
         "ground_truth_schema_version": "v1",
+        "sandbox_image": runner.image_name,
         "baseline_results": baseline_results,
         "comparison_table": csv_rows,
     }
     write_summary_files(benchmark_root, csv_rows, payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
+
+
+def build_runner(image_name: str = DEFAULT_SANDBOX_IMAGE) -> DockerRunner:
+    return DockerRunner(image_name=image_name)
 
 
 def discover_cases(datasets_root: Path) -> list[BenchmarkCase]:
@@ -196,8 +201,20 @@ def run_case(
     source_dir, skill_file = resolve_skill_target(case.skill_path)
 
     if analysis_mode == "static_only":
-        definition = load_skill_definition(source_dir, skill_file, allow_empty_actions=True)
-        analysis = analyze_static_skill(definition, analysis_mode=analysis_mode)
+        unified_result = analyze_skill_bundle(
+            str(source_dir),
+            execution_config=ExecutionConfig(
+                input_payload={},
+                timeout_seconds=timeout_seconds,
+                network_policy=network_policy,
+                analysis_mode=analysis_mode,
+                llm_config=LLMConfig(),
+                run_id=execution_id,
+            ),
+            runner=runner,
+            static_only=True,
+        )
+        analysis = unified_result.report
         artifact_dir = benchmark_root / "cases" / analysis_mode / case.case_id
         artifact_dir.mkdir(parents=True, exist_ok=True)
         (artifact_dir / "result.json").write_text(
@@ -228,17 +245,20 @@ def run_case(
             "artifact_dir": str(artifact_dir),
         }
 
-    execution = runner.run(
-        execution_id=execution_id,
-        skill_path=str(source_dir),
-        input_payload={},
-        timeout_seconds=timeout_seconds,
-        network_policy=network_policy,
-        llm_config=LLMConfig(),
+    unified_result = analyze_skill_bundle(
+        str(source_dir),
+        execution_config=ExecutionConfig(
+            input_payload={},
+            timeout_seconds=timeout_seconds,
+            network_policy=network_policy,
+            analysis_mode=analysis_mode,
+            llm_config=LLMConfig(),
+            run_id=execution_id,
+        ),
+        runner=runner,
     )
-    analysis = analyze_trace(execution, analysis_mode=analysis_mode)
-    telemetry = build_execution_report(execution)
-    artifact_dir = Path(execution.artifacts_dir)
+    analysis = unified_result.report
+    artifact_dir = Path(unified_result.artifacts_dir)
     benchmark_case_dir = benchmark_root / "cases" / analysis_mode / case.case_id
     benchmark_case_dir.mkdir(parents=True, exist_ok=True)
     (benchmark_case_dir / "result.json").write_text(
@@ -246,10 +266,10 @@ def run_case(
             {
                 "analysis": analysis,
                 "telemetry_summary": {
-                    "file_event_count": len(telemetry.get("file_events", [])),
-                    "network_event_count": len(telemetry.get("network_events", [])),
-                    "process_event_count": len(telemetry.get("process_events", [])),
-                    "normalized_event_count": len(telemetry.get("normalized_events", [])),
+                    "file_event_count": len(analysis.get("file_events", [])),
+                    "network_event_count": len(analysis.get("network_events", [])),
+                    "process_event_count": len(analysis.get("process_events", [])),
+                    "normalized_event_count": len(analysis.get("normalized_events", [])),
                 },
                 "execution_artifact_dir": str(artifact_dir),
             },

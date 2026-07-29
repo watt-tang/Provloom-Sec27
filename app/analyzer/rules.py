@@ -14,6 +14,7 @@ from app.backend.schemas import EvidenceEvent
 from app.dynamic.alignment import StaticRuntimeAligner
 from app.dynamic.assessment import apply_canonical_assessment, assess_dynamic_result
 from app.dynamic.analyzer import DynamicAnalysisResult, DynamicRuntimeAnalyzer, persist_dynamic_analysis
+from app.explanation.builder import build_unified_explanation as build_unified_explanation_v1
 from app.graph.builder import build_execution_provenance_graph
 from app.graph.exporter import export_graph
 from app.runtime.skill_parser import SkillDefinition, load_skill_definition
@@ -293,26 +294,11 @@ def analyze_trace(
 
 
 def _build_unified_explanation(static_payload: dict, dynamic_result: DynamicAnalysisResult) -> dict:
-    canonical = assess_dynamic_result(dynamic_result)
-    alignment = dynamic_result.static_runtime_alignment or {}
-    records = alignment.get("alignment_records", [])
-    contradictions = alignment.get("contradictions", [])
-    return {
-        "schema_version": "unified-explanation-v1",
-        "static_summary": static_payload.get("static_analysis_summary", {}) if static_payload else {},
-        "runtime_summary": dynamic_result.summary(),
-        "alignments": records,
-        "contradictions": contradictions,
-        "instruction_only_paths": static_payload.get("static_chains", []) if static_payload and not records else [],
-        "runtime_only_paths": [record for record in records if record.get("status") == "runtime_only"],
-        "aligned_paths": [record for record in records if record.get("status") in {"aligned", "partially_aligned"}],
-        "coverage": dynamic_result.coverage.to_dict(),
-        "canonical_assessment": canonical.to_dict(),
-        "policy": {
-            "violation_count": len(dynamic_result.policy_violations),
-            "violations": [violation.to_dict() for violation in dynamic_result.policy_violations],
-        },
-    }
+    return build_unified_explanation_v1(
+        skill_id=dynamic_result.graph.session_id,
+        static_result=static_payload,
+        dynamic_result=dynamic_result,
+    ).to_dict()
 
 
 def analyze_static_skill(skill_definition, analysis_mode: str = "static_only") -> dict:

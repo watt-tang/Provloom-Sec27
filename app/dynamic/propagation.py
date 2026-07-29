@@ -8,7 +8,7 @@ from typing import Any
 from app.dynamic.config import DynamicAnalysisConfig
 from app.dynamic.marker_registry import MarkerMatch, TaintRegistry
 from app.dynamic.models import RuntimeEvent
-from app.taint.source_registry import normalize_path
+from app.taint.source_registry import SourceRegistry, normalize_path
 
 
 @dataclass
@@ -37,6 +37,7 @@ class RuntimeTaintPropagator:
         self.process_inputs: dict[str, ProcessInputTaint] = {}
         self.tool_outputs: dict[str, set[str]] = defaultdict(set)
         self.sensitive_read_events: list[RuntimeEvent] = []
+        self.source_policy = SourceRegistry(source_paths=self.config.sensitive_source_patterns)
 
     def propagate(self, events: list[RuntimeEvent]) -> list[RuntimeEvent]:
         enriched: list[RuntimeEvent] = []
@@ -85,10 +86,21 @@ class RuntimeTaintPropagator:
 
     def _handle_file_read(self, event: RuntimeEvent) -> None:
         path = event.object_path or ""
-        if self._is_sensitive_source_path(path):
-            source = self.registry.ensure_source_for_path(path, source_type="secret_file", timestamp=event.timestamp)
+        source_match = self.source_policy.match_path(path)
+        if source_match and str(source_match.sensitivity).lower() in {"medium", "high", "critical"}:
+            source = self.registry.ensure_source_for_path(path, source_type=source_match.source_type, timestamp=event.timestamp)
+            source.metadata.update(
+                {
+                    "sensitivity": source_match.sensitivity,
+                    "source_category": source_match.category,
+                    "source_policy": source_match.metadata,
+                }
+            )
             strength = "exact_value" if event.data_preview else "structured_relation"
             self._merge_taint(event, [source.taint_id], "confirmed", reason="TAINT_SOURCE_PATH_READ", evidence_strength=strength, carrier_type="file_content", carrier_location=path)
+            event.metadata.setdefault("source_policy", source_match.metadata)
+            event.metadata.setdefault("source_sensitivity", source_match.sensitivity)
+            event.metadata.setdefault("source_category", source_match.category)
             self.file_taint[path] = FileTaint({source.taint_id}, "confirmed", event.event_id, strength)
         if path in self.file_taint:
             record = self.file_taint[path]
@@ -301,6 +313,9 @@ class RuntimeTaintPropagator:
         return [candidate]
 
     def _is_sensitive_source_path(self, path: str) -> bool:
+        match = self.source_policy.match_path(path)
+        if match:
+            return str(match.sensitivity).lower() in {"medium", "high", "critical"}
         normalized = normalize_path(path)
         return any(fnmatch.fnmatch(normalized, normalize_path(pattern)) for pattern in self.config.sensitive_source_patterns)
 

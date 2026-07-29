@@ -7,6 +7,9 @@ ARG IMAGE_TAG=skill-runtime-sandbox:dynamic-v3
 ARG SOURCE_FINGERPRINT=unknown
 ARG BUILD_TIMESTAMP=unknown
 ARG DYNAMIC_ANALYSIS_VERSION=3.0
+LABEL org.provloom.image_tag="${IMAGE_TAG}" \
+      org.provloom.source_fingerprint="${SOURCE_FINGERPRINT}" \
+      org.provloom.dynamic_analysis_version="${DYNAMIC_ANALYSIS_VERSION}"
 
 RUN HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTPS_PROXY} NO_PROXY=${NO_PROXY} apt-get update \
     && apt-get install -y --no-install-recommends strace ca-certificates tini time \

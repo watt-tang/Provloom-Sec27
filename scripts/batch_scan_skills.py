@@ -19,7 +19,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.analyzer.rules import analyze_static_skill, analyze_trace
+from app.analysis.pipeline import ExecutionConfig, analyze_completed_execution, analyze_skill_bundle
+from app.analyzer.rules import analyze_static_skill
 from app.analyzer.capability_inference import CapabilityProfile, infer_capability_profile
 from app.analyzer.execution_profiles import (
     PROFILE_ADAPTER_BACKED,
@@ -59,9 +60,8 @@ from app.backend.schemas import (
 )
 from app.reporting.skill_report import generate_report_file
 from app.reporting.risk_mapper import map_risk_profile
-from app.runner.docker_runner import DockerRunner
+from app.runner.docker_runner import DEFAULT_SANDBOX_IMAGE, DockerRunner
 from app.runtime.skill_parser import SkillDefinition, load_skill_definition
-from app.telemetry.collector import build_execution_report
 
 SUPPORTED_RUNTIMES = {"provloom-embedded", "deepseek-agent", "llm-agent", "llm-native"}
 SUPPORTED_ACTION_TYPES = {"read_file", "write_file", "run_command", "http_request"}
@@ -396,6 +396,10 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def build_runner(image_name: str = DEFAULT_SANDBOX_IMAGE) -> DockerRunner:
+    return DockerRunner(image_name=image_name)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Batch-scan many SKILL.md folders with the ProvLoom sandbox.")
     parser.add_argument("--skills-root", required=True, help="Root directory that contains many skill folders.")
@@ -404,6 +408,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skill-paths-file", help="Optional newline-delimited file listing exact skill directories to scan.")
     parser.add_argument("--analysis-mode", default="epg_with_filtering")
     parser.add_argument("--network-policy", default="default", choices=["default", "disabled"])
+    parser.add_argument("--image-name", default=DEFAULT_SANDBOX_IMAGE)
     parser.add_argument("--default-timeout-seconds", type=int, default=600)
     parser.add_argument("--timeout-seconds", dest="default_timeout_seconds", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--max-workers", type=int, default=5)
@@ -725,9 +730,17 @@ def _static_partial_report(definition: SkillDefinition | None) -> dict[str, Any]
     if definition is None:
         return {}
     try:
-        return analyze_static_skill(definition, analysis_mode="static_only")
+        result = analyze_skill_bundle(
+            definition.skill_root,
+            execution_config=ExecutionConfig(analysis_mode="static_only", run_id=f"STATIC-{uuid.uuid4().hex[:12]}"),
+            static_only=True,
+        )
+        return result.report
     except Exception:
-        return {}
+        try:
+            return analyze_static_skill(definition, analysis_mode="static_only")
+        except Exception:
+            return {}
 
 
 def _dual_axis_for_partial(
@@ -883,9 +896,19 @@ def scan_one_skill(
             memory_peak_bytes=execution.resource_usage.memory_peak_bytes,
             memory_limit_bytes=execution.resource_usage.memory_limit_bytes,
         )
-        analysis = analyze_trace(execution, analysis_mode=analysis_mode)
+        unified_result = analyze_completed_execution(
+            execution,
+            execution_config=ExecutionConfig(
+                input_payload=input_payload,
+                timeout_seconds=timeout_seconds,
+                network_policy=network_policy,
+                analysis_mode=analysis_mode,
+                llm_config=llm_config,
+                run_id=execution_id,
+            ),
+        )
+        analysis = unified_result.report
         report = build_result_payload(analysis)
-        telemetry = build_execution_report(execution)
         trigger_hits, trigger_unexecuted = evaluate_trigger_results(
             plan=parsed_trigger_plan,
             trigger_used=execution.trigger_used,
@@ -1021,7 +1044,7 @@ def scan_one_skill(
             root_cause_v2=root_cause_v2,
             trace_summary={
                 **report.get("trace_summary", {}),
-                "normalized_event_count": len(telemetry.get("normalized_events", [])),
+                "normalized_event_count": len(report.get("normalized_events", [])),
             },
             execution_id=execution_id,
             execution_artifact_dir=execution.artifacts_dir,
@@ -1241,10 +1264,12 @@ def main() -> int:
     )
     tracker.state["totals"] = build_initial_totals(len(discovered), existing_results)
     tracker.update_discovery(len(discovered), pending=len(pending_skills))
+    runner = build_runner(args.image_name)
     tracker.write_manifest(
         {
             "generated_at": utc_now(),
             "skills_root": str(skills_root),
+            "sandbox_image": runner.image_name,
             "count": len(discovered),
             "skills": [str(item) for item in discovered],
             "discovered_paths_file": str(discovered_paths_file),
@@ -1275,7 +1300,6 @@ def main() -> int:
             if existing_result_path.exists():
                 generate_markdown_report_for_result(existing_result_path)
 
-    runner = DockerRunner()
     probe = CommandAvailabilityProbe(runner)
     summary_rows: list[dict[str, Any]] = list(existing_results.values())
 

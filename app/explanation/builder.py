@@ -1,0 +1,1109 @@
+from __future__ import annotations
+
+import difflib
+import posixpath
+import re
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlparse
+
+from app.dynamic.assessment import assess_dynamic_result
+from app.explanation.models import (
+    ALIGNMENT_VERSION,
+    ASSESSMENT_VERSION,
+    DYNAMIC_VERSION,
+    STATIC_VERSION,
+    CoverageCertificate,
+    PolicyFinding,
+    RuntimeObligation,
+    UnifiedAlignment,
+    UnifiedContradiction,
+    UnifiedExplanationResult,
+)
+from app.taint.source_registry import SourceRegistry
+
+
+ACTION_COMPATIBILITY = {
+    "READ": {"file_read", "read", "read_file", "ACCESS_CREDENTIAL"},
+    "WRITE": {"file_write", "write", "write_file", "PERSIST"},
+    "EXECUTE": {"process_exec", "exec", "run_command", "EXEC"},
+    "SEND": {"network_send", "send", "http_request", "llm_request", "INVOKE_API"},
+    "UPLOAD": {"file_upload", "upload", "network_send"},
+    "DOWNLOAD": {"network_receive", "download", "file_write"},
+    "ACCESS_CREDENTIAL": {"file_read", "read", "sensitive_source"},
+    "INVOKE_API": {"network_send", "network_connect", "llm_request", "http_request"},
+    "PERSIST": {"file_write", "write", "persistence_confirmed"},
+}
+
+CONTRADICTION_TYPES = {
+    "declared_local_only_but_runtime_network",
+    "declared_endpoint_mismatch",
+    "declared_auth_but_runtime_body_exposure",
+    "declared_artifact_identity_mismatch",
+    "required_confirmation_but_runtime_preconfirmation_action",
+    "declared_temporary_but_runtime_persistence",
+    "declared_read_scope_but_runtime_extra_sensitive_read",
+    "declared_tool_but_runtime_different_tool",
+    "declared_no_external_side_effect_but_runtime_external_effect",
+}
+
+
+def build_unified_explanation(
+    *,
+    skill_id: str,
+    static_result: Any | None,
+    dynamic_result: Any | None,
+    execution: Any | None = None,
+    legacy_report: dict[str, Any] | None = None,
+) -> UnifiedExplanationResult:
+    static_payload = _payload(static_result)
+    dynamic_payload = _payload(dynamic_result)
+    runtime_events = _runtime_events(dynamic_result, dynamic_payload)
+    runtime_chains = _runtime_chains(dynamic_result, dynamic_payload)
+    static_items = _static_items(static_payload)
+    runtime_items = _runtime_items(runtime_events, dynamic_payload)
+    alignments = _build_alignments(static_items, runtime_items, runtime_chains, static_payload)
+    contradictions = _build_contradictions(static_payload, runtime_events, runtime_chains, alignments)
+    coverage_certificate = _build_coverage_certificate(
+        static_payload=static_payload,
+        runtime_events=runtime_events,
+        runtime_chains=runtime_chains,
+        dynamic_payload=dynamic_payload,
+        execution=execution,
+    )
+    policy_findings = _build_policy_findings(static_payload, dynamic_payload, runtime_chains, contradictions, coverage_certificate)
+    canonical = _canonical_assessment(dynamic_result, static_payload, dynamic_payload, policy_findings, coverage_certificate)
+    witnesses = _minimal_witnesses(static_payload, runtime_chains)
+    relevant_unresolved = [item.to_dict() for item in alignments if item.status == "relevant_unresolved"]
+    internal_unresolved = [item.to_dict() for item in alignments if item.status == "internal_unresolved"]
+    aligned_runtime_ids = {rid for item in alignments for rid in item.runtime_ids if item.status in {"aligned", "partially_aligned"}}
+    internal_runtime_ids = {rid for item in alignments for rid in item.runtime_ids if item.status == "internal_unresolved"}
+    aligned_static_ids = {sid for item in alignments for sid in item.static_ids if item.status in {"aligned", "partially_aligned"}}
+    unified = UnifiedExplanationResult(
+        skill_id=skill_id,
+        static_result=static_payload,
+        dynamic_result=dynamic_payload,
+        alignments=alignments,
+        contradictions=contradictions,
+        aligned_paths=[item.to_dict() for item in alignments if item.alignment_type == "path" and item.status in {"aligned", "partially_aligned"}],
+        instruction_only_paths=_instruction_only_paths(static_payload, aligned_static_ids),
+        runtime_only_paths=_runtime_only_paths(runtime_chains, runtime_events, aligned_runtime_ids, internal_runtime_ids),
+        relevant_unresolved=relevant_unresolved,
+        internal_unresolved=internal_unresolved,
+        coverage_certificate=coverage_certificate,
+        policy_violations=list(dynamic_payload.get("policy_violations", dynamic_payload.get("runtime_policy_violations", [])) or []),
+        canonical_assessment=canonical,
+        minimal_witnesses=witnesses,
+        limitations=_limitations(dynamic_payload, coverage_certificate),
+        legacy_compatibility={
+            "legacy_risk_score": (legacy_report or {}).get("legacy_risk_score", (legacy_report or {}).get("risk_score", 0)),
+            "legacy_final_decision": (legacy_report or {}).get("legacy_final_decision", (legacy_report or {}).get("final_decision", "unknown")),
+            "legacy_static_result_present": bool((legacy_report or {}).get("legacy_static_result")),
+        },
+        policy_findings=policy_findings,
+    )
+    unified.versions.update(
+        {
+            "static_analysis_version": STATIC_VERSION,
+            "dynamic_analysis_version": DYNAMIC_VERSION,
+            "alignment_version": ALIGNMENT_VERSION,
+            "assessment_version": ASSESSMENT_VERSION,
+        }
+    )
+    return unified
+
+
+def _payload(value: Any | None) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if hasattr(value, "to_dict"):
+        return value.to_dict()
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _runtime_events(dynamic_result: Any | None, dynamic_payload: dict[str, Any]) -> list[dict[str, Any]]:
+    if dynamic_result is not None and hasattr(dynamic_result, "runtime_events"):
+        return [event.to_dict() if hasattr(event, "to_dict") else dict(event) for event in dynamic_result.runtime_events]
+    return list(dynamic_payload.get("runtime_events") or dynamic_payload.get("runtime_events_v2") or [])
+
+
+def _runtime_chains(dynamic_result: Any | None, dynamic_payload: dict[str, Any]) -> list[dict[str, Any]]:
+    if dynamic_result is not None and hasattr(dynamic_result, "chains"):
+        return [chain.to_dict() if hasattr(chain, "to_dict") else dict(chain) for chain in dynamic_result.chains]
+    return list(dynamic_payload.get("runtime_chains") or [])
+
+
+def _static_items(static_payload: dict[str, Any]) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for entity in static_payload.get("resolved_entities", []) or []:
+        sid = _static_id(entity, "entity")
+        for key in _entity_keys(entity):
+            kind = _entity_kind(entity)
+            items.append({"id": sid, "kind": kind, "key": key, "raw": entity})
+    for action in static_payload.get("extracted_actions", []) or []:
+        sid = _static_id(action, "action")
+        action_type = str(action.get("action_type") or action.get("type") or "").upper()
+        if action_type:
+            items.append({"id": sid, "kind": "action", "key": action_type, "raw": action})
+        for key in _action_keys(action):
+            items.append({"id": sid, "kind": "action", "key": key, "raw": action})
+    for mention in static_payload.get("deterministic_mentions", []) or []:
+        value = mention.get("normalized_value") or mention.get("raw_value")
+        if not value:
+            continue
+        kind = "endpoint" if str(mention.get("mention_type")) in {"url", "domain"} else "entity"
+        items.append({"id": str(mention.get("mention_id") or value), "kind": kind, "key": str(value), "raw": mention})
+    for chain in static_payload.get("static_chains", []) or []:
+        cid = str(chain.get("chain_id") or "")
+        if cid:
+            items.append({"id": cid, "kind": "path", "key": str(chain.get("chain_type") or ""), "raw": chain})
+    return _dedupe_items(items)
+
+
+def _runtime_items(events: list[dict[str, Any]], dynamic_payload: dict[str, Any]) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    graph = dynamic_payload.get("runtime_provenance_graph", {}) or {}
+    for node in graph.get("nodes", []) or []:
+        if not isinstance(node, dict):
+            continue
+        node_type = str(node.get("node_type") or "")
+        meta = node.get("metadata", {}) or {}
+        label = str(node.get("label") or "")
+        rid = str(node.get("node_id") or label)
+        if node_type == "File":
+            items.append({"id": rid, "kind": "file", "key": meta.get("path") or label, "raw": node})
+        elif node_type == "NetworkEndpoint":
+            items.append({"id": rid, "kind": "endpoint", "key": meta.get("sink_url") or meta.get("sink_domain") or label.replace("NET:", ""), "raw": node})
+        elif node_type in {"ToolInvocation", "Process"}:
+            items.append({"id": rid, "kind": "tool" if node_type == "ToolInvocation" else "process", "key": meta.get("tool_id") or meta.get("command") or label, "raw": node})
+        elif node_type == "DataObject":
+            items.append({"id": rid, "kind": "data", "key": meta.get("carrier_location") or label, "raw": node})
+    for event in events:
+        eid = str(event.get("event_id") or "")
+        operation = str(event.get("operation") or event.get("event_type") or "")
+        if operation:
+            items.append({"id": eid, "kind": "action", "key": operation, "raw": event})
+        if event.get("object_path"):
+            items.append({"id": eid, "kind": "file", "key": event.get("object_path"), "raw": event})
+        if event.get("object_type") == "network":
+            items.append({"id": eid, "kind": "endpoint", "key": _event_endpoint(event), "raw": event})
+    return _dedupe_items(items)
+
+
+def _build_alignments(
+    static_items: list[dict[str, Any]],
+    runtime_items: list[dict[str, Any]],
+    runtime_chains: list[dict[str, Any]],
+    static_payload: dict[str, Any],
+) -> list[UnifiedAlignment]:
+    records: list[UnifiedAlignment] = []
+    used_runtime: set[str] = set()
+    chain_related_runtime_ids = _chain_related_runtime_ids(runtime_chains)
+    for ritem in runtime_items:
+        match = _best_match(ritem, static_items)
+        if match is None:
+            internal_scope = _is_runtime_internal_item(ritem) and not _runtime_item_has_taint(ritem) and ritem["id"] not in chain_related_runtime_ids
+            status = "internal_unresolved" if internal_scope else "relevant_unresolved"
+            reason = (
+                "runtime_internal item is outside static entities, taint sources, runtime chains, and target actions"
+                if internal_scope
+                else "no compatible static entity, action, carrier, or path matched"
+            )
+            records.append(
+                UnifiedAlignment(
+                    alignment_id=f"ALN-{len(records) + 1:04d}",
+                    status=status,
+                    alignment_type=_alignment_type(ritem["kind"]),
+                    runtime_ids=[ritem["id"]],
+                    reason=reason,
+                    supporting_evidence=[_evidence("runtime", ritem["id"], ritem["key"], scope="runtime_internal" if internal_scope else "relevant")],
+                )
+            )
+            continue
+        used_runtime.add(ritem["id"])
+        records.append(
+            UnifiedAlignment(
+                alignment_id=f"ALN-{len(records) + 1:04d}",
+                status="aligned" if match["score"] >= 0.85 else "partially_aligned",
+                alignment_type=_alignment_type(ritem["kind"]),
+                static_ids=[match["item"]["id"]],
+                runtime_ids=[ritem["id"]],
+                score=match["score"],
+                reason=match["reason"],
+                matched_keys=[match["key"]],
+                conflicting_keys=[],
+                supporting_evidence=[_evidence("runtime", ritem["id"], ritem["key"]), _evidence("static", match["item"]["id"], match["item"]["key"])],
+            )
+        )
+    static_chain_keys = {_norm_key(item.get("chain_type")) for item in static_payload.get("static_chains", []) or [] if item.get("chain_id")}
+    for chain in runtime_chains:
+        runtime_type = _runtime_chain_semantic_type(chain)
+        if runtime_type and _norm_key(runtime_type) in static_chain_keys:
+            static_ids = [str(item.get("chain_id")) for item in static_payload.get("static_chains", []) or [] if _norm_key(item.get("chain_type")) == _norm_key(runtime_type)]
+            records.append(
+                UnifiedAlignment(
+                    alignment_id=f"ALN-{len(records) + 1:04d}",
+                    status="partially_aligned",
+                    alignment_type="path",
+                    static_ids=static_ids,
+                    runtime_ids=[str(chain.get("chain_id"))],
+                    score=0.72,
+                    reason="runtime chain semantic type is compatible with static path type",
+                    matched_keys=[runtime_type],
+                    supporting_evidence=[_evidence("runtime_chain", str(chain.get("chain_id")), runtime_type)],
+                )
+            )
+        elif str(chain.get("chain_id")) not in used_runtime:
+            records.append(
+                UnifiedAlignment(
+                    alignment_id=f"ALN-{len(records) + 1:04d}",
+                    status="relevant_unresolved",
+                    alignment_type="path",
+                    runtime_ids=[str(chain.get("chain_id"))],
+                    score=0.0,
+                    reason="runtime chain has no compatible static path",
+                    supporting_evidence=[_evidence("runtime_chain", str(chain.get("chain_id")), runtime_type or str(chain.get("chain_type")))],
+                )
+            )
+    return records
+
+
+def _chain_related_runtime_ids(runtime_chains: list[dict[str, Any]]) -> set[str]:
+    related: set[str] = set()
+    for chain in runtime_chains:
+        for field in ("chain_id", "source_event_id", "sink_event_id"):
+            if chain.get(field):
+                related.add(str(chain[field]))
+        for field in ("supporting_event_ids", "ordered_nodes", "ordered_edges"):
+            for value in chain.get(field, []) or []:
+                related.add(str(value))
+    return related
+
+
+def _runtime_item_has_taint(runtime_item: dict[str, Any]) -> bool:
+    raw = runtime_item.get("raw") or {}
+    if raw.get("taint_ids") or raw.get("input_taint_ids") or raw.get("output_taint_ids"):
+        return True
+    metadata = raw.get("metadata") or {}
+    if isinstance(metadata, dict) and (metadata.get("taint_ids") or metadata.get("source_id")):
+        return True
+    return False
+
+
+def _is_runtime_internal_item(runtime_item: dict[str, Any]) -> bool:
+    if _runtime_item_has_sensitive_source(runtime_item):
+        return False
+    kind = str(runtime_item.get("kind") or "")
+    raw = runtime_item.get("raw") or {}
+    keys = [
+        runtime_item.get("key"),
+        raw.get("label"),
+        raw.get("object_path"),
+        raw.get("object_id"),
+        raw.get("data_preview"),
+    ]
+    metadata = raw.get("metadata") or {}
+    if isinstance(metadata, dict):
+        keys.extend(
+            metadata.get(field)
+            for field in ("path", "command", "executable", "source_path", "destination", "carrier_location")
+        )
+    text = " ".join(str(key or "") for key in keys).replace("\\", "/").lower()
+    if not text:
+        return False
+    if kind == "endpoint":
+        return False
+    internal_markers = (
+        "/opt/skill_sandbox/",
+        "python -m app.runtime.container_runtime",
+        "/usr/local/lib/python",
+        "/usr/lib/python",
+        "/lib/python",
+        "/site-packages/",
+        "__pycache__",
+        ".pyc",
+        "/etc/ssl/",
+        "/usr/lib/ssl/",
+        "/etc/ca-certificates/",
+        "/usr/share/ca-certificates/",
+        "certifi/cacert.pem",
+        "/root/.cache/",
+        "/.cache/",
+        "/pip/",
+        "/.npm/",
+        "node_modules/",
+        "huggingface/",
+        "transformers/",
+        "modelscope/",
+        "/var/cache/",
+        "/var/lib/apt/",
+        "/tmp/pip-",
+        "/tmp/tmp",
+    )
+    if any(marker in text for marker in internal_markers):
+        return True
+    return bool(kind in {"process", "tool"} and "strace" in text and "/artifacts/trace.log" in text)
+
+
+def _runtime_item_has_sensitive_source(runtime_item: dict[str, Any]) -> bool:
+    registry = SourceRegistry()
+    raw = runtime_item.get("raw") or {}
+    candidates = [runtime_item.get("key"), raw.get("object_path")]
+    metadata = raw.get("metadata") or {}
+    if isinstance(metadata, dict):
+        candidates.extend(metadata.get(field) for field in ("path", "source_path", "source_location"))
+    sensitive_levels = {"medium", "high", "critical"}
+    for candidate in candidates:
+        match = registry.match_path(str(candidate or ""))
+        if match and match.sensitivity in sensitive_levels:
+            return True
+    return False
+
+
+def _best_match(runtime_item: dict[str, Any], static_items: list[dict[str, Any]]) -> dict[str, Any] | None:
+    rkind = runtime_item["kind"]
+    rkey = _norm_key(runtime_item["key"])
+    best: dict[str, Any] | None = None
+    for sitem in static_items:
+        skey = _norm_key(sitem["key"])
+        score = 0.0
+        reason = ""
+        matched_key = ""
+        if not rkey or not skey:
+            continue
+        if rkey == skey:
+            score, reason, matched_key = 1.0, "exact normalized identity", skey
+        elif rkind in {"file", "data"} and sitem["kind"] in {"file", "artifact", "credential", "entity"} and _same_path(rkey, skey):
+            score, reason, matched_key = 0.9, "exact normalized path or artifact identity", skey
+        elif rkind == "endpoint" and sitem["kind"] in {"endpoint", "entity"} and _same_endpoint(rkey, skey):
+            score, reason, matched_key = 0.88, "exact URL/domain endpoint relationship", skey
+        elif rkind in {"tool", "process"} and sitem["kind"] in {"tool", "process", "action"} and _same_executable(rkey, skey):
+            score, reason, matched_key = 0.86, "normalized command/executable match", skey
+        elif rkind == "action" and sitem["kind"] == "action" and _actions_compatible(rkey, skey):
+            score, reason, matched_key = 0.8, "structured semantic action compatibility", skey
+        else:
+            fuzzy = difflib.SequenceMatcher(a=rkey, b=skey).ratio()
+            if fuzzy >= 0.82:
+                score, reason, matched_key = min(0.69, fuzzy), "fuzzy string similarity weak evidence", skey
+        if score and (best is None or score > best["score"]):
+            best = {"item": sitem, "score": score, "reason": reason, "key": matched_key}
+    return best
+
+
+def _build_contradictions(
+    static_payload: dict[str, Any],
+    runtime_events: list[dict[str, Any]],
+    runtime_chains: list[dict[str, Any]],
+    alignments: list[UnifiedAlignment],
+) -> list[UnifiedContradiction]:
+    contradictions: list[UnifiedContradiction] = []
+    claims = _static_claims(static_payload)
+    network_events = [event for event in runtime_events if event.get("object_type") == "network" or str(event.get("event_type", "")).startswith(("network_", "llm_"))]
+    tainted_body = [event for event in network_events if event.get("taint_ids") and event.get("carrier_type") in {"http_body", "multipart_field", "http_form", "socket_payload"}]
+    persistence = [chain for chain in runtime_chains if chain.get("chain_type") == "persistence_confirmed"]
+    sensitive_reads = [event for event in runtime_events if event.get("operation") == "read" and event.get("taint_ids") and event.get("object_type") == "file"]
+    external_effects = [event for event in runtime_events if event.get("operation") in {"send", "upload", "write", "connect"} and (event.get("object_type") == "network" or _is_external_write(event))]
+
+    if claims["local_only"] and network_events:
+        contradictions.append(_contradiction("declared_local_only_but_runtime_network", "high", claims["local_only"], network_events, "static declares local-only execution but runtime observed network activity", 0.82))
+    if claims["endpoints"] and network_events:
+        runtime_endpoints = {_norm_endpoint(_event_endpoint(event)) for event in network_events if _event_endpoint(event)}
+        static_endpoints = {_norm_endpoint(item["key"]) for item in claims["endpoints"] if item["key"]}
+        if runtime_endpoints and static_endpoints and runtime_endpoints.isdisjoint(static_endpoints):
+            contradictions.append(_contradiction("declared_endpoint_mismatch", "high", claims["endpoints"], network_events, "runtime endpoint does not match declared static endpoint set", 0.8))
+    if claims["auth_only"] and tainted_body:
+        contradictions.append(_contradiction("declared_auth_but_runtime_body_exposure", "critical", claims["auth_only"], tainted_body, "static describes credential use as authentication but runtime placed taint in body/form payload", 0.86))
+    if claims["artifact_identity"] and _artifact_mismatch(claims["artifact_identity"], runtime_events):
+        contradictions.append(_contradiction("declared_artifact_identity_mismatch", "high", claims["artifact_identity"], runtime_events, "runtime artifact path/hash differs from declared artifact identity", 0.72))
+    if claims["confirmation_required"] and _preconfirmation_effects(runtime_events):
+        contradictions.append(_contradiction("required_confirmation_but_runtime_preconfirmation_action", "high", claims["confirmation_required"], _preconfirmation_effects(runtime_events), "runtime performed side effect before any observed user confirmation", 0.75))
+    if claims["temporary_only"] and persistence:
+        contradictions.append(_contradiction("declared_temporary_but_runtime_persistence", "high", claims["temporary_only"], persistence, "static declares temporary behavior but runtime persistence chain was recovered", 0.8))
+    if claims["read_scope"] and _extra_sensitive_reads(claims["read_scope"], sensitive_reads):
+        contradictions.append(_contradiction("declared_read_scope_but_runtime_extra_sensitive_read", "high", claims["read_scope"], _extra_sensitive_reads(claims["read_scope"], sensitive_reads), "runtime read sensitive source outside declared read scope", 0.78))
+    if claims["tools"] and _different_runtime_tools(claims["tools"], runtime_events):
+        contradictions.append(_contradiction("declared_tool_but_runtime_different_tool", "medium", claims["tools"], _different_runtime_tools(claims["tools"], runtime_events), "runtime invoked a tool/executable not declared statically", 0.68, ["tool equivalence is syntactic"]))
+    if claims["no_external_side_effect"] and external_effects:
+        contradictions.append(_contradiction("declared_no_external_side_effect_but_runtime_external_effect", "high", claims["no_external_side_effect"], external_effects, "static says no external side effect but runtime observed one", 0.82))
+
+    known = {item.contradiction_type for item in contradictions}
+    for missing in sorted(CONTRADICTION_TYPES - known):
+        _ = missing
+    for item in contradictions:
+        item.alignment_id = _alignment_for(item, alignments)
+    return contradictions
+
+
+def _build_coverage_certificate(
+    *,
+    static_payload: dict[str, Any],
+    runtime_events: list[dict[str, Any]],
+    runtime_chains: list[dict[str, Any]],
+    dynamic_payload: dict[str, Any],
+    execution: Any | None,
+) -> CoverageCertificate:
+    obligations = _runtime_obligations(static_payload, runtime_events)
+    gaps = sorted(
+        {
+            str(event.get("instrumentation_visibility"))
+            for event in runtime_events
+            if str(event.get("instrumentation_visibility") or "") not in {"", "observed", "payload_preview_observed", "endpoint_only"}
+        }
+        | {str(gap) for chain in runtime_chains for gap in chain.get("instrumentation_gaps", [])}
+    )
+    if any(event.get("metadata", {}).get("encrypted_payload_invisible") for event in runtime_events):
+        gaps.append("encrypted_payload_invisible")
+    satisfied = sum(1 for item in obligations if item.status == "satisfied")
+    unsatisfied = sum(1 for item in obligations if item.status == "unsatisfied")
+    unverifiable = sum(1 for item in obligations if item.status == "unverifiable")
+    dynamic_state = str((dynamic_payload.get("coverage") or dynamic_payload.get("runtime_coverage") or {}).get("coverage_state") or "")
+    state = _coverage_state_from_obligations(obligations, runtime_events, runtime_chains, gaps, dynamic_state, execution)
+    reasons = _coverage_reasons(state, obligations, gaps, dynamic_state, execution)
+    return CoverageCertificate(
+        coverage_state=state,
+        obligations=obligations,
+        reasons=reasons,
+        instrumentation_gaps=sorted(set(gaps)),
+        summary={
+            "obligation_count": len(obligations),
+            "satisfied": satisfied,
+            "unsatisfied": unsatisfied,
+            "unverifiable": unverifiable,
+            "not_applicable": sum(1 for item in obligations if item.status == "not_applicable"),
+            "dynamic_coverage_state": dynamic_state,
+        },
+    )
+
+
+def _runtime_obligations(static_payload: dict[str, Any], runtime_events: list[dict[str, Any]]) -> list[RuntimeObligation]:
+    obligations: list[RuntimeObligation] = []
+    if static_payload:
+        obligations.append(
+            RuntimeObligation(
+                obligation_id="OBL-0001",
+                origin="trigger_plan",
+                static_ids=[],
+                expected_runtime_operation="skill_activation",
+                status="satisfied" if runtime_events else "unsatisfied",
+                supporting_runtime_ids=[event.get("event_id", "") for event in runtime_events[:1]],
+                reason="runtime emitted at least one event" if runtime_events else "no runtime events were observed",
+            )
+        )
+    for action in static_payload.get("extracted_actions", []) or []:
+        action_id = _static_id(action, "action")
+        expected = _expected_operation(action)
+        matches = [event for event in runtime_events if _runtime_matches_expected(event, expected, action)]
+        status = "satisfied" if matches else "unsatisfied"
+        if expected == "payload_observable" and _tls_payload_gap(runtime_events):
+            status = "unverifiable"
+        obligations.append(
+            RuntimeObligation(
+                obligation_id=f"OBL-{len(obligations) + 1:04d}",
+                origin="declared_action",
+                static_ids=[action_id],
+                expected_runtime_operation=expected,
+                expected_entity_keys=_action_keys(action),
+                status=status,
+                supporting_runtime_ids=[str(event.get("event_id")) for event in matches],
+                reason="matched runtime operation" if matches else "declared static action was not observed at runtime",
+            )
+        )
+    for chain in static_payload.get("static_chains", []) or []:
+        chain_id = str(chain.get("chain_id") or "")
+        expected = _expected_chain_obligation(chain)
+        matches = [event for event in runtime_events if _runtime_chain_action_match(event, expected)]
+        obligations.append(
+            RuntimeObligation(
+                obligation_id=f"OBL-{len(obligations) + 1:04d}",
+                origin="static_path",
+                static_ids=[chain_id],
+                expected_runtime_operation=expected,
+                expected_entity_keys=[str(chain.get("source_entity") or ""), str(chain.get("sink_entity") or "")],
+                status="satisfied" if matches else "unsatisfied",
+                supporting_runtime_ids=[str(event.get("event_id")) for event in matches],
+                reason="static risk path target operation reached" if matches else "static risk path target operation not observed",
+            )
+        )
+    if not obligations:
+        obligations.append(
+            RuntimeObligation(
+                obligation_id="OBL-0001",
+                origin="trigger_plan",
+                static_ids=[],
+                expected_runtime_operation="skill_activation",
+                status="satisfied" if runtime_events else "unsatisfied",
+                supporting_runtime_ids=[event.get("event_id", "") for event in runtime_events[:1]],
+                reason="runtime-only analysis" if runtime_events else "no static or runtime evidence",
+            )
+        )
+    return obligations
+
+
+def _coverage_state_from_obligations(
+    obligations: list[RuntimeObligation],
+    runtime_events: list[dict[str, Any]],
+    runtime_chains: list[dict[str, Any]],
+    gaps: list[str],
+    dynamic_state: str,
+    execution: Any | None,
+) -> str:
+    if execution is not None and getattr(execution, "timed_out", False):
+        return "timeout"
+    if execution is not None and getattr(execution, "exit_code", 0) not in (0, None):
+        return "execution_failed"
+    if dynamic_state in {"timeout", "execution_failed", "environment_missing", "unsupported_operation", "source_unavailable", "sink_unavailable"}:
+        return dynamic_state
+    if any(chain.get("chain_type", "").endswith("_confirmed") for chain in runtime_chains):
+        return "runtime_confirmed" if not gaps else "instrumentation_gap"
+    if gaps or any(item.status == "unverifiable" for item in obligations):
+        return "instrumentation_gap"
+    if not runtime_events:
+        return "path_not_triggered"
+    if any(chain.get("chain_type") == "confidentiality_candidate" for chain in runtime_chains):
+        return "insufficient_coverage"
+    if _strict_target_reached_no_flow(obligations, runtime_events, runtime_chains):
+        return "target_reached_no_flow"
+    if any(item.status == "unsatisfied" for item in obligations):
+        return "path_not_triggered"
+    return dynamic_state or "insufficient_coverage"
+
+
+def _strict_target_reached_no_flow(
+    obligations: list[RuntimeObligation],
+    runtime_events: list[dict[str, Any]],
+    runtime_chains: list[dict[str, Any]],
+) -> bool:
+    if any(chain.get("chain_type") in {"confidentiality_confirmed", "confidentiality_candidate"} for chain in runtime_chains):
+        return False
+    if _tls_payload_gap(runtime_events):
+        return False
+    action_reached = any(item.status == "satisfied" and item.expected_runtime_operation in {"file_read", "network_send", "network_connect", "process_exec", "tool_invoke"} for item in obligations)
+    source_ok = all(item.status in {"satisfied", "not_applicable"} for item in obligations if item.expected_runtime_operation in {"source_available", "source_read", "file_read"})
+    sink_ok = all(item.status in {"satisfied", "not_applicable"} for item in obligations if item.expected_runtime_operation in {"sink_available", "request_attempted", "network_send", "network_connect", "payload_observable"})
+    carriers_observable = all(str(event.get("instrumentation_visibility") or "observed") in {"observed", "payload_preview_observed", "endpoint_only"} for event in runtime_events)
+    return action_reached and source_ok and sink_ok and carriers_observable
+
+
+def _build_policy_findings(
+    static_payload: dict[str, Any],
+    dynamic_payload: dict[str, Any],
+    runtime_chains: list[dict[str, Any]],
+    contradictions: list[UnifiedContradiction],
+    coverage: CoverageCertificate,
+) -> list[PolicyFinding]:
+    findings: list[PolicyFinding] = []
+    for chain in static_payload.get("static_chains", []) or []:
+        alert = str(chain.get("alert_status") or chain.get("policy_status") or "capability_only")
+        status = "capability" if alert in {"capability_only", "allowed"} else "review"
+        findings.append(
+            PolicyFinding(
+                finding_id=f"PF-{len(findings) + 1:04d}",
+                origin="static",
+                policy_domain=_policy_domain(chain),
+                status=status,
+                evidence_status="instruction_supported",
+                supporting_ids=[str(chain.get("chain_id") or "")],
+                reason=str(chain.get("explanation") or chain.get("policy_status") or "static instruction finding"),
+            )
+        )
+    for violation in dynamic_payload.get("policy_violations", dynamic_payload.get("runtime_policy_violations", [])) or []:
+        findings.append(
+            PolicyFinding(
+                finding_id=f"PF-{len(findings) + 1:04d}",
+                origin="runtime",
+                policy_domain=str(violation.get("policy_type") or "confidentiality"),
+                status="violation",
+                evidence_status="runtime_confirmed",
+                supporting_ids=[str(violation.get("violation_id") or violation.get("chain_id") or "")],
+                reason=str(violation.get("reason") or "runtime policy violation"),
+            )
+        )
+    for chain in runtime_chains:
+        if str(chain.get("chain_type")) == "confidentiality_candidate":
+            findings.append(
+                PolicyFinding(
+                    finding_id=f"PF-{len(findings) + 1:04d}",
+                    origin="runtime",
+                    policy_domain="confidentiality",
+                    status="review",
+                    evidence_status="insufficient",
+                    supporting_ids=[str(chain.get("chain_id") or "")],
+                    reason="candidate runtime flow requires review and is not benign",
+                )
+            )
+    for contradiction in contradictions:
+        findings.append(
+            PolicyFinding(
+                finding_id=f"PF-{len(findings) + 1:04d}",
+                origin="reconciliation",
+                policy_domain="confidentiality" if "endpoint" in contradiction.contradiction_type or "auth" in contradiction.contradiction_type else "integrity",
+                status="review",
+                evidence_status="contradicted",
+                supporting_ids=list(contradiction.static_claim.get("ids", [])) + list(contradiction.runtime_observation.get("ids", [])),
+                reason=contradiction.reason,
+            )
+        )
+    if coverage.coverage_state in {"instrumentation_gap", "insufficient_coverage", "path_not_triggered", "execution_failed", "timeout"}:
+        findings.append(
+            PolicyFinding(
+                finding_id=f"PF-{len(findings) + 1:04d}",
+                origin="reconciliation",
+                policy_domain="confidentiality",
+                status="review",
+                evidence_status="insufficient",
+                supporting_ids=[],
+                reason=f"coverage state is {coverage.coverage_state}",
+            )
+        )
+    return findings
+
+
+def _canonical_assessment(
+    dynamic_result: Any | None,
+    static_payload: dict[str, Any],
+    dynamic_payload: dict[str, Any],
+    findings: list[PolicyFinding],
+    coverage: CoverageCertificate,
+) -> dict[str, Any]:
+    if dynamic_result is not None:
+        assessment = assess_dynamic_result(dynamic_result).to_dict()
+    else:
+        assessment = dict(dynamic_payload.get("canonical_assessment") or {})
+    if not assessment:
+        review_findings = [item for item in findings if item.status in {"review", "violation"}]
+        status = "review_required" if review_findings else "no_violation_observed"
+        assessment = {
+            "status": status,
+            "canonical_final_decision": "needs_review" if review_findings else "benign",
+            "canonical_risk_score": 30 if review_findings else 0,
+            "needs_review": bool(review_findings),
+            "reason_codes": ["static_instruction_supported_review"] if review_findings else [],
+        }
+    if any(item.status == "violation" and item.evidence_status == "runtime_confirmed" for item in findings):
+        assessment.update({"status": "violation_confirmed", "canonical_final_decision": "malicious", "canonical_risk_score": max(80, int(assessment.get("canonical_risk_score", 0) or 0)), "needs_review": False})
+    elif coverage.coverage_state in {"instrumentation_gap", "insufficient_coverage", "path_not_triggered", "execution_failed", "timeout"} and assessment.get("status") == "no_violation_observed":
+        assessment.update({"status": "review_required", "canonical_final_decision": "needs_review", "canonical_risk_score": max(30, int(assessment.get("canonical_risk_score", 0) or 0)), "needs_review": True})
+    assessment["coverage_state"] = coverage.coverage_state
+    assessment["assessment_version"] = ASSESSMENT_VERSION
+    return assessment
+
+
+def _static_claims(static_payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    claims = {key: [] for key in ("local_only", "endpoints", "auth_only", "artifact_identity", "confirmation_required", "temporary_only", "read_scope", "tools", "no_external_side_effect")}
+    for unit in static_payload.get("static_semantic_units", []) or []:
+        text = _unit_text(unit)
+        sid = str(unit.get("unit_id") or unit.get("semantic_unit_id") or unit.get("id") or "")
+        _claim_from_text(claims, sid, text, unit)
+    for action in static_payload.get("extracted_actions", []) or []:
+        sid = _static_id(action, "action")
+        text = _action_text(action)
+        _claim_from_text(claims, sid, text, action)
+        if str(action.get("action_type", "")).upper() in {"SEND", "UPLOAD", "INVOKE_API"}:
+            for key in _action_keys(action):
+                if "." in key or key.startswith("http"):
+                    claims["endpoints"].append({"id": sid, "key": key, "evidence": action})
+        if str(action.get("action_type", "")).upper() == "READ":
+            for key in _action_keys(action):
+                if "/" in key or key.startswith("~"):
+                    claims["read_scope"].append({"id": sid, "key": _norm_path(key), "evidence": action})
+        for key in action.get("tool_mentions", []) or []:
+            claims["tools"].append({"id": sid, "key": str(key), "evidence": action})
+    for entity in static_payload.get("resolved_entities", []) or []:
+        sid = _static_id(entity, "entity")
+        kind = _entity_kind(entity)
+        for key in _entity_keys(entity):
+            if kind == "endpoint":
+                claims["endpoints"].append({"id": sid, "key": key, "evidence": entity})
+            if kind in {"file", "artifact"}:
+                claims["artifact_identity"].append({"id": sid, "key": key, "evidence": entity})
+    return {key: _dedupe_claims(value) for key, value in claims.items()}
+
+
+def _claim_from_text(claims: dict[str, list[dict[str, Any]]], sid: str, text: str, evidence: dict[str, Any]) -> None:
+    low = text.lower()
+    if re.search(r"\b(local[- ]only|offline only|no network|without network|never connect|do not connect)\b", low):
+        claims["local_only"].append({"id": sid, "key": "local_only", "evidence": evidence})
+    if re.search(r"\b(no external side effects?|no outbound|no uploads?|will not upload|never send)\b", low):
+        claims["no_external_side_effect"].append({"id": sid, "key": "no_external_side_effect", "evidence": evidence})
+    if "authorization" in low or "bearer" in low or "authenticate" in low or "oauth" in low:
+        claims["auth_only"].append({"id": sid, "key": "authentication", "evidence": evidence})
+    if "confirm" in low or "approval" in low or "permission" in low:
+        claims["confirmation_required"].append({"id": sid, "key": "confirmation_required", "evidence": evidence})
+    if "temporary" in low or "temp file" in low or "delete after" in low:
+        claims["temporary_only"].append({"id": sid, "key": "temporary", "evidence": evidence})
+    for url in re.findall(r"https?://[^\s'\"<>]+", text):
+        claims["endpoints"].append({"id": sid, "key": url.rstrip(".,)"), "evidence": evidence})
+    for path in re.findall(r"(?:~|/|\.)[\w./-]+", text):
+        if path:
+            claims["read_scope"].append({"id": sid, "key": _norm_path(path), "evidence": evidence})
+    for command in re.findall(r"\b(?:curl|wget|python3?|bash|sh|node|npm|pip)\b", low):
+        claims["tools"].append({"id": sid, "key": command, "evidence": evidence})
+
+
+def _contradiction(
+    ctype: str,
+    severity: str,
+    static_claims: list[dict[str, Any]],
+    runtime_observations: list[dict[str, Any]],
+    reason: str,
+    confidence: float,
+    limitations: list[str] | None = None,
+) -> UnifiedContradiction:
+    return UnifiedContradiction(
+        contradiction_type=ctype,
+        severity=severity,
+        static_claim={
+            "ids": [str(item.get("id")) for item in static_claims if item.get("id")],
+            "evidence_span": [{"key": item.get("key"), "source": item.get("evidence", {}).get("source_artifact_id") or item.get("evidence", {}).get("artifact_id")} for item in static_claims],
+        },
+        runtime_observation={
+            "ids": [str(item.get("event_id") or item.get("chain_id") or item.get("edge_id") or "") for item in runtime_observations],
+            "raw_references": [str(item.get("raw_reference") or "") for item in runtime_observations if item.get("raw_reference")],
+        },
+        reason=reason,
+        confidence=confidence,
+        limitations=list(limitations or []),
+    )
+
+
+def _instruction_only_paths(static_payload: dict[str, Any], aligned_static_ids: set[str]) -> list[dict[str, Any]]:
+    paths = []
+    for chain in static_payload.get("static_chains", []) or []:
+        cid = str(chain.get("chain_id") or "")
+        if cid and cid not in aligned_static_ids:
+            paths.append({"static_ids": [cid], "chain_type": chain.get("chain_type"), "status": chain.get("status"), "reason": "static path has no aligned runtime chain"})
+    return paths
+
+
+def _runtime_only_paths(
+    runtime_chains: list[dict[str, Any]],
+    runtime_events: list[dict[str, Any]],
+    aligned_runtime_ids: set[str],
+    internal_runtime_ids: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    internal_runtime_ids = internal_runtime_ids or set()
+    paths = []
+    for chain in runtime_chains:
+        cid = str(chain.get("chain_id") or "")
+        if cid and cid not in aligned_runtime_ids and cid not in internal_runtime_ids:
+            paths.append({"runtime_ids": [cid], "chain_type": chain.get("chain_type"), "evidence_level": chain.get("evidence_level"), "reason": "runtime chain has no aligned static path"})
+    if not paths:
+        for event in runtime_events:
+            eid = str(event.get("event_id") or "")
+            if eid and eid not in aligned_runtime_ids and eid not in internal_runtime_ids and event.get("object_type") == "network":
+                paths.append({"runtime_ids": [eid], "operation": event.get("operation"), "reason": "runtime network action has no aligned static declaration"})
+    return paths
+
+
+def _minimal_witnesses(static_payload: dict[str, Any], runtime_chains: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    witnesses = []
+    for chain in runtime_chains:
+        witnesses.append(
+            {
+                "witness_id": f"W-{len(witnesses) + 1:04d}",
+                "source": "runtime",
+                "supporting_ids": [chain.get("chain_id")] + list(chain.get("ordered_edges", []) or []) + list(chain.get("supporting_event_ids", []) or []),
+                "confidence": chain.get("confidence", 0.0),
+                "limitations": list(chain.get("instrumentation_gaps", []) or []),
+            }
+        )
+    for chain in static_payload.get("static_chains", []) or []:
+        if str(chain.get("alert_status")) in {"review", "violation"}:
+            witnesses.append(
+                {
+                    "witness_id": f"W-{len(witnesses) + 1:04d}",
+                    "source": "static",
+                    "supporting_ids": [chain.get("chain_id")] + list(chain.get("ordered_edges", []) or []) + list(chain.get("evidence_unit_ids", []) or []),
+                    "confidence": 0.7 if chain.get("status") == "closed" else 0.45,
+                    "limitations": list(chain.get("limitations", []) or []),
+                }
+            )
+    return witnesses
+
+
+def _limitations(dynamic_payload: dict[str, Any], coverage: CoverageCertificate) -> list[str]:
+    limits = []
+    if coverage.coverage_state != "runtime_confirmed":
+        limits.append(f"coverage_state={coverage.coverage_state}")
+    for gap in coverage.instrumentation_gaps:
+        limits.append(f"instrumentation_gap:{gap}")
+    if not dynamic_payload:
+        limits.append("no runtime execution was performed")
+    return sorted(set(limits))
+
+
+def _coverage_reasons(state: str, obligations: list[RuntimeObligation], gaps: list[str], dynamic_state: str, execution: Any | None) -> list[str]:
+    reasons = [f"coverage certificate resolved state={state}"]
+    if dynamic_state:
+        reasons.append(f"dynamic_v3_state={dynamic_state}")
+    if gaps:
+        reasons.append("instrumentation gaps prevent no-flow certification")
+    if any(item.status == "unsatisfied" for item in obligations):
+        reasons.append("one or more runtime obligations were unsatisfied")
+    if execution is not None and getattr(execution, "timed_out", False):
+        reasons.append("execution timed out")
+    return reasons
+
+
+def _expected_operation(action: dict[str, Any]) -> str:
+    atype = str(action.get("action_type") or action.get("type") or "").upper()
+    return {
+        "READ": "file_read",
+        "WRITE": "file_write",
+        "EXECUTE": "process_exec",
+        "RUN_COMMAND": "process_exec",
+        "SEND": "network_send",
+        "UPLOAD": "network_send",
+        "INVOKE_API": "network_send",
+        "ACCESS_CREDENTIAL": "file_read",
+        "PERSIST": "file_write",
+    }.get(atype, "tool_invoke")
+
+
+def _expected_chain_obligation(chain: dict[str, Any]) -> str:
+    ctype = str(chain.get("chain_type") or "")
+    if "exfiltration" in ctype or "network" in ctype:
+        return "network_send"
+    if "download" in ctype:
+        return "process_exec"
+    if "persistence" in ctype:
+        return "file_write"
+    return "tool_invoke"
+
+
+def _runtime_matches_expected(event: dict[str, Any], expected: str, action: dict[str, Any]) -> bool:
+    if expected == "file_read":
+        return event.get("operation") == "read" and event.get("object_type") == "file"
+    if expected == "file_write":
+        return event.get("operation") == "write" and event.get("object_type") == "file"
+    if expected == "process_exec":
+        return event.get("operation") == "exec" or event.get("event_type") == "process_exec"
+    if expected == "network_send":
+        return event.get("object_type") == "network" and event.get("operation") in {"send", "upload", "connect"}
+    if expected == "payload_observable":
+        return event.get("object_type") == "network" and event.get("instrumentation_visibility") in {"observed", "payload_preview_observed"}
+    return event.get("event_type", "").startswith("tool_")
+
+
+def _runtime_chain_action_match(event: dict[str, Any], expected: str) -> bool:
+    return _runtime_matches_expected(event, expected, {})
+
+
+def _event_endpoint(event: dict[str, Any]) -> str:
+    meta = event.get("metadata", {}) or {}
+    return str(meta.get("destination") or meta.get("sink_url") or meta.get("url") or event.get("object_id", "").replace("NET:", ""))
+
+
+def _entity_keys(entity: dict[str, Any]) -> list[str]:
+    keys = []
+    for field in ("canonical_value", "canonical", "value", "name", "path", "url", "domain"):
+        if entity.get(field):
+            keys.append(str(entity[field]))
+    attrs = entity.get("attributes") or entity.get("alignment_keys") or {}
+    if isinstance(attrs, dict):
+        for field in ("normalized_path", "path", "url", "domain", "artifact_hash", "command", "tool"):
+            if attrs.get(field):
+                keys.append(str(attrs[field]))
+    return sorted(set(keys))
+
+
+def _action_keys(action: dict[str, Any]) -> list[str]:
+    keys: list[str] = []
+    for field in ("object_mentions", "source_mentions", "destination_mentions", "tool_mentions"):
+        for value in action.get(field, []) or []:
+            keys.append(str(value))
+    for field in ("raw_verb", "action_type", "tool", "command"):
+        if action.get(field):
+            keys.append(str(action[field]))
+    return sorted(set(keys))
+
+
+def _entity_kind(entity: dict[str, Any]) -> str:
+    etype = str(entity.get("entity_type") or entity.get("type") or "").lower()
+    if "network" in etype or "endpoint" in etype or "url" in etype or "domain" in etype:
+        return "endpoint"
+    if "artifact" in etype:
+        return "artifact"
+    if "credential" in etype or "secret" in etype:
+        return "credential"
+    if "file" in etype or "path" in etype:
+        return "file"
+    return "entity"
+
+
+def _static_id(item: dict[str, Any], default: str) -> str:
+    return str(item.get(f"{default}_id") or item.get("action_id") or item.get("entity_id") or item.get("unit_id") or item.get("id") or "")
+
+
+def _unit_text(unit: dict[str, Any]) -> str:
+    for key in ("text", "content", "raw_text", "normalized_text"):
+        if unit.get(key):
+            return str(unit[key])
+    return str(unit)
+
+
+def _action_text(action: dict[str, Any]) -> str:
+    evidence = action.get("evidence") or {}
+    if isinstance(evidence, dict):
+        for key in ("text", "exact_text", "snippet"):
+            if evidence.get(key):
+                return str(evidence[key])
+    return " ".join(str(value) for value in [action.get("raw_verb"), action.get("action_type"), *(_action_keys(action))] if value)
+
+
+def _dedupe_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen = set()
+    out = []
+    for item in items:
+        marker = (item.get("id"), item.get("kind"), _norm_key(item.get("key")))
+        if marker in seen:
+            continue
+        seen.add(marker)
+        out.append(item)
+    return out
+
+
+def _dedupe_claims(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen = set()
+    out = []
+    for item in items:
+        marker = (item.get("id"), _norm_key(item.get("key")))
+        if marker in seen:
+            continue
+        seen.add(marker)
+        out.append(item)
+    return out
+
+
+def _norm_key(value: Any) -> str:
+    text = str(value or "").strip().replace("\\", "/")
+    parsed = urlparse(text)
+    if parsed.scheme and parsed.hostname:
+        return f"{parsed.hostname}{parsed.path}".rstrip("/").lower()
+    return posixpath.normpath(text).lower()
+
+
+def _norm_path(value: Any) -> str:
+    return posixpath.normpath(str(value or "").replace("\\", "/")).lower()
+
+
+def _norm_endpoint(value: Any) -> str:
+    text = str(value or "").replace("network:", "").replace("NET:", "")
+    parsed = urlparse(text)
+    if parsed.hostname:
+        return f"{parsed.hostname}:{parsed.port or (443 if parsed.scheme == 'https' else 80)}{parsed.path}".rstrip("/").lower()
+    return text.rstrip("/").lower()
+
+
+def _same_path(left: str, right: str) -> bool:
+    return _norm_path(left) == _norm_path(right)
+
+
+def _same_endpoint(left: str, right: str) -> bool:
+    return _norm_endpoint(left) == _norm_endpoint(right) or _norm_endpoint(left).split(":", 1)[0] == _norm_endpoint(right).split(":", 1)[0]
+
+
+def _same_executable(left: str, right: str) -> bool:
+    return posixpath.basename(_norm_path(left)) == posixpath.basename(_norm_path(right))
+
+
+def _actions_compatible(left: str, right: str) -> bool:
+    left_u = str(left).upper()
+    right_u = str(right).upper()
+    if left_u == right_u:
+        return True
+    for static_action, runtime_ops in ACTION_COMPATIBILITY.items():
+        if right_u == static_action and left.lower() in {item.lower() for item in runtime_ops}:
+            return True
+        if left_u == static_action and right.lower() in {item.lower() for item in runtime_ops}:
+            return True
+    return False
+
+
+def _alignment_type(kind: str) -> str:
+    if kind in {"file", "artifact", "endpoint", "tool", "process", "data", "credential", "entity"}:
+        return "entity"
+    if kind == "action":
+        return "action"
+    return "path"
+
+
+def _runtime_chain_semantic_type(chain: dict[str, Any]) -> str:
+    ctype = str(chain.get("chain_type") or "")
+    if ctype.startswith("confidentiality_"):
+        return "credential_exfiltration"
+    if ctype.startswith("persistence_"):
+        return "persistence"
+    return ctype
+
+
+def _evidence(source: str, item_id: str, key: Any, **extra: Any) -> dict[str, Any]:
+    payload = {"source": source, "id": item_id, "key": str(key)}
+    payload.update(extra)
+    return payload
+
+
+def _artifact_mismatch(static_artifacts: list[dict[str, Any]], events: list[dict[str, Any]]) -> bool:
+    declared = {_norm_path(item["key"]) for item in static_artifacts if item.get("key") and "/" in str(item["key"])}
+    runtime_files = {_norm_path(event.get("object_path")) for event in events if event.get("object_type") == "file" and event.get("operation") in {"write", "exec"}}
+    return bool(declared and runtime_files and declared.isdisjoint(runtime_files))
+
+
+def _preconfirmation_effects(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    confirmation_times = [float(event.get("timestamp") or 0) for event in events if str(event.get("event_type")) in {"user_confirmation", "confirmation"}]
+    first_confirmation = min(confirmation_times) if confirmation_times else None
+    effects = [event for event in events if event.get("operation") in {"send", "upload", "write", "exec"}]
+    if first_confirmation is None:
+        return effects
+    return [event for event in effects if float(event.get("timestamp") or 0) < first_confirmation]
+
+
+def _extra_sensitive_reads(read_scope: list[dict[str, Any]], reads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    allowed = {_norm_path(item["key"]) for item in read_scope if item.get("key")}
+    return [event for event in reads if _norm_path(event.get("object_path")) not in allowed]
+
+
+def _different_runtime_tools(tools: list[dict[str, Any]], events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    allowed = {posixpath.basename(_norm_path(item["key"])) for item in tools if item.get("key")}
+    different = []
+    for event in events:
+        if event.get("operation") != "exec":
+            continue
+        command = str(event.get("data_preview") or event.get("metadata", {}).get("command") or "")
+        exe = posixpath.basename(command.split()[0]) if command.split() else ""
+        if exe and allowed and exe not in allowed:
+            different.append(event)
+    return different
+
+
+def _is_external_write(event: dict[str, Any]) -> bool:
+    path = _norm_path(event.get("object_path"))
+    return bool(path.startswith("/etc/") or path.startswith("/root/") or "/.config/systemd/" in path or "crontab" in path)
+
+
+def _tls_payload_gap(events: list[dict[str, Any]]) -> bool:
+    return any(
+        event.get("instrumentation_visibility") == "encrypted_payload_invisible"
+        or event.get("metadata", {}).get("encrypted_payload_invisible")
+        or event.get("metadata", {}).get("network_evidence_level") == "encrypted_payload_invisible"
+        for event in events
+    )
+
+
+def _policy_domain(chain: dict[str, Any]) -> str:
+    ctype = str(chain.get("chain_type") or chain.get("capability_type") or "")
+    if "credential" in ctype or "exfil" in ctype:
+        return "confidentiality"
+    if "persist" in ctype:
+        return "persistence"
+    if "execute" in ctype or "download" in ctype:
+        return "execution"
+    return "permission"
+
+
+def _alignment_for(contradiction: UnifiedContradiction, alignments: list[UnifiedAlignment]) -> str:
+    ids = set(contradiction.static_claim.get("ids", [])) | set(contradiction.runtime_observation.get("ids", []))
+    for alignment in alignments:
+        if ids.intersection(alignment.static_ids) or ids.intersection(alignment.runtime_ids):
+            return alignment.alignment_id
+    return ""

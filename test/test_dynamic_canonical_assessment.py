@@ -259,7 +259,9 @@ class DynamicCanonicalAssessmentTests(unittest.TestCase):
         )
 
         self.assertFalse([chain for chain in result.chains if chain.chain_type == "confidentiality_candidate"])
-        self.assertIsNone(SourceRegistry().match_path("/etc/hosts"))
+        hosts_match = SourceRegistry().match_path("/etc/hosts")
+        self.assertIsNotNone(hosts_match)
+        self.assertEqual(hosts_match.sensitivity, "public")
 
     def test_legacy_canonical_compatibility_and_consistency_validator(self) -> None:
         legacy = canonical_from_dict({})

@@ -110,7 +110,7 @@ Container flags:
 
 | Property | Implementation |
 |---|---|
-| Image | default `skill-runtime-sandbox:latest`, built from `docker/sandbox/Dockerfile`; `app/runner/docker_runner.py:36-45`, `304-338` |
+| Image | default `skill-runtime-sandbox:dynamic-v3`, built from `docker/sandbox/Dockerfile`; `app/runner/docker_runner.py:27-55`, `310-355` |
 | Capabilities | `--cap-drop ALL`, `--security-opt no-new-privileges`; `app/runner/docker_runner.py:152-155` |
 | Limits | `--pids-limit 64`, memory max `memory_limit_mb`, `--cpus 1.0`; `app/runner/docker_runner.py:156-161` |
 | Mounts | copied skill dir to `/workspace/skill`, artifact dir to `/artifacts`; `app/runner/docker_runner.py:75-83`, `162-165` |

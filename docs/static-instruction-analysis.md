@@ -159,6 +159,16 @@ Static entities include `runtime_alignment_keys` for later joining with Dynamic 
 
 Static never fabricates runtime events or runtime confirmation.
 
+## Canonical Reconciliation Update
+
+Static v2 is now the canonical static analyzer for API `analysis_mode=static_only` and for the shared analysis pipeline. The unified pipeline is:
+
+`Skill Bundle -> StaticV2Result -> Runtime Execution -> DynamicV3Result -> StaticRuntimeReconciliation -> CoverageCertificate -> PolicyFinding -> CanonicalAssessment -> API/CLI/batch/report`.
+
+Static evidence remains instruction-supported evidence. A Static v2 violation or review path does not automatically become runtime confirmation; it is mapped into `PolicyFinding(origin="static", evidence_status="instruction_supported")` and reconciled with runtime observations when present.
+
+Unified reconciliation preserves original Static v2 ids for artifacts, units, actions, entities, edges, and static chains. Unaligned static paths are reported as `instruction_only_paths`; runtime-only paths are separate from contradictions.
+
 ## Migration Notes
 
 The legacy `app.analyzer.instruction_chain.analyze_instruction_chain()` remains compatible and still returns existing `instruction_*` fields. It now also includes Static v2 fields such as `static_artifacts_v2`, `deterministic_mentions`, `resolved_entities`, `instruction_provenance_graph`, `static_chains`, `static_coverage`, and `static_analysis_summary`.

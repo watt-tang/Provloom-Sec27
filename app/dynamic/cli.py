@@ -7,11 +7,11 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from app.analyzer.rules import analyze_trace
+from app.analysis.pipeline import ExecutionConfig, analyze_skill_bundle
 from app.backend.schemas import LLMConfig
 from app.dynamic.analyzer import DynamicRuntimeAnalyzer, persist_dynamic_analysis
 from app.dynamic.config import DynamicAnalysisConfig
-from app.runner.docker_runner import DockerRunner
+from app.runner.docker_runner import DEFAULT_SANDBOX_IMAGE, DockerRunner
 from app.static.static_report import analyze_static_bundle
 from app.telemetry.collector import build_execution_report
 from app.telemetry.normalizer import build_normalized_events
@@ -30,6 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     run_p.add_argument("--config", default="")
     run_p.add_argument("--timeout-seconds", type=int, default=30)
     run_p.add_argument("--network-policy", choices=["default", "disabled"], default="default")
+    run_p.add_argument("--image-name", default=DEFAULT_SANDBOX_IMAGE)
     run_p.add_argument("--input", default="{}")
 
     trace_p = sub.add_parser("trace", help="print canonical runtime events for a run")
@@ -75,47 +76,40 @@ def _run(args) -> int:
         return 1
     run_id = args.run_id or f"RUN-{uuid.uuid4().hex[:12]}"
     input_payload = json.loads(args.input) if args.input.strip().startswith(("{", "[")) else json.loads(Path(args.input).read_text(encoding="utf-8"))
-    execution = DockerRunner().run(
-        execution_id=run_id,
-        skill_path=args.skill_path,
-        input_payload=input_payload,
-        timeout_seconds=args.timeout_seconds,
-        network_policy=args.network_policy,
-        llm_config=LLMConfig(enabled=False),
+    analysis = analyze_skill_bundle(
+        args.skill_path,
+        execution_config=ExecutionConfig(
+            input_payload=input_payload,
+            timeout_seconds=args.timeout_seconds,
+            network_policy=args.network_policy,
+            analysis_mode="rule_plus_epg",
+            llm_config=LLMConfig(enabled=False),
+            run_id=run_id,
+        ),
+        dynamic_config=config,
+        runner=DockerRunner(image_name=args.image_name),
     )
-    static_result = analyze_static_bundle(execution.skill_path, execution.skill_file)
-    normalized_events = build_normalized_events(execution)
-    dynamic_result = DynamicRuntimeAnalyzer(config=config, skill_root=execution.skill_path).analyze_execution(
-        execution,
-        normalized_events,
-        static_result=static_result,
-    )
-    persist_dynamic_analysis(dynamic_result, execution.artifacts_dir)
-    report = analyze_trace(
-        execution,
-        analysis_mode="rule_plus_epg",
-        normalized_events=normalized_events,
-        dynamic_result=dynamic_result,
-        static_result=static_result,
-    )
-    telemetry = build_execution_report(
-        execution,
-        normalized_events=normalized_events,
-        dynamic_result=dynamic_result,
-        static_result=static_result,
-    )
+    report = analysis.report
+    dynamic_result = analysis.dynamic_result
     output = {
         "run_id": run_id,
-        "artifacts_dir": execution.artifacts_dir,
-        "exit_code": execution.exit_code,
-        "timed_out": execution.timed_out,
-        "coverage": dynamic_result.coverage.to_dict(),
-        "dynamic_summary": dynamic_result.summary(),
-        "static_runtime_alignment": dynamic_result.static_runtime_alignment or {},
+        "artifacts_dir": analysis.artifacts_dir,
+        "exit_code": report.get("exit_code"),
+        "timed_out": report.get("timed_out"),
+        "sandbox_image": report.get("sandbox_image"),
+        "sandbox_image_id": report.get("sandbox_image_id"),
+        "source_fingerprint": report.get("source_fingerprint"),
+        "coverage": report.get("coverage_certificate", {}),
+        "dynamic_summary": dynamic_result.summary() if dynamic_result is not None else {},
+        "static_runtime_alignment": report.get("static_runtime_alignment", {}),
         "unified_explanation": report.get("unified_explanation", {}),
-        "legacy_review_priority": report.get("final_decision"),
+        "canonical_decision": report.get("canonical_final_decision"),
+        "canonical_risk_score": report.get("canonical_risk_score"),
+        "legacy_review_priority": report.get("legacy_final_decision"),
         "trace_summary": report.get("trace_summary"),
-        "telemetry_event_count": len(telemetry.get("normalized_events", [])),
+        "telemetry_event_count": len(report.get("normalized_events", [])),
+        "unified_analysis_path": report.get("unified_analysis_path"),
+        "unified_explanation_report_path": report.get("unified_explanation_report_path"),
     }
     print(json.dumps(output, ensure_ascii=False, indent=2))
     return 0
@@ -129,6 +123,13 @@ def _load_dynamic(run_id: str) -> dict[str, Any]:
 
 
 def _export(run_id: str, fmt: str) -> int:
+    unified_path = ARTIFACTS_ROOT / run_id / "unified-analysis.json"
+    if unified_path.exists():
+        if fmt == "json":
+            return _print_json(json.loads(unified_path.read_text(encoding="utf-8")))
+        md_path = ARTIFACTS_ROOT / run_id / "unified-explanation.md"
+        print(md_path.read_text(encoding="utf-8"))
+        return 0
     payload = _load_dynamic(run_id)
     if fmt == "json":
         return _print_json(payload)

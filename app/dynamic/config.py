@@ -51,9 +51,14 @@ class ClosureLiftConfig:
 class DynamicAnalysisConfig:
     sensitive_source_patterns: list[str] = field(
         default_factory=lambda: [
-            "/etc/passwd",
             "/etc/shadow",
-            "/root/**",
+            "/root/.ssh/id_*",
+            "/root/.aws/credentials",
+            "/root/.config/gcloud/**",
+            "/root/.azure/**",
+            "/root/.docker/config.json",
+            "**/.env",
+            "**/.env.*",
             "/workspace/skill/.provloom/private/**",
             ".provloom/adapters/credential_state/**",
         ]

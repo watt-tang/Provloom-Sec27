@@ -207,3 +207,14 @@ Permanent regression artifacts:
 - `artifacts/runs/static-dynamic-alignment-probes/alignment-probe-official-image-v3-rollup.json`
 
 The report primary status is `canonical_assessment.status`. `final_decision` and `risk_score` remain compatibility mappings. Source-mounted preliminary E2E results are superseded by the official-image final E2E results.
+
+## Canonical Pipeline Update
+
+Current dynamic entry points should use `app.analysis.pipeline.analyze_skill_bundle()` or `app.analysis.pipeline.analyze_completed_execution()`.
+
+- `analyze_skill_bundle()` performs Static v2 first, then optional Docker execution, then normalized runtime event construction, Dynamic v3, reconciliation, coverage certificate, policy findings, canonical assessment, and unified reports.
+- `analyze_completed_execution()` consumes an existing `SandboxExecution` and guarantees normalized events and `DynamicRuntimeAnalyzer` are built once for that execution.
+- API dynamic, API static_only, Dynamic CLI, batch scan, and benchmark runner now emit `unified-analysis.json`, `unified-explanation.md`, and `canonical-analysis-result.json`.
+- `connect()` alone remains insufficient for confirmed confidentiality. Candidate/gap/incomplete coverage maps to review, not benign.
+
+Source policy is narrower than the original `/root/**` default. `/etc/hosts` is public, `/etc/passwd` is low/account metadata, `/root/.cache/**` is runtime/package cache, and high/critical taint sources are explicit secrets such as `/etc/shadow`, SSH private keys, cloud credentials, `.env`, and `.provloom/private/**`.

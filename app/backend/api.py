@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import uuid
+from dataclasses import MISSING, fields
 from pathlib import Path
 from wsgiref.util import setup_testing_defaults
 
+from app.analysis.pipeline import ExecutionConfig, analyze_skill_bundle
 from app.analyzer.rules import analyze_static_skill, analyze_trace
 from app.backend.log_writer import ExecutionLogWriter
 from app.backend.schemas import AnalyzeSkillRequest, AnalyzeSkillResponse, TaskResponse
@@ -65,175 +67,20 @@ def _handle_analyze_skill(environ, start_response):
             request=task_request,
         )
 
-        if payload.analysis_mode == "static_only":
-            source_dir, skill_file = resolve_skill_target(payload.skill_path)
-            definition = load_skill_definition(
-                source_dir,
-                skill_file,
-                allow_empty_actions=True,
-            )
-            report = analyze_static_skill(definition, analysis_mode=payload.analysis_mode)
-            response = _build_static_response(
-                execution_id=execution_id,
-                payload=payload,
-                source_dir=str(source_dir),
-                skill_file=skill_file,
-                report=report,
-            )
-            task_store.complete(execution_id, response.to_dict())
-            log_writer.write(
-                execution_id=execution_id,
-                status="completed",
-                request=task_request,
-                result=response.to_dict(),
-            )
-            return _json_response(start_response, 200, response.to_dict())
-
-        execution = runner.run(
-            execution_id=execution_id,
-            skill_path=payload.skill_path,
-            input_payload=payload.input_payload,
-            timeout_seconds=payload.timeout_seconds,
-            network_policy=payload.network_policy,
-            llm_config=payload.llm_config,
+        analysis = analyze_skill_bundle(
+            payload.skill_path,
+            execution_config=ExecutionConfig(
+                input_payload=payload.input_payload,
+                timeout_seconds=payload.timeout_seconds,
+                network_policy=payload.network_policy,
+                analysis_mode=payload.analysis_mode,
+                llm_config=payload.llm_config,
+                run_id=execution_id,
+            ),
+            runner=runner,
+            static_only=payload.analysis_mode == "static_only",
         )
-        static_result = analyze_static_bundle(execution.skill_path, execution.skill_file)
-        normalized_events = build_normalized_events(execution)
-        dynamic_result = DynamicRuntimeAnalyzer(skill_root=execution.skill_path).analyze_execution(
-            execution,
-            normalized_events,
-            static_result=static_result,
-        )
-        persist_dynamic_analysis(dynamic_result, execution.artifacts_dir)
-        report = analyze_trace(
-            execution,
-            analysis_mode=payload.analysis_mode,
-            normalized_events=normalized_events,
-            dynamic_result=dynamic_result,
-            static_result=static_result,
-        )
-        telemetry_report = build_execution_report(
-            execution,
-            normalized_events=normalized_events,
-            dynamic_result=dynamic_result,
-            static_result=static_result,
-        )
-        risk_profile = map_risk_profile(
-            risk_score=report["risk_score"],
-            detected_behaviors=report["detected_behaviors"],
-        )
-        response = AnalyzeSkillResponse(
-            execution_id=execution_id,
-            status="completed",
-            skill_path=execution.skill_path,
-            skill_file=execution.skill_file,
-            sandbox_image=execution.sandbox_image,
-            runtime_name=execution.runtime_name,
-            network_policy=payload.network_policy,
-            analysis_mode=payload.analysis_mode,
-            llm_config=payload.llm_config.to_public_dict(),
-            exit_code=execution.exit_code,
-            timed_out=execution.timed_out,
-            stdout=execution.stdout,
-            stderr=execution.stderr,
-            trace_summary=report["trace_summary"],
-            risk_score=report["risk_score"],
-            risk_level=risk_profile["risk_level"],
-            risk_level_name=risk_profile["risk_level_name"],
-            primary_risk=risk_profile["primary_risk"],
-            risk_labels=risk_profile["risk_labels"],
-            risk_summary=risk_profile["risk_summary"],
-            detected_behaviors=report["detected_behaviors"],
-            evidence_timeline=report["evidence_timeline"],
-            file_events=telemetry_report["file_events"],
-            network_events=telemetry_report["network_events"],
-            process_events=telemetry_report["process_events"],
-            tool_calls=telemetry_report["tool_calls"],
-            llm_events=telemetry_report["llm_events"],
-            data_flows=telemetry_report["data_flows"],
-            normalized_events=telemetry_report.get("normalized_events", []),
-            runtime_events_v2=report.get("runtime_events_v2", []),
-            runtime_provenance_graph=report.get("runtime_provenance_graph", {}),
-            runtime_chains=report.get("runtime_chains", []),
-            runtime_coverage=report.get("runtime_coverage", {}),
-            runtime_policy_violations=report.get("runtime_policy_violations", []),
-            dynamic_analysis_summary=report.get("dynamic_analysis_summary", {}),
-            taint_sources=report.get("taint_sources", []),
-            static_runtime_alignment=report.get("static_runtime_alignment", {}),
-            unified_explanation=report.get("unified_explanation", {}),
-            canonical_assessment=report.get("canonical_assessment", {}),
-            canonical_final_decision=report.get("canonical_final_decision", report.get("final_decision", "unknown")),
-            canonical_risk_score=int(report.get("canonical_risk_score", report.get("risk_score", 0)) or 0),
-            legacy_final_decision=report.get("legacy_final_decision", "unknown"),
-            legacy_risk_score=int(report.get("legacy_risk_score", 0) or 0),
-            needs_review=bool(report.get("needs_review", False)),
-            policy_violation_count=int(report.get("policy_violation_count", 0) or 0),
-            confirmed_chain_count=int(report.get("confirmed_chain_count", 0) or 0),
-            candidate_chain_count=int(report.get("candidate_chain_count", 0) or 0),
-            coverage_state=report.get("coverage_state", "unknown"),
-            instrumentation_gaps=report.get("instrumentation_gaps", []),
-            consistency_status=report.get("consistency_status", "unknown"),
-            consistency_errors=report.get("consistency_errors", []),
-            resource_usage=execution.resource_usage.to_dict(),
-            primary_chain=report.get("primary_chain", []),
-            root_cause=report.get("root_cause", "unknown"),
-            root_cause_detail=report.get("root_cause_detail", "unknown"),
-            root_cause_v2=report.get("root_cause_v2", {}),
-            graph_summary=report.get("graph_summary", {}),
-            final_decision=report.get("final_decision", "unknown"),
-            triggered_factors=report.get("triggered_factors", []),
-            suppression_factors=report.get("suppression_factors", []),
-            decision_evidence=report.get("decision_evidence", {}),
-            capability_profile=report.get("capability_profile", {}),
-            capability_tags=report.get("capability_tags", []),
-            recommended_execution_profile=report.get("recommended_execution_profile", ""),
-            recommended_trigger_mode=report.get("recommended_trigger_mode", ""),
-            estimated_budget_class=report.get("estimated_budget_class", ""),
-            execution_feasibility=report.get("execution_feasibility", ""),
-            blocking_requirements=report.get("blocking_requirements", []),
-            enabled_adapters=report.get("enabled_adapters", []),
-            adapter_events_summary=report.get("adapter_events_summary", {}),
-            synthetic_artifact_summary=report.get("synthetic_artifact_summary", {}),
-            trigger_plan=report.get("trigger_plan", {}),
-            trigger_used=report.get("trigger_used", []),
-            trigger_hits=report.get("trigger_hits", []),
-            trigger_unexecuted=report.get("trigger_unexecuted", []),
-            trigger_events_summary=report.get("trigger_events_summary", {}),
-            severity_label=report.get("severity_label", ""),
-            evidence_strength=report.get("evidence_strength", ""),
-            decision_rationale=report.get("decision_rationale", {}),
-            dynamic_chain_observed=report.get("dynamic_chain_observed", False),
-            instruction_chain_recovered=report.get("instruction_chain_recovered", False),
-            chain_evidence_type=report.get("chain_evidence_type", "none"),
-            instruction_chain=report.get("instruction_chain", []),
-            instruction_indicators=report.get("instruction_indicators", []),
-            static_supply_chain_risk=report.get("static_supply_chain_risk", {}),
-            instruction_document_scan=report.get("instruction_document_scan", {}),
-            instruction_actions=report.get("instruction_actions", []),
-            instruction_entities=report.get("instruction_entities", []),
-            instruction_graph=report.get("instruction_graph", {}),
-            validated_instruction_paths=report.get("validated_instruction_paths", []),
-            partial_instruction_paths=report.get("partial_instruction_paths", []),
-            instruction_analysis_summary=report.get("instruction_analysis_summary", {}),
-            extraction_coverage=report.get("extraction_coverage", {}),
-            abstention_reasons=report.get("abstention_reasons", []),
-            static_artifacts_v2=report.get("static_artifacts_v2", []),
-            static_semantic_units=report.get("static_semantic_units", []),
-            deterministic_mentions=report.get("deterministic_mentions", []),
-            extracted_actions=report.get("extracted_actions", []),
-            grounding_validation=report.get("grounding_validation", []),
-            resolved_entities=report.get("resolved_entities", []),
-            entity_resolutions=report.get("entity_resolutions", []),
-            instruction_provenance_graph=report.get("instruction_provenance_graph", {}),
-            static_chains=report.get("static_chains", []),
-            static_coverage=report.get("static_coverage", {}),
-            static_analysis_summary=report.get("static_analysis_summary", {}),
-            llm_extraction_metadata=report.get("llm_extraction_metadata", []),
-            static_schema_version=report.get("static_schema_version", ""),
-            schema_version=report.get("schema_version", ""),
-            final_risk_level=report.get("final_risk_level", ""),
-            final_label_reason=report.get("final_label_reason", ""),
-        )
+        response = _response_from_report(analysis.report)
         task_store.complete(execution_id, response.to_dict())
         log_writer.write(
             execution_id=execution_id,
@@ -302,6 +149,22 @@ def _json_response(start_response, status_code: int, payload: dict):
     ]
     start_response(status_text, headers)
     return [body]
+
+
+def _response_from_report(report: dict) -> AnalyzeSkillResponse:
+    kwargs = {}
+    for field in fields(AnalyzeSkillResponse):
+        if field.name in report:
+            kwargs[field.name] = report[field.name]
+            continue
+        if field.default is not MISSING:
+            kwargs[field.name] = field.default
+            continue
+        if field.default_factory is not MISSING:  # type: ignore[attr-defined]
+            kwargs[field.name] = field.default_factory()  # type: ignore[misc]
+            continue
+        raise KeyError(f"canonical report missing required response field: {field.name}")
+    return AnalyzeSkillResponse(**kwargs)
 
 
 def _build_static_response(

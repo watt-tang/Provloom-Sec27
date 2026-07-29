@@ -169,6 +169,9 @@ class AnalyzeSkillResponse:
     llm_events: list[dict[str, Any]]
     data_flows: list[dict[str, Any]]
     resource_usage: dict[str, Any]
+    sandbox_image_id: str = ""
+    source_fingerprint: str = ""
+    runtime_build_info: dict[str, Any] = field(default_factory=dict)
     normalized_events: list[dict[str, Any]] = field(default_factory=list)
     runtime_events_v2: list[dict[str, Any]] = field(default_factory=list)
     runtime_provenance_graph: dict[str, Any] = field(default_factory=dict)
@@ -178,10 +181,29 @@ class AnalyzeSkillResponse:
     dynamic_analysis_summary: dict[str, Any] = field(default_factory=dict)
     taint_sources: list[dict[str, Any]] = field(default_factory=list)
     static_runtime_alignment: dict[str, Any] = field(default_factory=dict)
+    alignments: list[dict[str, Any]] = field(default_factory=list)
+    contradictions: list[dict[str, Any]] = field(default_factory=list)
+    aligned_paths: list[dict[str, Any]] = field(default_factory=list)
+    instruction_only_paths: list[dict[str, Any]] = field(default_factory=list)
+    runtime_only_paths: list[dict[str, Any]] = field(default_factory=list)
+    relevant_unresolved: list[dict[str, Any]] = field(default_factory=list)
+    internal_unresolved: list[dict[str, Any]] = field(default_factory=list)
     unified_explanation: dict[str, Any] = field(default_factory=dict)
+    unified_analysis: dict[str, Any] = field(default_factory=dict)
+    unified_analysis_path: str = ""
+    unified_explanation_report_path: str = ""
+    coverage_certificate: dict[str, Any] = field(default_factory=dict)
+    policy_findings: list[dict[str, Any]] = field(default_factory=list)
+    minimal_witnesses: list[dict[str, Any]] = field(default_factory=list)
+    limitations: list[str] = field(default_factory=list)
     canonical_assessment: dict[str, Any] = field(default_factory=dict)
     canonical_final_decision: str = "unknown"
     canonical_risk_score: int = 0
+    static_analysis_version: str = ""
+    dynamic_analysis_version: str = ""
+    alignment_version: str = ""
+    assessment_version: str = ""
+    legacy_static_result: dict[str, Any] = field(default_factory=dict)
     legacy_final_decision: str = "unknown"
     legacy_risk_score: int = 0
     needs_review: bool = False

@@ -7,6 +7,8 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from app.explanation.builder import build_unified_explanation
+from app.reporting.unified_report import write_unified_reports
 from app.static.static_config import StaticAnalysisConfig
 from app.static.static_report import StaticAnalysisResult, analyze_static_bundle
 
@@ -82,11 +84,15 @@ def _run(args) -> int:
     output_dir = ARTIFACTS_ROOT / run_id
     output_dir.mkdir(parents=True, exist_ok=True)
     _write_result(result, output_dir)
+    unified = build_unified_explanation(skill_id=Path(args.skill_path).name, static_result=result, dynamic_result=None)
+    report_paths = write_unified_reports(unified, output_dir)
     print(
         json.dumps(
             {
                 "run_id": run_id,
                 "artifacts_dir": str(output_dir),
+                "unified_analysis_path": str(report_paths["json"]),
+                "unified_explanation_report_path": str(report_paths["markdown"]),
                 "review_priority": result.static_analysis_summary.get("review_priority", "informational"),
                 "chain_status_counts": result.static_analysis_summary.get("chain_status_counts", {}),
                 "alert_status_counts": result.static_analysis_summary.get("alert_status_counts", {}),

@@ -215,3 +215,6 @@ class SandboxExecution:
     trigger_hits: list[str] = field(default_factory=list)
     trigger_unexecuted: list[str] = field(default_factory=list)
     trigger_events_summary: dict[str, Any] = field(default_factory=dict)
+    sandbox_image_id: str = ""
+    source_fingerprint: str = ""
+    runtime_build_info: dict[str, Any] = field(default_factory=dict)

@@ -13,6 +13,7 @@ import hashlib
 from pathlib import Path
 from threading import Lock
 from shlex import quote
+from typing import Any
 
 from app.backend.schemas import LLMConfig
 from app.analyzer.trigger_synthesis import TriggerPlan, build_trigger_event_injections, materialize_artifact_triggers
@@ -21,6 +22,9 @@ from app.runtime.skill_parser import load_skill_definition, resolve_skill_target
 from app.runner.models import ResourceUsage, SandboxExecution
 from app.telemetry.collector import build_data_flow_hints, load_llm_events, load_runtime_events
 from app.runner.trace_parser import parse_trace_dir
+
+
+DEFAULT_SANDBOX_IMAGE = "skill-runtime-sandbox:dynamic-v3"
 
 
 class DockerUnavailableError(RuntimeError):
@@ -34,10 +38,11 @@ class SandboxRunError(RuntimeError):
 class DockerRunner:
     _build_lock = Lock()
     _image_built = False
+    _built_images: set[str] = set()
 
     def __init__(
         self,
-        image_name: str = "skill-runtime-sandbox:latest",
+        image_name: str | None = None,
         dockerfile_dir: str = "docker/sandbox",
         artifacts_root: str = "artifacts/runs",
         *,
@@ -45,7 +50,7 @@ class DockerRunner:
         build_timeout_seconds: int = 600,
         reuse_existing_image: bool = True,
     ) -> None:
-        self.image_name = image_name
+        self.image_name = image_name or os.environ.get("PROVLOOM_SANDBOX_IMAGE", DEFAULT_SANDBOX_IMAGE)
         self.dockerfile_dir = Path(dockerfile_dir)
         self.force_rebuild = force_rebuild
         self.build_timeout_seconds = int(build_timeout_seconds)
@@ -80,6 +85,7 @@ class DockerRunner:
         )
         self._ensure_docker_available()
         self._build_image()
+        image_metadata = self._inspect_image_metadata()
 
         with tempfile.TemporaryDirectory(prefix="skill-sandbox-") as temp_dir:
             temp_root = Path(temp_dir)
@@ -228,6 +234,7 @@ class DockerRunner:
 
             self._sanitize_llm_config_artifact(artifacts_dir / "llm-config.json")
             meta = self._load_meta(artifacts_dir / "meta.json")
+            runtime_build_info = self._load_meta(artifacts_dir / "runtime-build-info.json")
             stdout = self._read_text(artifacts_dir / "stdout.log")
             stderr = self._read_text(artifacts_dir / "stderr.log")
             trace_artifacts = parse_trace_dir(artifacts_dir)
@@ -300,6 +307,13 @@ class DockerRunner:
                         "network_events": len(trigger_event_bundle["network_events"]),
                         "tool_calls": len(trigger_event_bundle["tool_calls"]),
                     },
+                    sandbox_image_id=str(image_metadata.get("image_id") or ""),
+                    source_fingerprint=str(
+                        runtime_build_info.get("source_fingerprint")
+                        or image_metadata.get("source_fingerprint")
+                        or ""
+                    ),
+                    runtime_build_info=runtime_build_info or image_metadata,
                 )
             finally:
                 adapter_manager.teardown(adapter_ctx)
@@ -313,7 +327,7 @@ class DockerRunner:
 
     def _build_image(self) -> None:
         with self._build_lock:
-            if self._image_built and not self.force_rebuild:
+            if self.image_name in self._built_images and not self.force_rebuild:
                 return
             # Reuse an existing local image to keep benchmark reruns stable.
             inspect_result = subprocess.run(
@@ -324,6 +338,7 @@ class DockerRunner:
             )
             if inspect_result.returncode == 0 and self.reuse_existing_image and not self.force_rebuild:
                 self._image_built = True
+                self._built_images.add(self.image_name)
                 return
             source_fingerprint = self._source_fingerprint()
             build_timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -370,6 +385,32 @@ class DockerRunner:
                 tail = "\n".join(combined.splitlines()[-80:])
                 raise SandboxRunError(f"Failed to build sandbox image {self.image_name}:\n{tail}")
             self._image_built = True
+            self._built_images.add(self.image_name)
+
+    def _inspect_image_metadata(self) -> dict[str, Any]:
+        result = subprocess.run(
+            ["docker", "image", "inspect", self.image_name],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return {"image_tag": self.image_name}
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return {"image_tag": self.image_name}
+        if not payload:
+            return {"image_tag": self.image_name}
+        image = payload[0]
+        labels = (image.get("Config") or {}).get("Labels") or {}
+        return {
+            "image_tag": self.image_name,
+            "image_id": image.get("Id", ""),
+            "repo_tags": image.get("RepoTags", []),
+            "source_fingerprint": labels.get("org.provloom.source_fingerprint") or labels.get("source_fingerprint", ""),
+            "dynamic_analysis_version": labels.get("org.provloom.dynamic_analysis_version", ""),
+        }
 
     def _build_runner_script(self, skill_file: str, timeout_seconds: int) -> str:
         skill_file_quoted = quote(skill_file)
