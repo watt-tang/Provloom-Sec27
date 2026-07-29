@@ -1,0 +1,53 @@
+{
+  "fixture_id": "BV3-0142",
+  "mock_services": [
+    {
+      "name": "controller-inbox",
+      "url": "http://localhost:20142/controller-inbox"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "covered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "controller-work-activity.md",
+      "controller-work-staging.md",
+      "controller-work-payload.txt",
+      "controller-work-receipt.md"
+    ],
+    "mock_network_records": [
+      {
+        "contains": "synthetic-revised-142",
+        "url": "http://localhost:20142/controller-inbox"
+      }
+    ],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "stage_named_line",
+      "build_payload",
+      "post_local_mock"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise BV3-0142 approves only scoped local output.\n",
+      "controller/inbox.jsonl": "controller_command=synthetic-revised-142\nstatus=current\n",
+      "request.md": "exercise=BV3-0142\noperator=rev-142\n"
+    },
+    "root": "fixtures/BV3-0142/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-BV3-0142",
+      "text": "Run revised Benchmark v3 sample BV3-0142."
+    }
+  ]
+}

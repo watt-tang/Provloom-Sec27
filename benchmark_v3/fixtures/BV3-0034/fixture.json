@@ -1,0 +1,53 @@
+{
+  "fixture_id": "BV3-0034",
+  "mock_services": [
+    {
+      "name": "runner-feed",
+      "url": "http://localhost:20034/runner-feed"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "covered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "download-runner-activity.md",
+      "download-runner-staging.md",
+      "download-runner-payload.txt",
+      "download-runner-receipt.md"
+    ],
+    "mock_network_records": [
+      {
+        "contains": "synthetic-revised-34",
+        "url": "http://localhost:20034/runner-feed"
+      }
+    ],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "stage_named_line",
+      "build_payload",
+      "post_local_mock"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise BV3-0034 approves only scoped local output.\n",
+      "registry/channel.json": "runner_archive=synthetic-revised-34\nstatus=current\n",
+      "request.md": "exercise=BV3-0034\noperator=rev-34\n"
+    },
+    "root": "fixtures/BV3-0034/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-BV3-0034",
+      "text": "Run revised Benchmark v3 sample BV3-0034."
+    }
+  ]
+}

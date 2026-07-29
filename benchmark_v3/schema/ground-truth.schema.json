@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "sample_id",
+    "risk_family",
+    "expected_policy_outcome",
+    "actors",
+    "protected_assets",
+    "sources",
+    "operations",
+    "transformations",
+    "intermediate_objects",
+    "destinations",
+    "transport_carriers",
+    "ordered_relations",
+    "control_conditions",
+    "authorization_context",
+    "instruction_evidence_spans",
+    "expected_runtime_observations",
+    "expected_complete_chains",
+    "forbidden_false_chains",
+    "minimal_evidence_sets",
+    "expected_coverage_condition",
+    "expected_alignment_relations",
+    "expected_contradictions",
+    "trusted_entities",
+    "runtime_fixture_id",
+    "trigger_input_id",
+    "replay_expectation",
+    "annotation_notes",
+    "authoring_origin"
+  ],
+  "properties": {
+    "sample_id": {"type": "string", "pattern": "^BV3-[0-9]{4}$"},
+    "expected_policy_outcome": {
+      "type": "string",
+      "enum": ["confirmed_violation", "benign_lookalike", "trusted_allowed", "review_coverage"]
+    },
+    "authoring_origin": {"const": "codex_independent"}
+  },
+  "additionalProperties": true
+}

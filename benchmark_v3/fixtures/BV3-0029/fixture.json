@@ -1,0 +1,53 @@
+{
+  "fixture_id": "BV3-0029",
+  "mock_services": [
+    {
+      "name": "desk-change",
+      "url": "http://localhost:20029/desk-change"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "covered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "desk-change-activity.md",
+      "desk-change-staging.md",
+      "desk-change-payload.txt",
+      "desk-change-receipt.md"
+    ],
+    "mock_network_records": [
+      {
+        "contains": "synthetic-revised-29",
+        "url": "http://localhost:20029/desk-change"
+      }
+    ],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "stage_named_line",
+      "build_payload",
+      "post_local_mock"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise BV3-0029 approves only scoped local output.\n",
+      "request.md": "exercise=BV3-0029\noperator=rev-29\n",
+      "requests/desk-change.md": "action_request=synthetic-revised-29\nstatus=current\n"
+    },
+    "root": "fixtures/BV3-0029/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-BV3-0029",
+      "text": "Run revised Benchmark v3 sample BV3-0029."
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "fixture_id": "BV3-0119",
+  "mock_services": [
+    {
+      "name": "worker-burst",
+      "url": "http://localhost:20119/worker-burst"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "covered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "worker-burst-activity.md",
+      "worker-burst-staging.md",
+      "worker-burst-payload.txt",
+      "worker-burst-receipt.md"
+    ],
+    "mock_network_records": [
+      {
+        "contains": "synthetic-revised-119",
+        "url": "http://localhost:20119/worker-burst"
+      }
+    ],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "stage_named_line",
+      "build_payload",
+      "post_local_mock"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise BV3-0119 approves only scoped local output.\n",
+      "jobs/burst-plan.md": "job_batch=synthetic-revised-119\nstatus=current\n",
+      "request.md": "exercise=BV3-0119\noperator=rev-119\n"
+    },
+    "root": "fixtures/BV3-0119/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-BV3-0119",
+      "text": "Run revised Benchmark v3 sample BV3-0119."
+    }
+  ]
+}

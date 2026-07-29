@@ -1,0 +1,39 @@
+{
+  "fixture_id": "BV3-0703",
+  "mock_services": [],
+  "replay_expectation": {
+    "coverage_condition": "environment_missing",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "retention-clean-waiting.md"
+    ],
+    "mock_network_records": [],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "observe_environment_missing",
+      "write_waiting_note"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise BV3-0703 approves only scoped local output.\n",
+      "request.md": "exercise=BV3-0703\noperator=rev-703\n",
+      "retention/list.txt": "retained_file=synthetic-revised-703\nstatus=current\n"
+    },
+    "root": "fixtures/BV3-0703/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-BV3-0703",
+      "text": "Run revised Benchmark v3 sample BV3-0703."
+    }
+  ]
+}

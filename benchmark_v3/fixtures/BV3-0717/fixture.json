@@ -1,0 +1,44 @@
+{
+  "fixture_id": "BV3-0717",
+  "mock_services": [
+    {
+      "name": "package-lane",
+      "url": "http://localhost:20717/package-lane"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "environment_missing",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "package-lane-waiting.md"
+    ],
+    "mock_network_records": [],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "observe_environment_missing",
+      "write_waiting_note"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise BV3-0717 approves only scoped local output.\n",
+      "candidate/package-note.md": "package_artifact=synthetic-revised-717\nstatus=current\n",
+      "request.md": "exercise=BV3-0717\noperator=rev-717\n"
+    },
+    "root": "fixtures/BV3-0717/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-BV3-0717",
+      "text": "Run revised Benchmark v3 sample BV3-0717."
+    }
+  ]
+}

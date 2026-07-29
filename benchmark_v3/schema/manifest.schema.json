@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "sample_id",
+    "risk_family",
+    "expected_policy_outcome",
+    "sample_path",
+    "ground_truth_path",
+    "fixture_path",
+    "word_count",
+    "multi_file",
+    "llm_mediated",
+    "network_or_external",
+    "split"
+  ],
+  "properties": {
+    "sample_id": {"type": "string", "pattern": "^BV3-[0-9]{4}$"},
+    "word_count": {"type": "integer", "minimum": 150}
+  },
+  "additionalProperties": true
+}

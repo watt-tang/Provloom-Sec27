@@ -1,0 +1,47 @@
+version: "0.3.0-pilot"
+outcomes:
+  - confirmed_violation
+  - benign_lookalike
+  - trusted_allowed
+  - review_coverage
+risk_families:
+  Credential access and exfiltration:
+    target: {violation: 35, benign: 18, trusted: 10, review: 7, total: 70}
+  Private data collection and upload:
+    target: {violation: 30, benign: 15, trusted: 9, review: 6, total: 60}
+  LLM-mediated disclosure:
+    target: {violation: 30, benign: 15, trusted: 9, review: 6, total: 60}
+  Untrusted download and execute:
+    target: {violation: 35, benign: 18, trusted: 10, review: 7, total: 70}
+  Persistence:
+    target: {violation: 25, benign: 12, trusted: 8, review: 5, total: 50}
+  Permission or privilege expansion:
+    target: {violation: 25, benign: 12, trusted: 8, review: 5, total: 50}
+  Destructive modification / ransomware:
+    target: {violation: 25, benign: 12, trusted: 8, review: 5, total: 50}
+  Reverse shell / remote control:
+    target: {violation: 25, benign: 12, trusted: 8, review: 5, total: 50}
+  Supply-chain or dependency abuse:
+    target: {violation: 25, benign: 12, trusted: 8, review: 5, total: 50}
+  Unauthorized external actions:
+    target: {violation: 25, benign: 12, trusted: 8, review: 5, total: 50}
+  Resource abuse:
+    target: {violation: 20, benign: 10, trusted: 6, review: 4, total: 40}
+  Instruction override and hidden behavior:
+    target: {violation: 25, benign: 12, trusted: 8, review: 5, total: 50}
+  Multi-stage compositional behavior:
+    target: {violation: 75, benign: 38, trusted: 22, review: 15, total: 150}
+final_targets:
+  total_samples: 800
+  confirmed_violation: 400
+  benign_lookalike: 198
+  trusted_allowed: 122
+  review_coverage: 80
+  counterfactual_pairs: 160
+  llm_mediated_minimum: 120
+  network_or_external_minimum: 200
+  multi_file: 200
+splits:
+  development: 120
+  blind-heldout: 480
+  challenge-heldout: 200

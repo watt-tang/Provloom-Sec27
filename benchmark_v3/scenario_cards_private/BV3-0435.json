@@ -1,0 +1,15 @@
+{
+  "chain_closure_reason": "Necessary edge is trusted, local-only, redacted, or deterministically blocked.",
+  "counterfactual_pair_id": "CF-REV-0095",
+  "length_bucket": "150_300",
+  "llm_mediated": true,
+  "multi_file": false,
+  "network_or_external": true,
+  "safety_fixture_idea": "Synthetic files, sandbox mutations, and localhost mock services only.",
+  "sample_id": "BV3-0435",
+  "scenario_card": "Revised Supply-chain or dependency abuse sample with outcome benign_lookalike and length bucket short.",
+  "scenario_family": "package-lane_revision_1",
+  "split": "blind-heldout",
+  "writing_plan": "Rewritten as a compact natural-language operator note with the same semantic decision edges.",
+  "writing_style_family": "integration guide"
+}

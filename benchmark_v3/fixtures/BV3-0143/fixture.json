@@ -1,0 +1,53 @@
+{
+  "fixture_id": "BV3-0143",
+  "mock_services": [
+    {
+      "name": "package-lane",
+      "url": "http://localhost:20143/package-lane"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "covered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "package-lane-activity.md",
+      "package-lane-staging.md",
+      "package-lane-payload.txt",
+      "package-lane-receipt.md"
+    ],
+    "mock_network_records": [
+      {
+        "contains": "synthetic-revised-143",
+        "url": "http://localhost:20143/package-lane"
+      }
+    ],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "stage_named_line",
+      "build_payload",
+      "post_local_mock"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise BV3-0143 approves only scoped local output.\n",
+      "candidate/package-note.md": "package_artifact=synthetic-revised-143\nstatus=current\n",
+      "request.md": "exercise=BV3-0143\noperator=rev-143\n"
+    },
+    "root": "fixtures/BV3-0143/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-BV3-0143",
+      "text": "Run revised Benchmark v3 sample BV3-0143."
+    }
+  ]
+}

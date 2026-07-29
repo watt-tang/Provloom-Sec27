@@ -1,0 +1,41 @@
+{
+  "fixture_id": "BV3-0324",
+  "mock_services": [],
+  "replay_expectation": {
+    "coverage_condition": "covered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "retention-clean-activity.md",
+      "retention-clean-staging.md",
+      "retention-clean-payload.txt"
+    ],
+    "mock_network_records": [],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "stage_named_line",
+      "build_payload"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise BV3-0324 approves only scoped local output.\n",
+      "request.md": "exercise=BV3-0324\noperator=rev-324\n",
+      "retention/list.txt": "retained_file=synthetic-revised-324\nstatus=current\n"
+    },
+    "root": "fixtures/BV3-0324/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-BV3-0324",
+      "text": "Run revised Benchmark v3 sample BV3-0324."
+    }
+  ]
+}

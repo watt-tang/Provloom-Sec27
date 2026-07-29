@@ -1,0 +1,28 @@
+{
+  "by_family": {
+    "Credential access and exfiltration": 70,
+    "Destructive modification / ransomware": 50,
+    "Instruction override and hidden behavior": 50,
+    "LLM-mediated disclosure": 60,
+    "Multi-stage compositional behavior": 150,
+    "Permission or privilege expansion": 50,
+    "Persistence": 50,
+    "Private data collection and upload": 60,
+    "Resource abuse": 40,
+    "Reverse shell / remote control": 50,
+    "Supply-chain or dependency abuse": 50,
+    "Unauthorized external actions": 50,
+    "Untrusted download and execute": 70
+  },
+  "by_outcome": {
+    "benign_lookalike": 198,
+    "confirmed_violation": 400,
+    "review_coverage": 80,
+    "trusted_allowed": 122
+  },
+  "counterfactual_pairs": 160,
+  "llm_mediated": 240,
+  "multi_file": 200,
+  "network_or_external": 593,
+  "total": 800
+}

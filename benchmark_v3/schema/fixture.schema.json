@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["fixture_id", "trigger_inputs", "sandbox", "safety", "replay_expectation"],
+  "properties": {
+    "fixture_id": {"type": "string", "pattern": "^BV3-[0-9]{4}$"},
+    "safety": {
+      "type": "object",
+      "required": ["synthetic_only", "local_or_mock_only", "no_real_credentials", "no_live_external_actions"],
+      "properties": {
+        "synthetic_only": {"const": true},
+        "local_or_mock_only": {"const": true},
+        "no_real_credentials": {"const": true},
+        "no_live_external_actions": {"const": true}
+      }
+    }
+  },
+  "additionalProperties": true
+}
