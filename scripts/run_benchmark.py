@@ -19,6 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.analysis.pipeline import ExecutionConfig, analyze_skill_bundle
 from app.backend.schemas import LLMConfig
 from app.runner.docker_runner import DEFAULT_SANDBOX_IMAGE, DockerRunner
+from app.runner.timeout_config import resolve_total_timeout
 from app.runtime.skill_parser import load_skill_definition, resolve_skill_target
 
 BASELINES = ["static_only", "rule_only", "rule_plus_epg", "epg_with_filtering"]
@@ -44,7 +45,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run ACSAC-style benchmark over Skill sandbox baselines.")
     parser.add_argument("--datasets-root", default="datasets")
     parser.add_argument("--analysis-mode", choices=BASELINES + ["all"], default="all")
-    parser.add_argument("--timeout-seconds", default=30, type=int)
+    parser.add_argument("--timeout-seconds", default=None, type=int)
     parser.add_argument("--network-policy", default="default", choices=["default", "disabled"])
     parser.add_argument("--image-name", default=DEFAULT_SANDBOX_IMAGE)
     args = parser.parse_args()
@@ -56,6 +57,7 @@ def main() -> int:
     modes = BASELINES if args.analysis_mode == "all" else [args.analysis_mode]
 
     runner = build_runner(args.image_name)
+    timeout_resolution = resolve_total_timeout(args.timeout_seconds)
     baseline_results: dict[str, dict[str, Any]] = {}
     csv_rows: list[dict[str, Any]] = []
 
@@ -65,7 +67,7 @@ def main() -> int:
             evaluation = run_and_evaluate_case(
                 case=case,
                 analysis_mode=mode,
-                timeout_seconds=args.timeout_seconds,
+                timeout_seconds=timeout_resolution.total_timeout_seconds,
                 network_policy=args.network_policy,
                 runner=runner,
                 benchmark_root=benchmark_root,

@@ -8,10 +8,12 @@ class CoverageAnalyzer:
     def analyze(self, *, events: list[RuntimeEvent], chains: list[RuntimeChain], timed_out: bool = False, exit_code: int | None = 0) -> CoverageReport:
         if timed_out or any(event.event_type == "timeout" for event in events):
             return CoverageReport("timeout", ["runtime timed out"], len(events), metadata={"exit_code": exit_code})
+        llm_failure = _llm_provider_failure(events)
+        if llm_failure:
+            state, reason = llm_failure
+            return CoverageReport(state, [reason], len(events), metadata={"exit_code": exit_code, "failure_type": "llm_provider_failure"})
         if any(event.event_type == "analysis_error" for event in events):
             return CoverageReport("execution_failed", ["analysis event stream contains an error"], len(events), metadata={"exit_code": exit_code, "legacy_coverage_state": "analysis_error"})
-        if exit_code not in (0, None):
-            return CoverageReport("execution_failed", [f"runtime exited with code {exit_code}"], len(events), metadata={"exit_code": exit_code})
 
         explicit = _explicit_state(events)
         if explicit:
@@ -22,7 +24,26 @@ class CoverageAnalyzer:
             missing = sorted({point for chain in chains for point in chain.missing_observation_points})
             state = "instrumentation_gap" if missing else "runtime_confirmed"
             legacy = "triggered_but_partially_observed" if missing else "triggered_and_observed"
-            return CoverageReport(state, ["runtime behavior observed with canonical provenance chain"], len(events), missing_observations=missing, metadata={"legacy_coverage_state": legacy})
+            reasons = ["runtime behavior observed with canonical provenance chain"]
+            metadata = {"legacy_coverage_state": legacy, "exit_code": exit_code}
+            if exit_code not in (0, None):
+                reasons.append(f"post-confirmation runtime exited with code {exit_code}")
+                metadata["post_confirmation_exit_code"] = exit_code
+            return CoverageReport(state, reasons, len(events), missing_observations=missing, metadata=metadata)
+
+        if _has_sink_unavailable(events):
+            return CoverageReport("sink_unavailable", ["HTTP sink endpoint was unavailable during runtime execution"], len(events), metadata={"exit_code": exit_code, "failure_type": "sink_unavailable"})
+        missing_command = _missing_required_command(events)
+        if missing_command:
+            return CoverageReport(
+                "environment_missing",
+                [f"required command unavailable: {missing_command}"],
+                len(events),
+                missing_observations=[f"command:{missing_command}"],
+                metadata={"exit_code": exit_code, "failure_type": "missing_required_command"},
+            )
+        if exit_code not in (0, None):
+            return CoverageReport("execution_failed", [f"runtime exited with code {exit_code}"], len(events), metadata={"exit_code": exit_code})
 
         instrumentation_gaps = sorted(
             {
@@ -116,3 +137,45 @@ def _has_tainted_sink_visibility_gap(events: list[RuntimeEvent]) -> bool:
             if event.metadata.get("encrypted_payload_invisible"):
                 return True
     return False
+
+
+def _llm_provider_failure(events: list[RuntimeEvent]) -> tuple[str, str] | None:
+    for event in events:
+        if event.event_type != "llm_error":
+            continue
+        error_type = str(event.metadata.get("error_type") or "")
+        if error_type == "llm_request_timeout" or str(event.metadata.get("coverage_state") or "") == "timeout":
+            return "timeout", "LLM provider request timed out before runtime target behavior completed"
+        return "environment_missing", "LLM provider request failed before runtime target behavior completed"
+    return None
+
+
+def _has_sink_unavailable(events: list[RuntimeEvent]) -> bool:
+    for event in events:
+        if event.object_type != "tool" and event.event_type not in {"tool_return", "tool_invoke"}:
+            continue
+        if str(event.metadata.get("tool_type") or "") != "http_request":
+            continue
+        stderr = str(event.metadata.get("stderr_preview") or event.metadata.get("stderr") or "").lower()
+        status = str(event.metadata.get("status") or "").lower()
+        if status == "failed" and any(token in stderr for token in ("connection refused", "name or service not known", "timed out", "connection reset", "network is unreachable")):
+            return True
+    return False
+
+
+def _missing_required_command(events: list[RuntimeEvent]) -> str:
+    for event in events:
+        if event.event_type not in {"tool_return", "tool_invoke"}:
+            continue
+        if str(event.metadata.get("tool_type") or "") != "run_command":
+            continue
+        status = str(event.metadata.get("status") or "").lower()
+        stderr = str(event.metadata.get("stderr_preview") or event.metadata.get("stderr") or "")
+        if status == "failed" and ("not found" in stderr.lower() or "no such file or directory" in stderr.lower()):
+            command = event.metadata.get("config", {}).get("command") if isinstance(event.metadata.get("config"), dict) else ""
+            if isinstance(command, list) and command:
+                return str(command[0])
+            if isinstance(command, str) and command.strip():
+                return command.strip().split()[0]
+            return "unknown"
+    return ""

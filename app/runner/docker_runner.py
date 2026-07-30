@@ -19,7 +19,8 @@ from app.backend.schemas import LLMConfig
 from app.analyzer.trigger_synthesis import TriggerPlan, build_trigger_event_injections, materialize_artifact_triggers
 from app.runtime.adapter_layer import AdapterContext, AdapterManager
 from app.runtime.skill_parser import load_skill_definition, resolve_skill_target
-from app.runner.models import ResourceUsage, SandboxExecution
+from app.runner.fixture_orchestrator import FixtureOrchestrator
+from app.runner.models import LLMEvent, NetworkEvent, ResourceUsage, SandboxExecution
 from app.telemetry.collector import build_data_flow_hints, load_llm_events, load_runtime_events
 from app.runner.trace_parser import parse_trace_dir
 
@@ -76,6 +77,8 @@ class DockerRunner:
         escalation_allowed: bool = False,
         trigger_plan: dict | None = None,
         trigger_prompt_used: list[str] | None = None,
+        fixture: dict | None = None,
+        fixture_path: str | None = None,
     ) -> SandboxExecution:
         source_dir, skill_file = resolve_skill_target(skill_path)
         skill_definition = load_skill_definition(
@@ -100,16 +103,13 @@ class DockerRunner:
                 json.dumps(input_payload, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+            private_llm_config_path = temp_root / "llm-config-private.json"
+            private_llm_config_path.write_text(
+                json.dumps(self._llm_config_payload(llm_config, redact_api_key=False), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
             (artifacts_dir / "llm-config.json").write_text(
-                json.dumps({
-                    "enabled": llm_config.enabled,
-                    "provider": llm_config.provider,
-                    "base_url": llm_config.base_url,
-                    "api_key": llm_config.api_key,
-                    "model": llm_config.model,
-                    "temperature": llm_config.temperature,
-                    "max_steps": llm_config.max_steps,
-                }, ensure_ascii=False, indent=2),
+                json.dumps(self._llm_config_payload(llm_config, redact_api_key=True), ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
             adapter_ctx = AdapterContext(
@@ -125,6 +125,11 @@ class DockerRunner:
                 browser_enabled=browser_enabled,
             )
             adapter_manager.setup(adapter_ctx)
+            fixture_orchestrator = FixtureOrchestrator(fixture=fixture, fixture_path=fixture_path)
+            fixture_preparation = fixture_orchestrator.prepare_fixture(
+                skill_workspace=mounted_skill_dir,
+                artifacts_dir=artifacts_dir,
+            )
             (artifacts_dir / "adapter-state.json").write_text(
                 json.dumps(
                     {
@@ -178,6 +183,8 @@ class DockerRunner:
                 f"type=bind,src={mounted_skill_dir},dst=/workspace/skill",
                 "--mount",
                 f"type=bind,src={artifacts_dir},dst=/artifacts",
+                "--mount",
+                f"type=bind,src={private_llm_config_path},dst=/tmp/provloom-llm-config.json,readonly",
                 "--add-host",
                 "host.docker.internal:host-gateway",
             ]
@@ -199,6 +206,8 @@ class DockerRunner:
                 f"PROVLOOM_ADAPTERS_ENABLED={','.join(adapters_enabled or [])}",
                 "-e",
                 f"PROVLOOM_ESCALATION_ALLOWED={'1' if escalation_allowed else '0'}",
+                "-e",
+                "PROVLOOM_FIXTURE_PROTECTED_ASSETS=/artifacts/protected-assets.json",
                 self.image_name,
                 "sh",
                 "-lc",
@@ -259,12 +268,19 @@ class DockerRunner:
             network_events = network_events + trigger_event_bundle["network_events"]
             tool_calls = tool_calls + trigger_event_bundle["tool_calls"]
             data_flows = data_flows + trigger_event_bundle["data_flows"]
+            mock_service_records = fixture_orchestrator.collect_service_records(artifacts_dir=artifacts_dir)
+            fixture_mutations = fixture_orchestrator.collect_fixture_mutations(
+                mounted_skill_dir=mounted_skill_dir,
+                artifacts_dir=artifacts_dir,
+            )
+            network_events = network_events + self._network_events_from_mock_records(mock_service_records)
             resource_usage = self._collect_resource_usage(
                 container_name=container_name,
                 peak_memory_bytes=peak_holder["peak"],
                 mounted_skill_dir=mounted_skill_dir,
                 artifacts_dir=artifacts_dir,
             )
+            llm_execution_summary = self._llm_execution_summary(llm_events, meta)
 
             if result.returncode != 0 and not meta:
                 self._force_cleanup(container_name)
@@ -314,9 +330,26 @@ class DockerRunner:
                         or ""
                     ),
                     runtime_build_info=runtime_build_info or image_metadata,
+                    fixture_preparation=fixture_preparation.to_dict(),
+                    mock_service_records=mock_service_records,
+                    fixture_mutations=fixture_mutations,
+                    termination_reason=llm_execution_summary.get("termination_reason") or meta.get("termination_reason"),
+                    termination_signal=meta.get("termination_signal"),
+                    deadline_reached=bool(meta.get("deadline_reached", False)),
+                    runner_killed_process=bool(meta.get("runner_killed_process", False)),
+                    container_oom_killed=bool(meta.get("container_oom_killed", False)),
+                    agent_step_count=int(llm_execution_summary.get("agent_step_count", 0) or 0),
+                    max_agent_steps=int(llm_execution_summary.get("max_agent_steps", 0) or 0),
+                    max_steps_exhausted=bool(llm_execution_summary.get("max_steps_exhausted", False)),
+                    llm_request_timeout_count=int(llm_execution_summary.get("llm_request_timeout_count", 0) or 0),
+                    provider_retry_count=int(llm_execution_summary.get("provider_retry_count", 0) or 0),
+                    final_response_emitted=bool(llm_execution_summary.get("final_response_emitted", False)),
+                    pending_tool_call=llm_execution_summary.get("pending_tool_call"),
+                    pending_obligation_count=int(llm_execution_summary.get("pending_obligation_count", 0) or 0),
                 )
             finally:
                 adapter_manager.teardown(adapter_ctx)
+                fixture_orchestrator.cleanup()
                 self._force_cleanup(container_name)
 
     def _ensure_docker_available(self) -> None:
@@ -412,23 +445,148 @@ class DockerRunner:
             "dynamic_analysis_version": labels.get("org.provloom.dynamic_analysis_version", ""),
         }
 
+    def _network_events_from_mock_records(self, records: list[dict[str, Any]]) -> list[NetworkEvent]:
+        events: list[NetworkEvent] = []
+        for index, record in enumerate(records, start=1):
+            host = str(record.get("host") or "localhost")
+            port = int(record.get("port") or 0)
+            path = str(record.get("path") or "/")
+            address = f"http://localhost:{port}{path}" if port else f"http://localhost{path}"
+            events.append(
+                NetworkEvent(
+                    timestamp=str(record.get("timestamp") or ""),
+                    address=address,
+                    action="send",
+                    raw=f"mock service received {record.get('method')} {path}",
+                    host="localhost",
+                    port=port or None,
+                    display_label=address,
+                    endpoint_kind="http",
+                    endpoint_source="fixture_mock_service",
+                    endpoint_role="mock_sink",
+                    sink_resolution_status="controlled_mock",
+                    raw_host=host.split(":", 1)[0],
+                    raw_port=port or None,
+                    original_url=address,
+                    sink_display_label=address,
+                    sink_domain="localhost",
+                    sink_url=address,
+                    sink_port=port or None,
+                    sink_type="mock_http",
+                    is_controlled_sink=True,
+                    network_evidence_sources=["fixture_mock_receipt"],
+                    fd=None,
+                    byte_count=int(record.get("body_length") or 0),
+                    payload_preview=None,
+                    encrypted_payload_invisible=False,
+                    network_evidence_level="tainted_payload_delivered",
+                    carrier_type="http_body" if int(record.get("body_length") or 0) else "http_query",
+                    carrier_location="body" if int(record.get("body_length") or 0) else "query",
+                    event_id=f"mock-network-{index:04d}",
+                    source="fixture_mock",
+                )
+            )
+        return events
+
+    def _llm_execution_summary(self, llm_events: list[LLMEvent], meta: dict[str, Any]) -> dict[str, Any]:
+        summary: dict[str, Any] = {
+            "termination_reason": "",
+            "agent_step_count": 0,
+            "max_agent_steps": 0,
+            "max_steps_exhausted": False,
+            "llm_request_timeout_count": 0,
+            "provider_retry_count": 0,
+            "final_response_emitted": False,
+            "pending_tool_call": None,
+            "pending_obligation_count": 0,
+        }
+        for event in llm_events:
+            metadata = event.metadata or {}
+            step = metadata.get("agent_step_count") or metadata.get("step")
+            if isinstance(step, int):
+                summary["agent_step_count"] = max(int(summary["agent_step_count"]), step)
+            max_steps = metadata.get("max_agent_steps")
+            if isinstance(max_steps, int):
+                summary["max_agent_steps"] = max(int(summary["max_agent_steps"]), max_steps)
+            if event.event == "max_steps_exhausted" or metadata.get("max_steps_exhausted"):
+                summary["max_steps_exhausted"] = True
+                summary["termination_reason"] = "max_steps_exhausted"
+            if event.event in {"response", "final_response"} or metadata.get("final_response_emitted"):
+                summary["final_response_emitted"] = True
+            if metadata.get("error_type") == "llm_request_timeout":
+                summary["llm_request_timeout_count"] = int(summary["llm_request_timeout_count"]) + 1
+                if not summary["termination_reason"]:
+                    summary["termination_reason"] = "llm_request_timeout"
+            if metadata.get("retry_count") is not None:
+                try:
+                    summary["provider_retry_count"] = max(int(summary["provider_retry_count"]), int(metadata["retry_count"]))
+                except (TypeError, ValueError):
+                    pass
+            if metadata.get("pending_tool_call"):
+                summary["pending_tool_call"] = str(metadata["pending_tool_call"])
+            if metadata.get("pending_obligation_count") is not None:
+                try:
+                    summary["pending_obligation_count"] = max(int(summary["pending_obligation_count"]), int(metadata["pending_obligation_count"]))
+                except (TypeError, ValueError):
+                    pass
+        if not summary["termination_reason"] and meta.get("termination_reason"):
+            summary["termination_reason"] = str(meta.get("termination_reason"))
+        return summary
+
     def _build_runner_script(self, skill_file: str, timeout_seconds: int) -> str:
         skill_file_quoted = quote(skill_file)
         return f"""
 set -eu
 cp /opt/skill_sandbox/runtime-build-info.json /artifacts/runtime-build-info.json 2>/dev/null || true
+cp /opt/skill_sandbox/installed-tool-versions.txt /artifacts/installed-tool-versions.txt 2>/dev/null || true
 cd /workspace/skill
 TIMED_OUT=0
 EXIT_CODE=0
-if timeout --preserve-status {timeout_seconds}s sh -lc 'PYTHONPATH=/opt/skill_sandbox /usr/bin/time -v -o /artifacts/runtime-resource-usage.txt strace -ff -tt -s 256 -o /artifacts/trace.log -e trace=file,process,network python -m app.runtime.container_runtime --skill-root /workspace/skill --skill-file {skill_file_quoted} --input-payload /artifacts/input-payload.json --runtime-events /artifacts/runtime-events.jsonl --llm-config /artifacts/llm-config.json > /artifacts/stdout.log 2> /artifacts/stderr.log'; then
+DEADLINE_REACHED=0
+TERMINATION_REASON="completed"
+TERMINATION_SIGNAL=""
+RUNNER_KILLED_PROCESS=0
+START_TS=$(date +%s)
+MOCK_PID=""
+if [ -s /artifacts/fixture-runtime.json ]; then
+  mkdir -p /artifacts/mock-services
+  PYTHONPATH=/opt/skill_sandbox python -m app.runner.fixture_mock_server --config /artifacts/fixture-runtime.json > /artifacts/mock-services/stdout.log 2> /artifacts/mock-services/stderr.log &
+  MOCK_PID=$!
+  for i in $(seq 1 50); do
+    if [ -s /artifacts/mock-services/mock-services-ready.json ]; then
+      break
+    fi
+    if ! kill -0 "$MOCK_PID" 2>/dev/null; then
+      TERMINATION_REASON="mock_service_unavailable"
+      EXIT_CODE=70
+      printf '{{"exit_code": %s, "timed_out": false, "termination_reason": "%s", "termination_signal": "", "deadline_reached": false, "runner_killed_process": false, "container_oom_killed": false}}' "$EXIT_CODE" "$TERMINATION_REASON" > /artifacts/meta.json
+      exit 0
+    fi
+    sleep 0.1
+  done
+fi
+if timeout --preserve-status {timeout_seconds}s sh -lc 'PYTHONPATH=/opt/skill_sandbox /usr/bin/time -v -o /artifacts/runtime-resource-usage.txt strace -ff -tt -s 256 -o /artifacts/trace.log -e trace=file,process,network python -m app.runtime.container_runtime --skill-root /workspace/skill --skill-file {skill_file_quoted} --input-payload /artifacts/input-payload.json --runtime-events /artifacts/runtime-events.jsonl --llm-config /tmp/provloom-llm-config.json > /artifacts/stdout.log 2> /artifacts/stderr.log'; then
   EXIT_CODE=0
 else
   EXIT_CODE=$?
-  if [ "$EXIT_CODE" = "124" ]; then
+  END_TS=$(date +%s)
+  ELAPSED=$((END_TS - START_TS))
+  if [ "$EXIT_CODE" = "124" ] || {{ [ "$ELAPSED" -ge {timeout_seconds} ] && {{ [ "$EXIT_CODE" = "137" ] || [ "$EXIT_CODE" = "143" ]; }}; }}; then
     TIMED_OUT=1
+    DEADLINE_REACHED=1
+    RUNNER_KILLED_PROCESS=1
+    TERMINATION_REASON="timeout"
+    if [ "$EXIT_CODE" = "137" ]; then TERMINATION_SIGNAL="SIGKILL"; fi
+    if [ "$EXIT_CODE" = "143" ]; then TERMINATION_SIGNAL="SIGTERM"; fi
+  else
+    TERMINATION_REASON="process_exit"
   fi
 fi
-printf '{{"exit_code": %s, "timed_out": %s}}' "$EXIT_CODE" "$TIMED_OUT" > /artifacts/meta.json
+if [ -n "$MOCK_PID" ]; then
+  kill "$MOCK_PID" 2>/dev/null || true
+  wait "$MOCK_PID" 2>/dev/null || true
+fi
+printf '{{"exit_code": %s, "timed_out": %s, "termination_reason": "%s", "termination_signal": "%s", "deadline_reached": %s, "runner_killed_process": %s, "container_oom_killed": false}}' "$EXIT_CODE" "$TIMED_OUT" "$TERMINATION_REASON" "$TERMINATION_SIGNAL" "$DEADLINE_REACHED" "$RUNNER_KILLED_PROCESS" > /artifacts/meta.json
 exit 0
 """.strip()
 
@@ -476,6 +634,18 @@ exit 0
             return
         payload["api_key"] = "***redacted***" if payload.get("api_key") else ""
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    @staticmethod
+    def _llm_config_payload(llm_config: LLMConfig, *, redact_api_key: bool) -> dict[str, Any]:
+        return {
+            "enabled": llm_config.enabled,
+            "provider": llm_config.provider,
+            "base_url": llm_config.base_url,
+            "api_key": "***redacted***" if redact_api_key and llm_config.api_key else llm_config.api_key,
+            "model": llm_config.model,
+            "temperature": llm_config.temperature,
+            "max_steps": llm_config.max_steps,
+        }
 
     def _sanitize_trace_payload_artifacts(self, artifacts_dir: Path) -> None:
         patterns = [

@@ -218,3 +218,19 @@ class SandboxExecution:
     sandbox_image_id: str = ""
     source_fingerprint: str = ""
     runtime_build_info: dict[str, Any] = field(default_factory=dict)
+    fixture_preparation: dict[str, Any] = field(default_factory=dict)
+    mock_service_records: list[dict[str, Any]] = field(default_factory=list)
+    fixture_mutations: list[dict[str, Any]] = field(default_factory=list)
+    termination_reason: str | None = None
+    termination_signal: str | None = None
+    deadline_reached: bool = False
+    runner_killed_process: bool = False
+    container_oom_killed: bool = False
+    agent_step_count: int = 0
+    max_agent_steps: int = 0
+    max_steps_exhausted: bool = False
+    llm_request_timeout_count: int = 0
+    provider_retry_count: int = 0
+    final_response_emitted: bool = False
+    pending_tool_call: str | None = None
+    pending_obligation_count: int = 0

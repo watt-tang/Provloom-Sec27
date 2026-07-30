@@ -61,6 +61,7 @@ from app.backend.schemas import (
 from app.reporting.skill_report import generate_report_file
 from app.reporting.risk_mapper import map_risk_profile
 from app.runner.docker_runner import DEFAULT_SANDBOX_IMAGE, DockerRunner
+from app.runner.timeout_config import DEFAULT_TOTAL_TIMEOUT_SECONDS
 from app.runtime.skill_parser import SkillDefinition, load_skill_definition
 
 SUPPORTED_RUNTIMES = {"provloom-embedded", "deepseek-agent", "llm-agent", "llm-native"}
@@ -409,7 +410,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--analysis-mode", default="epg_with_filtering")
     parser.add_argument("--network-policy", default="default", choices=["default", "disabled"])
     parser.add_argument("--image-name", default=DEFAULT_SANDBOX_IMAGE)
-    parser.add_argument("--default-timeout-seconds", type=int, default=600)
+    parser.add_argument("--default-timeout-seconds", type=int, default=DEFAULT_TOTAL_TIMEOUT_SECONDS)
     parser.add_argument("--timeout-seconds", dest="default_timeout_seconds", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--max-workers", type=int, default=5)
     parser.add_argument(

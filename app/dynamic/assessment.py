@@ -71,10 +71,15 @@ def assess_dynamic_result(dynamic_result: Any | None) -> CanonicalAssessment:
 
     incomplete_states = {
         "timeout",
+        "max_steps_exhausted",
+        "path_incomplete",
+        "partially_complete",
         "execution_failed",
         "path_not_triggered",
         "source_unavailable",
         "environment_missing",
+        "missing_required_command",
+        "mock_service_unavailable",
         "unsupported_operation",
         "sink_unavailable",
     }

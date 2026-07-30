@@ -16,7 +16,7 @@ Outputs in `artifacts/static-runs/<run-id>/`:
 ## Dynamic
 
 ```bash
-python3 -m app.dynamic.cli run /path/to/skill --run-id RUN-ID --timeout-seconds 30 --network-policy default
+python3 -m app.dynamic.cli run /path/to/skill --run-id RUN-ID --network-policy default
 ```
 
 Outputs in `artifacts/runs/<run-id>/`:
@@ -38,5 +38,6 @@ python3 -m app.dynamic.cli export RUN-ID --format json
 
 Notes:
 - Dynamic CLI defaults to the official `skill-runtime-sandbox:dynamic-v3` image.
+- Dynamic CLI defaults to a 600 second total sandbox timeout. Override it with `--timeout-seconds`; fixture/runtime and environment defaults are used only when no explicit value is provided.
 - Override with `--image-name` or `PROVLOOM_SANDBOX_IMAGE` when running development images.
 - Candidate flows, instrumentation gaps, timeouts, and execution failures require review; they are not mapped to benign.

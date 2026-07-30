@@ -12,6 +12,7 @@ from app.backend.schemas import LLMConfig
 from app.dynamic.analyzer import DynamicRuntimeAnalyzer, persist_dynamic_analysis
 from app.dynamic.config import DynamicAnalysisConfig
 from app.runner.docker_runner import DEFAULT_SANDBOX_IMAGE, DockerRunner
+from app.runner.timeout_config import resolve_total_timeout
 from app.static.static_report import analyze_static_bundle
 from app.telemetry.collector import build_execution_report
 from app.telemetry.normalizer import build_normalized_events
@@ -28,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     run_p.add_argument("skill_path")
     run_p.add_argument("--run-id", default="")
     run_p.add_argument("--config", default="")
-    run_p.add_argument("--timeout-seconds", type=int, default=30)
+    run_p.add_argument("--timeout-seconds", type=int, default=None)
     run_p.add_argument("--network-policy", choices=["default", "disabled"], default="default")
     run_p.add_argument("--image-name", default=DEFAULT_SANDBOX_IMAGE)
     run_p.add_argument("--input", default="{}")
@@ -76,15 +77,17 @@ def _run(args) -> int:
         return 1
     run_id = args.run_id or f"RUN-{uuid.uuid4().hex[:12]}"
     input_payload = json.loads(args.input) if args.input.strip().startswith(("{", "[")) else json.loads(Path(args.input).read_text(encoding="utf-8"))
+    timeout_resolution = resolve_total_timeout(args.timeout_seconds)
     analysis = analyze_skill_bundle(
         args.skill_path,
         execution_config=ExecutionConfig(
             input_payload=input_payload,
-            timeout_seconds=args.timeout_seconds,
+            timeout_seconds=timeout_resolution.total_timeout_seconds,
             network_policy=args.network_policy,
             analysis_mode="rule_plus_epg",
             llm_config=LLMConfig(enabled=False),
             run_id=run_id,
+            timeout_resolution=timeout_resolution.to_dict(),
         ),
         dynamic_config=config,
         runner=DockerRunner(image_name=args.image_name),

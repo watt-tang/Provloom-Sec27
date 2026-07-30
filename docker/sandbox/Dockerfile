@@ -12,7 +12,20 @@ LABEL org.provloom.image_tag="${IMAGE_TAG}" \
       org.provloom.dynamic_analysis_version="${DYNAMIC_ANALYSIS_VERSION}"
 
 RUN HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTPS_PROXY} NO_PROXY=${NO_PROXY} apt-get update \
-    && apt-get install -y --no-install-recommends strace ca-certificates tini time \
+    && apt-get install -y --no-install-recommends \
+        bash \
+        ca-certificates \
+        coreutils \
+        curl \
+        git \
+        gzip \
+        jq \
+        strace \
+        tar \
+        tini \
+        time \
+        unzip \
+        wget \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
@@ -29,5 +42,17 @@ RUN printf '%s\n' \
     '  "canonical_assessment_version": "1.0",' \
     '  "alignment_version": "1.0"' \
     '}' > /opt/skill_sandbox/runtime-build-info.json
+RUN printf '%s\n' \
+    "git=$(git --version 2>/dev/null || true)" \
+    "curl=$(curl --version 2>/dev/null | head -n 1 || true)" \
+    "wget=$(wget --version 2>/dev/null | head -n 1 || true)" \
+    "tar=$(tar --version 2>/dev/null | head -n 1 || true)" \
+    "gzip=$(gzip --version 2>/dev/null | head -n 1 || true)" \
+    "unzip=$(unzip -v 2>/dev/null | head -n 1 || true)" \
+    "jq=$(jq --version 2>/dev/null || true)" \
+    "coreutils=$(realpath --version 2>/dev/null | head -n 1 || true)" \
+    "shell=$(sh --version 2>/dev/null | head -n 1 || echo sh)" \
+    "python=$(python --version 2>/dev/null || true)" \
+    > /opt/skill_sandbox/installed-tool-versions.txt
 ENV PYTHONPATH=/opt/skill_sandbox
 ENTRYPOINT ["/usr/bin/tini", "--"]

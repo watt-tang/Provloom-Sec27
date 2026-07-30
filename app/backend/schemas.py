@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from app.runner.timeout_config import DEFAULT_TOTAL_TIMEOUT_SECONDS
+
 
 DEFAULT_LLM_PROVIDER = "siliconflow"
 DEFAULT_LLM_BASE_URL = "https://api.siliconflow.cn/v1"
@@ -94,7 +96,7 @@ class LLMConfig:
 class AnalyzeSkillRequest:
     skill_path: str
     input_payload: dict[str, Any] = field(default_factory=dict)
-    timeout_seconds: int = 30
+    timeout_seconds: int = DEFAULT_TOTAL_TIMEOUT_SECONDS
     network_policy: str = "default"
     analysis_mode: str = "rule_plus_epg"
     llm_config: LLMConfig = field(default_factory=LLMConfig)
@@ -103,7 +105,7 @@ class AnalyzeSkillRequest:
     def from_dict(cls, payload: dict[str, Any]) -> "AnalyzeSkillRequest":
         skill_path = payload.get("skill_path")
         input_payload = payload.get("input_payload", {})
-        timeout_seconds = payload.get("timeout_seconds", 30)
+        timeout_seconds = payload.get("timeout_seconds", DEFAULT_TOTAL_TIMEOUT_SECONDS)
         network_policy = payload.get("network_policy", "default")
         analysis_mode = payload.get("analysis_mode", "rule_plus_epg")
         llm_config = LLMConfig.from_dict(payload.get("llm_config", {}))
@@ -112,8 +114,8 @@ class AnalyzeSkillRequest:
             raise ValueError("`skill_path` must be a non-empty string.")
         if not isinstance(input_payload, dict):
             raise ValueError("`input_payload` must be a JSON object.")
-        if not isinstance(timeout_seconds, int) or not (1 <= timeout_seconds <= 300):
-            raise ValueError("`timeout_seconds` must be an integer between 1 and 300.")
+        if not isinstance(timeout_seconds, int) or not (1 <= timeout_seconds <= 3600):
+            raise ValueError("`timeout_seconds` must be an integer between 1 and 3600.")
         if network_policy not in {"default", "disabled"}:
             raise ValueError("`network_policy` must be one of: default, disabled.")
         if analysis_mode not in {"rule_only", "rule_plus_epg", "static_only"}:

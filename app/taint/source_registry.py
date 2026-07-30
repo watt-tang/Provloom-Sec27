@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fnmatch
+import json
 import os
 import posixpath
 from dataclasses import dataclass
@@ -74,6 +75,8 @@ class SourceRegistry:
         *,
         source_paths: list[str] | None = None,
         source_types: dict[str, str] | None = None,
+        protected_assets: list[dict[str, Any]] | None = None,
+        protected_assets_path: str | None = None,
     ) -> None:
         self.source_paths = tuple(source_paths or self._paths_from_env() or DEFAULT_SOURCE_PATHS)
         self.source_types = {
@@ -87,11 +90,37 @@ class SourceRegistry:
             **(source_types or {}),
         }
         self.system_rules = SYSTEM_SOURCE_RULES
+        self.protected_assets = tuple(
+            self._normalize_asset(item)
+            for item in (protected_assets if protected_assets is not None else self._assets_from_file(protected_assets_path))
+            if isinstance(item, dict)
+        )
 
     def match_path(self, path: str) -> SourceMatch | None:
         normalized = normalize_path(path)
         if not normalized:
             return None
+
+        for asset in self.protected_assets:
+            asset_path = str(asset.get("normalized_path") or "")
+            if not asset_path:
+                continue
+            if normalized == asset_path or _glob_match(normalized, asset_path):
+                source_type = str(asset.get("source_type") or asset.get("asset_class") or "protected_synthetic_data")
+                sensitivity = str(asset.get("sensitivity") or "high")
+                return SourceMatch(
+                    source_type=source_type,
+                    sensitivity=self.source_types.get(source_type, sensitivity),
+                    normalized_path=normalized,
+                    metadata={
+                        "matcher": "fixture_protected_asset",
+                        "category": str(asset.get("source_category") or asset.get("asset_class") or "protected_synthetic_data"),
+                        "asset_id": asset.get("asset_id"),
+                        "content_source": asset.get("content_source", "fixture"),
+                        "value_sha256": asset.get("value_sha256"),
+                        "value_variants": asset.get("value_variants", {}),
+                    },
+                )
 
         for rule in self.system_rules:
             pattern = rule["pattern"]
@@ -137,6 +166,34 @@ class SourceRegistry:
     def _paths_from_env() -> list[str]:
         raw = os.environ.get("PROVLOOM_TAINT_SOURCE_PATHS", "")
         return [item.strip() for item in raw.split(os.pathsep) if item.strip()]
+
+    @classmethod
+    def from_artifacts(cls, artifacts_dir: str | os.PathLike[str] | None = None) -> "SourceRegistry":
+        path = None
+        if artifacts_dir:
+            candidate = os.path.join(str(artifacts_dir), "protected-assets.json")
+            if os.path.exists(candidate):
+                path = candidate
+        return cls(protected_assets_path=path)
+
+    def _assets_from_file(self, explicit_path: str | None = None) -> list[dict[str, Any]]:
+        path = explicit_path or os.environ.get("PROVLOOM_FIXTURE_PROTECTED_ASSETS", "")
+        if not path:
+            return []
+        try:
+            with open(path, encoding="utf-8") as handle:
+                payload = json.loads(handle.read())
+        except Exception:
+            return []
+        assets = payload.get("protected_assets") if isinstance(payload, dict) else payload
+        return list(assets or []) if isinstance(assets, list) else []
+
+    @staticmethod
+    def _normalize_asset(asset: dict[str, Any]) -> dict[str, Any]:
+        item = dict(asset)
+        path = item.get("path") or item.get("source_location") or item.get("normalized_path")
+        item["normalized_path"] = normalize_path(str(path or ""))
+        return item
 
 
 def normalize_path(path: str) -> str:

@@ -12,6 +12,8 @@ COVERAGE_STATES = {
     "path_not_triggered",
     "source_unavailable",
     "sink_unavailable",
+    "mock_service_unavailable",
+    "missing_required_command",
     "environment_missing",
     "instrumentation_gap",
     "unsupported_operation",
@@ -27,6 +29,10 @@ COVERAGE_STATES = {
     "endpoint_unavailable",
     "execution_failed",
     "timeout",
+    "max_steps_exhausted",
+    "path_incomplete",
+    "partially_complete",
+    "complete",
     "analysis_error",
 }
 

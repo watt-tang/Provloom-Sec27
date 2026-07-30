@@ -115,6 +115,7 @@ class SkillToolExecutor:
         arguments: dict[str, Any] | None = None,
         step_id: str | None = None,
         parent_event_id: str | None = None,
+        extra_input_taint_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         tool_spec = self._virtual_tool_specs().get(tool_id)
         if tool_spec is None:
@@ -132,6 +133,7 @@ class SkillToolExecutor:
             overrides=arguments or {},
             step_id=step_id,
             parent_event_id=parent_event_id,
+            extra_input_taint_ids=extra_input_taint_ids,
         )
 
     def get_tool_catalog(self, actions: list[SkillAction]) -> list[dict[str, Any]]:
@@ -660,6 +662,7 @@ class LLMAgentSkillRuntime:
         self.tool_catalog = executor.get_tool_catalog(definition.actions)
         self._message_taint_ids: dict[int, list[str]] = {}
         self._tainted_text_by_id: dict[str, str] = {}
+        self._tainted_fragments_by_id: dict[str, list[str]] = {}
         self.client = OpenAICompatibleClient(
             base_url=llm_config["base_url"],
             api_key=llm_config["api_key"],
@@ -688,7 +691,22 @@ class LLMAgentSkillRuntime:
                 "message_count": len(messages),
                 **llm_context_metadata,
             }, step_id=step_id)
-            response = self.client.chat(messages)
+            try:
+                response = self.client.chat(messages)
+            except RuntimeError as exc:
+                message = str(exc)
+                error_type = "llm_request_timeout" if "timed out" in message.lower() else "llm_request_failed"
+                self._emit("llm", "error", {
+                    "step": step,
+                    "provider": self.llm_config.get("provider", "openai-compatible"),
+                    "model": self.llm_config["model"],
+                    "base_url": self.client.base_url,
+                    "endpoint_host": urlparse(self.client.base_url).hostname,
+                    "error_type": error_type,
+                    "coverage_state": "timeout" if error_type == "llm_request_timeout" else "environment_missing",
+                    "error_preview": message[:240],
+                }, step_id=step_id, parent_event_id=request_event_id)
+                return 70
             response_taint_ids = self._taint_ids_in_value(response.content)
             content_preview, content_privacy = _privacy_preserving_text_preview(response.content, response_taint_ids)
             self._emit("llm", "response", {
@@ -737,12 +755,20 @@ class LLMAgentSkillRuntime:
                 self._message_taint_ids[len(messages) - 1] = result_taint_ids
                 for taint_id in result_taint_ids:
                     if result.get("stdout"):
-                        self._tainted_text_by_id[taint_id] = str(result.get("stdout"))
+                        self._remember_tainted_text(taint_id, str(result.get("stdout")))
 
             if result["exit_code"] != 0 and not skill_action.continue_on_error:
                 return result["exit_code"]
 
-        return last_exit_code or 1
+        self._emit("llm", "max_steps_exhausted", {
+            "step": max_steps,
+            "agent_step_count": max_steps,
+            "max_agent_steps": max_steps,
+            "max_steps_exhausted": True,
+            "final_response_emitted": False,
+            "coverage_state": "max_steps_exhausted",
+        }, step_id=f"step-{max_steps}")
+        return 71
 
     def _find_action(self, tool_id: str) -> SkillAction | None:
         for action in self.definition.actions:
@@ -784,6 +810,7 @@ class LLMAgentSkillRuntime:
                     arguments,
                     step_id=step_id,
                     parent_event_id=parent_event_id,
+                    extra_input_taint_ids=extra_input_taint_ids,
                 ),
                 tool_id,
                 virtual_action,
@@ -792,12 +819,37 @@ class LLMAgentSkillRuntime:
 
     def _taint_ids_in_value(self, value: Any) -> list[str]:
         serialized = _stringify_message_content(value)
-        ids = [
-            taint_id
-            for taint_id, text in self._tainted_text_by_id.items()
-            if text and text in serialized
-        ]
+        ids = []
+        for taint_id, text in self._tainted_text_by_id.items():
+            if text and text in serialized:
+                ids.append(taint_id)
+                continue
+            for fragment in self._tainted_fragments_by_id.get(taint_id, []):
+                if fragment and fragment in serialized:
+                    ids.append(taint_id)
+                    break
         return sorted(set(ids))
+
+    def _remember_tainted_text(self, taint_id: str, text: str) -> None:
+        self._tainted_text_by_id[taint_id] = text
+        fragments = set(self._tainted_fragments_by_id.get(taint_id, []))
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if len(line) >= 6:
+                fragments.add(line)
+            if "=" in line:
+                key, value = line.split("=", 1)
+                if len(value.strip()) >= 6:
+                    fragments.add(value.strip())
+            if ":" in line:
+                key, value = line.split(":", 1)
+                if len(value.strip()) >= 6:
+                    fragments.add(value.strip())
+        for token in text.replace("\n", " ").split():
+            cleaned = token.strip("\"'`:,;()[]{}")
+            if len(cleaned) >= 10:
+                fragments.add(cleaned)
+        self._tainted_fragments_by_id[taint_id] = sorted(fragments, key=lambda item: (-len(item), item))[:32]
 
     def _llm_context_metadata(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
         observations: list[dict[str, Any]] = []

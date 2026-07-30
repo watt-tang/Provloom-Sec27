@@ -86,7 +86,7 @@ def _title_for(assessment: dict[str, Any]) -> str:
     coverage = str(assessment.get("coverage_state") or "")
     if status == "violation_confirmed" or decision == "malicious":
         return "Violation Confirmed"
-    if coverage in {"timeout", "execution_failed", "path_not_triggered"}:
+    if coverage in {"timeout", "execution_failed", "path_not_triggered", "max_steps_exhausted", "path_incomplete", "partially_complete"}:
         return "Execution Incomplete"
     if status == "review_required" or decision == "needs_review":
         return "Review Required"
@@ -136,9 +136,24 @@ def _coverage_lines(payload: dict[str, Any]) -> list[str]:
     coverage = payload.get("coverage_certificate", {}) or {}
     summary = coverage.get("summary", {}) or {}
     lines = [f"- State: {coverage.get('coverage_state', 'unknown')}"]
+    if coverage.get("path_completion_status"):
+        lines.append(f"- Path completion: {coverage.get('path_completion_status')}")
+    if coverage.get("termination_reason"):
+        lines.append(f"- Termination: {coverage.get('termination_reason')}")
+    if coverage.get("chain_evidence_status"):
+        lines.append(f"- Chain evidence: {coverage.get('chain_evidence_status')}")
+    for key, value in (coverage.get("obligation_summary", {}) or {}).items():
+        lines.append(f"- obligations.{key}: {value}")
     lines.extend(f"- {key}: {value}" for key, value in summary.items())
     for obligation in coverage.get("obligations", []) or []:
-        lines.append(f"- {obligation.get('obligation_id')}: {obligation.get('expected_runtime_operation')} -> {obligation.get('status')}")
+        lines.append(
+            f"- {obligation.get('obligation_id')}: {obligation.get('expected_runtime_operation')} "
+            f"({obligation.get('risk_relevance', 'low')}) -> {obligation.get('status')}"
+        )
+    for path in coverage.get("path_completion", []) or []:
+        lines.append(f"- path {path.get('static_path_id')}: {path.get('status')} ({path.get('completion_ratio')}) - {path.get('reason')}")
+    for artifact in coverage.get("sensitive_artifacts", []) or []:
+        lines.append(f"- artifact {artifact.get('artifact_path')}: {artifact.get('status')} - {artifact.get('reason')}")
     return lines
 
 

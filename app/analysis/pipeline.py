@@ -17,6 +17,7 @@ from app.reporting.unified_report import write_unified_reports
 from app.runtime.skill_parser import load_skill_definition, resolve_skill_target
 from app.runner.docker_runner import DockerRunner
 from app.runner.models import SandboxExecution
+from app.runner.timeout_config import resolve_total_timeout
 from app.static.static_config import StaticAnalysisConfig
 from app.static.static_report import StaticAnalysisResult, analyze_static_bundle
 from app.telemetry.collector import build_execution_report
@@ -26,11 +27,14 @@ from app.telemetry.normalizer import NormalizedEvent, build_normalized_events, p
 @dataclass
 class ExecutionConfig:
     input_payload: dict[str, Any] = field(default_factory=dict)
-    timeout_seconds: int = 30
+    timeout_seconds: int | None = None
     network_policy: str = "default"
     analysis_mode: str = "rule_plus_epg"
     llm_config: LLMConfig = field(default_factory=LLMConfig)
     run_id: str = ""
+    fixture: dict[str, Any] | None = None
+    fixture_path: str | None = None
+    timeout_resolution: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -57,6 +61,9 @@ def analyze_skill_bundle(
     static_only: bool = False,
 ) -> UnifiedAnalysisResult:
     config = execution_config or ExecutionConfig()
+    timeout_resolution = resolve_total_timeout(config.timeout_seconds, fixture=config.fixture)
+    config.timeout_seconds = timeout_resolution.total_timeout_seconds
+    config.timeout_resolution = timeout_resolution.to_dict()
     execution_id = config.run_id or uuid.uuid4().hex
     source_dir, skill_file = resolve_skill_target(str(skill_path))
     static_result = analyze_static_bundle(source_dir, skill_file, config=static_config)
@@ -75,6 +82,8 @@ def analyze_skill_bundle(
         timeout_seconds=config.timeout_seconds,
         network_policy=config.network_policy,
         llm_config=config.llm_config,
+        fixture=config.fixture,
+        fixture_path=config.fixture_path,
     )
     return analyze_completed_execution(
         execution,
@@ -96,6 +105,12 @@ def analyze_completed_execution(
     dynamic_result: DynamicAnalysisResult | None = None,
 ) -> UnifiedAnalysisResult:
     config = execution_config or ExecutionConfig(run_id=execution.execution_id)
+    if config.timeout_seconds is None:
+        timeout_resolution = resolve_total_timeout(None, fixture=config.fixture)
+        config.timeout_seconds = timeout_resolution.total_timeout_seconds
+        config.timeout_resolution = timeout_resolution.to_dict()
+    elif not config.timeout_resolution:
+        config.timeout_resolution = resolve_total_timeout(config.timeout_seconds, fixture=config.fixture).to_dict()
     static_result = static_result or analyze_static_bundle(execution.skill_path, execution.skill_file, config=static_config)
     normalized_events = normalized_events if normalized_events is not None else build_normalized_events(execution)
     persist_normalized_events(execution.artifacts_dir, normalized_events)
@@ -229,9 +244,23 @@ def _merge_dynamic_report(
             "runtime_name": execution.runtime_name,
             "network_policy": execution_config.network_policy,
             "analysis_mode": execution_config.analysis_mode,
+            "timeout_seconds": execution_config.timeout_seconds,
+            "timeout_resolution": execution_config.timeout_resolution,
             "llm_config": execution_config.llm_config.to_public_dict(),
             "exit_code": execution.exit_code,
             "timed_out": execution.timed_out,
+            "termination_reason": execution.termination_reason,
+            "deadline_reached": execution.deadline_reached,
+            "runner_killed_process": execution.runner_killed_process,
+            "container_oom_killed": execution.container_oom_killed,
+            "agent_step_count": execution.agent_step_count,
+            "max_agent_steps": execution.max_agent_steps,
+            "max_steps_exhausted": execution.max_steps_exhausted,
+            "llm_request_timeout_count": execution.llm_request_timeout_count,
+            "provider_retry_count": execution.provider_retry_count,
+            "final_response_emitted": execution.final_response_emitted,
+            "pending_tool_call": execution.pending_tool_call,
+            "pending_obligation_count": execution.pending_obligation_count,
             "stdout": execution.stdout,
             "stderr": execution.stderr,
             "resource_usage": execution.resource_usage.to_dict(),
@@ -276,8 +305,10 @@ def _merge_static_report(
             "sandbox_image_id": "",
             "source_fingerprint": "",
             "runtime_build_info": {},
-            "network_policy": execution_config.network_policy,
+        "network_policy": execution_config.network_policy,
         "analysis_mode": execution_config.analysis_mode,
+        "timeout_seconds": execution_config.timeout_seconds,
+        "timeout_resolution": execution_config.timeout_resolution,
         "llm_config": execution_config.llm_config.to_public_dict(),
         "exit_code": None,
         "timed_out": False,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import socket
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -46,6 +47,16 @@ class OpenAICompatibleClient:
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
                 raw_body = response.read().decode("utf-8")
+        except TimeoutError as exc:
+            raise RuntimeError(
+                f"LLM request timed out for provider={self.provider} model={self.model} "
+                f"base_url={self.base_url}"
+            ) from exc
+        except socket.timeout as exc:
+            raise RuntimeError(
+                f"LLM request timed out for provider={self.provider} model={self.model} "
+                f"base_url={self.base_url}"
+            ) from exc
         except urllib.error.HTTPError as exc:
             raise RuntimeError(self._format_http_error(exc)) from exc
         except urllib.error.URLError as exc:

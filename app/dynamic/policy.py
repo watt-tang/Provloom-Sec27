@@ -72,6 +72,8 @@ class PolicyEngine:
         chain_events = [event for event in events if event.event_id in set(chain.supporting_event_ids)]
         if any(event.derived_from_hash for event in chain_events):
             return True
+        if any(event.metadata.get("fixture_mock_sink") for event in chain_events):
+            return self._is_permitted_pair(chain)
         if chain.sink and self._is_trusted_sink(chain.sink):
             return True
         if self._is_trusted_llm_context(chain_events):

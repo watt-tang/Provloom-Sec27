@@ -53,6 +53,26 @@ class RuntimeObligation:
     status: str = "unsatisfied"
     supporting_runtime_ids: list[str] = field(default_factory=list)
     reason: str = ""
+    obligation_type: str = ""
+    risk_relevance: str = "low"
+    required_for_path_completion: bool = True
+    blocking_condition: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class PathCompletionResult:
+    static_path_id: str
+    status: str
+    satisfied_obligations: list[str] = field(default_factory=list)
+    unsatisfied_obligations: list[str] = field(default_factory=list)
+    unresolved_obligations: list[str] = field(default_factory=list)
+    observed_runtime_chains: list[str] = field(default_factory=list)
+    completion_ratio: float = 0.0
+    termination_effect: str = ""
+    reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -66,10 +86,19 @@ class CoverageCertificate:
     reasons: list[str] = field(default_factory=list)
     instrumentation_gaps: list[str] = field(default_factory=list)
     summary: dict[str, Any] = field(default_factory=dict)
+    execution_status: str = "unknown"
+    chain_evidence_status: str = "none"
+    path_completion_status: str = "unresolved"
+    termination_reason: str = ""
+    obligation_summary: dict[str, Any] = field(default_factory=dict)
+    environment_gaps: list[str] = field(default_factory=list)
+    sensitive_artifacts: list[dict[str, Any]] = field(default_factory=list)
+    path_completion: list[PathCompletionResult] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["obligations"] = [item.to_dict() if hasattr(item, "to_dict") else item for item in self.obligations]
+        payload["path_completion"] = [item.to_dict() if hasattr(item, "to_dict") else item for item in self.path_completion]
         return payload
 
 

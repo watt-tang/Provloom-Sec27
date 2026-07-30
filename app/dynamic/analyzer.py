@@ -112,12 +112,13 @@ class DynamicRuntimeAnalyzer:
         if self.skill_root is not None:
             all_events.extend(RuntimeInstructionLift(skill_root=self.skill_root, config=self.config.closure_lift).discover(all_events))
         propagated = RuntimeTaintPropagator(registry=registry, config=self.config).propagate(all_events)
-        graph = RuntimeGraphBuilder(session_id=session).build(propagated, registry.source_dicts())
+        taint_sources = _merged_taint_sources(registry.source_dicts(), propagated)
+        graph = RuntimeGraphBuilder(session_id=session).build(propagated, taint_sources)
         chains = ChainRecovery().recover(graph)
         coverage = CoverageAnalyzer().analyze(events=propagated, chains=chains, timed_out=timed_out, exit_code=exit_code)
         violations = PolicyEngine(self.config).evaluate(chains=chains, events=propagated)
         alignment = StaticRuntimeAligner().align(graph=graph, chains=chains, coverage=coverage, static_result=static_result)
-        return DynamicAnalysisResult(propagated, graph, chains, coverage, violations, registry.source_dicts(), alignment, schema_version=SCHEMA_VERSION)
+        return DynamicAnalysisResult(propagated, graph, chains, coverage, violations, taint_sources, alignment, schema_version=SCHEMA_VERSION)
 
     def analyze_execution(
         self,
@@ -160,6 +161,28 @@ def analyze_runtime_events(
     static_result: Any | None = None,
 ) -> DynamicAnalysisResult:
     return DynamicRuntimeAnalyzer(config=config, registry=registry, skill_root=skill_root).analyze(events, static_result=static_result)
+
+
+def _merged_taint_sources(existing: list[dict[str, Any]], events: list[RuntimeEvent]) -> list[dict[str, Any]]:
+    by_id = {str(item.get("taint_id")): dict(item) for item in existing if item.get("taint_id")}
+    for event in events:
+        if event.event_type != "sensitive_source":
+            continue
+        for taint_id in event.taint_ids:
+            by_id.setdefault(
+                str(taint_id),
+                {
+                    "taint_id": str(taint_id),
+                    "source_type": str(event.metadata.get("source_type") or event.metadata.get("source_label", {}).get("source_type") or "runtime_sensitive_source"),
+                    "source_location": event.object_path or event.carrier_location or str(taint_id),
+                    "marker": "",
+                    "created_at": event.timestamp,
+                    "allowed_sinks": [],
+                    "metadata": dict(event.metadata),
+                    "variants": {},
+                },
+            )
+    return list(by_id.values())
 
 
 def persist_dynamic_analysis(result: DynamicAnalysisResult, artifacts_dir: str | Path) -> dict[str, Path]:

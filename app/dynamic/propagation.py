@@ -96,6 +96,9 @@ class RuntimeTaintPropagator:
                     "source_policy": source_match.metadata,
                 }
             )
+            variants = source_match.metadata.get("value_variants", {})
+            if isinstance(variants, dict):
+                self.registry.register_source_variants(source.taint_id, {str(key): str(value) for key, value in variants.items()})
             strength = "exact_value" if event.data_preview else "structured_relation"
             self._merge_taint(event, [source.taint_id], "confirmed", reason="TAINT_SOURCE_PATH_READ", evidence_strength=strength, carrier_type="file_content", carrier_location=path)
             event.metadata.setdefault("source_policy", source_match.metadata)

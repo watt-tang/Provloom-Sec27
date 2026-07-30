@@ -73,6 +73,22 @@ class TaintRegistry:
                 return source
         return self.register_source(source_type=source_type, source_location=normalized, created_at=timestamp)
 
+    def register_source_variants(self, taint_id: str, variants: dict[str, str]) -> None:
+        source = self.sources.get(taint_id)
+        if source is None:
+            return
+        for name, value in variants.items():
+            if not value:
+                continue
+            source.variants[name] = value
+            derived = str(name).startswith("sha256")
+            self._variant_to_taint[value] = MarkerMatch(
+                taint_id=taint_id,
+                variant_name=str(name),
+                evidence_level="conservative" if derived else "confirmed",
+                derived=derived,
+            )
+
     def detect(self, value: Any) -> list[MarkerMatch]:
         text = _stringify(value)
         if not text:

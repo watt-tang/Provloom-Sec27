@@ -25,7 +25,7 @@ def build_taint_events(
     source_registry: SourceRegistry | None = None,
     skill_definition: SkillDefinition | None = None,
 ) -> list[dict[str, Any]]:
-    registry = source_registry or SourceRegistry()
+    registry = source_registry or SourceRegistry.from_artifacts(execution.artifacts_dir)
     definition = skill_definition if skill_definition is not None else _load_skill_definition(execution)
     analyzer = TaintPropagationAnalyzer(
         execution=execution,
@@ -91,6 +91,7 @@ class TaintPropagationAnalyzer:
         config = self._tool_config(event)
         declared_config = self._action_config_by_id.get(event.tool_id, config)
         input_taint = self._input_taint_from_config(config).union(self._input_taint_from_config(declared_config))
+        input_taint = input_taint.union(event.input_taint_ids or [])
 
         if event.tool_type == "read_file":
             self._handle_read_file(event, config)
@@ -115,7 +116,7 @@ class TaintPropagationAnalyzer:
     def _handle_read_file(self, event: ToolCallEvent, config: dict[str, Any]) -> None:
         path = str(config.get("path", ""))
         match = self.registry.match_path(path)
-        file_taint = self.state.taint_for_file(path)
+        file_taint = self.state.taint_for_file(path).union(event.output_taint_ids or [])
         if match is not None:
             if not _is_confidential_sensitivity(match.sensitivity):
                 self.state.set_action_output(event.tool_id, file_taint)
@@ -185,6 +186,7 @@ class TaintPropagationAnalyzer:
         sink = classify_http_sink(sink_config, sink_taint)
         if not sink.get("is_sink"):
             return
+        mock = self._matching_mock_record(str(sink_config.get("url", "")))
         self._emit_sink(
             event=event,
             taint=sink_taint,
@@ -203,6 +205,7 @@ class TaintPropagationAnalyzer:
                 "headers": sink_config.get("headers", {}),
                 "query": str(urlparse(str(sink_config.get("url", ""))).query),
                 "body": sink_config.get("body", ""),
+                **({"fixture_mock_sink": True, "is_controlled_sink": True, "mock_record_count": mock.get("count", 0)} if mock else {}),
             },
         )
 
@@ -468,6 +471,23 @@ class TaintPropagationAnalyzer:
             "original_target_candidates": list(network.original_target_candidates),
             "selected_sink_reason": network.selected_sink_reason,
         }
+
+    def _matching_mock_record(self, destination: str) -> dict[str, Any]:
+        if not destination:
+            return {}
+        records = list(getattr(self.execution, "mock_service_records", []) or [])
+        if not records:
+            return {}
+        parsed = urlparse(destination)
+        path = parsed.path or "/"
+        port = parsed.port
+        matches = [
+            record
+            for record in records
+            if str(record.get("path") or "/") == path
+            and (port is None or int(record.get("port") or 0) == port)
+        ]
+        return {"count": len(matches), "records": matches[:3]} if matches else {}
 
     def _input_taint_from_config(self, config: dict[str, Any]) -> TaintSet:
         taint = TaintSet()

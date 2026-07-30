@@ -87,7 +87,7 @@ class StaticRuntimeAligner:
                         supporting_ids=[runtime_item["id"], match["static"]["id"]],
                     )
                 )
-            contradictions = _contradictions(static_items, runtime_items, chains)
+            contradictions = _contradictions(static_items, runtime_items, chains, coverage)
 
         return {
             "schema_version": "static-runtime-alignment-v1",
@@ -222,21 +222,43 @@ def _best_match(runtime_item: dict[str, Any], static_items: list[dict[str, Any]]
     return best
 
 
-def _contradictions(static_items: list[dict[str, Any]], runtime_items: list[dict[str, Any]], chains: list[RuntimeChain]) -> list[RuntimeContradiction]:
+def _contradictions(
+    static_items: list[dict[str, Any]],
+    runtime_items: list[dict[str, Any]],
+    chains: list[RuntimeChain],
+    coverage: CoverageReport,
+) -> list[RuntimeContradiction]:
     contradictions: list[RuntimeContradiction] = []
+    if coverage.coverage_state in {
+        "timeout",
+        "execution_failed",
+        "path_not_triggered",
+        "source_unavailable",
+        "sink_unavailable",
+        "environment_missing",
+        "unsupported_operation",
+        "insufficient_coverage",
+    }:
+        return contradictions
+    confirmed_chains = [chain for chain in chains if chain.chain_type.endswith("_confirmed")]
+    if not confirmed_chains and coverage.coverage_state != "runtime_confirmed":
+        return contradictions
     static_keys = {item["key"] for item in static_items}
     has_static_network = any(item["kind"] in {"endpoint", "action"} and ("http" in item["key"] or "." in item["key"]) for item in static_items)
-    if not has_static_network and any(chain.chain_type == "confidentiality_confirmed" for chain in chains):
+    if not has_static_network and any(chain.chain_type == "confidentiality_confirmed" for chain in confirmed_chains):
         contradictions.append(
             RuntimeContradiction(
                 contradiction_type="static_no_network_action_runtime_network_flow",
                 reason="static inputs did not declare a network endpoint/action but runtime closed a network data-flow chain",
-                supporting_ids=[chain.chain_id for chain in chains if chain.chain_type == "confidentiality_confirmed"],
+                supporting_ids=[chain.chain_id for chain in confirmed_chains if chain.chain_type == "confidentiality_confirmed"],
             )
         )
     runtime_endpoints = [item for item in runtime_items if item["kind"] == "endpoint"]
     static_url_endpoints = [item for item in static_items if item["kind"] == "endpoint" and "/" in item["key"].rstrip("/")]
+    confirmed_sink_ids = {chain.sink for chain in confirmed_chains if chain.sink}
     for endpoint in runtime_endpoints:
+        if endpoint["id"] not in confirmed_sink_ids:
+            continue
         if static_url_endpoints and not any(_endpoint_url_match(endpoint["key"], item["key"]) for item in static_url_endpoints):
             contradictions.append(
                 RuntimeContradiction(

@@ -205,6 +205,46 @@ def _convert_normalized_event(factory: RuntimeEventFactory, normalized: Normaliz
     if normalized.event_type == "llm_step":
         event_kind = str(meta.get("event") or "")
         taint_ids = list(meta.get("taint_ids", []))
+        if event_kind == "error":
+            return factory.create(
+                timestamp=timestamp,
+                event_type="llm_error",
+                process_id=pid,
+                actor_type="agent",
+                actor_id=actor_id,
+                object_type="network",
+                object_id=f"NET:{meta.get('base_url') or meta.get('endpoint_host') or 'unknown'}",
+                operation="request_failed",
+                evidence_level=str(meta.get("evidence_level") or "confirmed"),
+                evidence_strength=str(meta.get("evidence_strength") or "structured_relation"),
+                observation_source="runtime_wrapper",
+                carrier_type="llm_context",
+                carrier_location="messages",
+                instrumentation_visibility="observed",
+                raw_source=normalized.source,
+                raw_reference=raw_reference,
+                metadata={**meta},
+            )
+        if event_kind == "max_steps_exhausted":
+            return factory.create(
+                timestamp=timestamp,
+                event_type="max_steps_exhausted",
+                process_id=pid,
+                actor_type="agent",
+                actor_id=actor_id,
+                object_type="agent",
+                object_id="AGENT:llm",
+                operation="max_steps_exhausted",
+                evidence_level=str(meta.get("evidence_level") or "confirmed"),
+                evidence_strength=str(meta.get("evidence_strength") or "structured_relation"),
+                observation_source="runtime_wrapper",
+                carrier_type="llm_context",
+                carrier_location="messages",
+                instrumentation_visibility="observed",
+                raw_source=normalized.source,
+                raw_reference=raw_reference,
+                metadata={**meta},
+            )
         if event_kind != "request" or not taint_ids:
             return None
         base_url = str(meta.get("base_url") or "")
