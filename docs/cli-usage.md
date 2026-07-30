@@ -29,6 +29,11 @@ Outputs in `artifacts/runs/<run-id>/`:
 - `unified-explanation.md`
 - `canonical-analysis-result.json`
 
+Unified reports show the three primary Dynamic v3 axes separately:
+- Security/risk-chain evidence: `risk_chain_status`
+- Runtime execution completeness: `execution_completion`
+- Per-static-path security coverage: `static_path_results` and `primary_static_path_status`
+
 `export` prefers unified artifacts when present:
 
 ```bash
@@ -41,3 +46,4 @@ Notes:
 - Dynamic CLI defaults to a 600 second total sandbox timeout. Override it with `--timeout-seconds`; fixture/runtime and environment defaults are used only when no explicit value is provided.
 - Override with `--image-name` or `PROVLOOM_SANDBOX_IMAGE` when running development images.
 - Candidate flows, instrumentation gaps, timeouts, and execution failures require review; they are not mapped to benign.
+- Confirmed violations remain malicious even if execution later times out or exhausts agent steps; those conditions are reported under execution completion.

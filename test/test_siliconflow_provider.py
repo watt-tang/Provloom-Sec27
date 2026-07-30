@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 import unittest
 from unittest.mock import patch
 import urllib.error
@@ -17,13 +18,19 @@ from app.runtime.llm_client import OpenAICompatibleClient
 
 class SiliconFlowProviderTests(unittest.TestCase):
     def test_llm_config_defaults_to_siliconflow(self) -> None:
-        config = LLMConfig.from_dict({"enabled": True})
+        with patch.dict(os.environ, {"PROVLOOM_SCAN_API_KEY": "unit-api-key"}, clear=False):
+            config = LLMConfig.from_dict({"enabled": True})
 
         self.assertTrue(config.enabled)
         self.assertEqual(config.provider, "siliconflow")
         self.assertEqual(config.base_url, DEFAULT_LLM_BASE_URL)
         self.assertEqual(config.model, DEFAULT_LLM_MODEL)
-        self.assertEqual(config.api_key, DEFAULT_LLM_API_KEY)
+        self.assertEqual(config.api_key, "unit-api-key")
+
+    def test_llm_config_requires_api_key_when_enabled_without_env(self) -> None:
+        with patch.dict(os.environ, {"PROVLOOM_SCAN_API_KEY": "", "PROVLOOM_LLM_API_KEY": ""}, clear=False):
+            with self.assertRaisesRegex(ValueError, "api_key"):
+                LLMConfig.from_dict({"enabled": True})
 
     def test_endpoint_semantics_recognizes_siliconflow_hosts(self) -> None:
         provider = llm_provider_name(
@@ -37,7 +44,7 @@ class SiliconFlowProviderTests(unittest.TestCase):
         client = OpenAICompatibleClient(
             provider="siliconflow",
             base_url=DEFAULT_LLM_BASE_URL,
-            api_key=DEFAULT_LLM_API_KEY,
+            api_key="unit-api-key",
             model=DEFAULT_LLM_MODEL,
         )
         error = urllib.error.HTTPError(

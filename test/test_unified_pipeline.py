@@ -14,6 +14,7 @@ from app.dynamic.config import DynamicAnalysisConfig
 from app.dynamic.event_schema import RuntimeEventFactory
 from app.dynamic.marker_registry import TaintRegistry
 from app.explanation.builder import CONTRADICTION_TYPES, build_unified_explanation
+from app.reporting.unified_report import generate_unified_markdown
 from app.runner.timeout_config import DEFAULT_TOTAL_TIMEOUT_SECONDS, resolve_total_timeout
 from app.taint.source_registry import SourceRegistry
 
@@ -252,7 +253,8 @@ class UnifiedPipelineTests(unittest.TestCase):
         unguarded = build_unified_explanation(skill_id="probe", static_result=no_guard_static, dynamic_result=runtime).to_dict()
 
         self.assertEqual(guarded["coverage_certificate"]["coverage_state"], "path_incomplete")
-        self.assertEqual(guarded["coverage_certificate"]["path_completion_status"], "unresolved")
+        self.assertEqual(guarded["risk_chain_status"]["status"], "confirmed_allowed")
+        self.assertIn(guarded["primary_static_path_status"], {"partial", "unresolved"})
         self.assertEqual(guarded["canonical_assessment"]["canonical_final_decision"], "needs_review")
         self.assertTrue([item for item in guarded["coverage_certificate"]["obligations"] if item["expected_runtime_operation"] == "untrusted_sink_absence_resolved"])
         self.assertEqual(unguarded["canonical_assessment"]["canonical_final_decision"], "benign")
@@ -308,6 +310,152 @@ class UnifiedPipelineTests(unittest.TestCase):
         self.assertEqual(resolve_total_timeout(fixture={"runtime": {"timeout_seconds": 123}}).total_timeout_seconds, 123)
         self.assertEqual(resolve_total_timeout(env={"PROVLOOM_TIMEOUT_SECONDS": "222"}).total_timeout_seconds, 222)
         self.assertEqual(resolve_total_timeout(77, fixture={"timeout_seconds": 123}, env={"PROVLOOM_TIMEOUT_SECONDS": "222"}).total_timeout_seconds, 77)
+
+    def test_pipeline_preserves_existing_timeout_resolution_source(self) -> None:
+        root = _bundle("Read notes.txt locally.\n")
+        result = analyze_skill_bundle(
+            str(root),
+            execution_config=ExecutionConfig(
+                analysis_mode="static_only",
+                run_id="TIMEOUT-SOURCE-UNIT",
+                timeout_seconds=600,
+                timeout_resolution={
+                    "total_timeout_seconds": 600,
+                    "llm_request_timeout_seconds": 120,
+                    "llm_max_retries": 2,
+                    "source": "default",
+                },
+            ),
+            static_only=True,
+        )
+
+        self.assertEqual(result.report["timeout_resolution"]["source"], "default")
+        self.assertEqual(result.report["timeout_seconds"], 600)
+
+    def test_three_axis_confirmed_violation_is_malicious_despite_timeout_and_auxiliary_gap(self) -> None:
+        static_payload = {
+            "schema_version": "provloom-static-v2",
+            "extracted_actions": [
+                {"action_id": "A1", "action_type": "READ", "modality": "required", "object_mentions": ["private/token.txt"], "evidence": {"exact_text": "Read protected token."}},
+                {"action_id": "A2", "action_type": "SEND", "modality": "required", "destination_mentions": ["https://evil.test/post"]},
+                {"action_id": "A3", "action_type": "WRITE", "modality": "required", "destination_mentions": ["activity.md"], "evidence": {"exact_text": "Write activity log."}},
+            ],
+            "static_chains": [{"chain_id": "SP1", "ordered_nodes": ["A1", "A2", "A3"], "review_priority": "high", "alert_status": "review"}],
+        }
+        runtime = {
+            "schema_version": "runtime-analysis-v3",
+            "runtime_events": [
+                {"event_id": "EV1", "timestamp": 1, "event_type": "file_read", "object_type": "file", "object_path": "/workspace/skill/private/token.txt", "operation": "read", "taint_ids": ["T1"]},
+                {"event_id": "EV2", "timestamp": 2, "event_type": "network_send", "object_type": "network", "object_id": "NET:https://evil.test/post", "operation": "send", "taint_ids": ["T1"], "instrumentation_visibility": "payload_preview_observed", "metadata": {"destination": "https://evil.test/post", "network_evidence_level": "tainted_payload_observed"}},
+            ],
+            "runtime_chains": [{"chain_id": "RC1", "chain_type": "confidentiality_confirmed", "evidence_level": "confirmed", "sink": "network:NET:https://evil.test/post", "metadata": {"carrier_types": ["http_body"]}}],
+            "coverage": {"coverage_state": "timeout"},
+            "policy_violations": [{"violation_id": "PV1", "chain_id": "RC1", "policy_type": "confidentiality", "reason": "confirmed exfiltration"}],
+        }
+
+        unified = build_unified_explanation(skill_id="sample-a", static_result=static_payload, dynamic_result=runtime).to_dict()
+
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "malicious")
+        self.assertEqual(unified["risk_chain_status"]["status"], "confirmed_violation")
+        self.assertEqual(unified["execution_completion"]["status"], "timeout")
+        self.assertEqual(unified["primary_static_path_status"], "complete")
+        self.assertEqual(unified["coverage_certificate"]["path_completion_status"], "complete")
+        self.assertTrue(all(item["static_path_id"] for item in unified["coverage_certificate"]["obligations"]))
+        self.assertGreaterEqual(unified["obligation_relevance_summary"]["auxiliary_unresolved"], 1)
+
+    def test_confirmed_violation_max_steps_keeps_primary_path_complete(self) -> None:
+        static_payload = {
+            "schema_version": "provloom-static-v2",
+            "extracted_actions": [{"action_id": "A1", "action_type": "SEND", "modality": "required", "destination_mentions": ["https://evil.test/post"]}],
+            "static_chains": [{"chain_id": "SP1", "ordered_nodes": ["A1"], "review_priority": "high", "alert_status": "review"}],
+        }
+        runtime = {
+            "schema_version": "runtime-analysis-v3",
+            "runtime_events": [{"event_id": "EV1", "event_type": "max_steps_exhausted", "object_type": "agent", "operation": "max_steps_exhausted", "metadata": {"max_steps_exhausted": True}}],
+            "runtime_chains": [{"chain_id": "RC1", "chain_type": "confidentiality_confirmed", "evidence_level": "confirmed", "sink": "network:NET:https://evil.test/post", "metadata": {"carrier_types": ["http_body"]}}],
+            "coverage": {"coverage_state": "max_steps_exhausted"},
+            "policy_violations": [{"violation_id": "PV1", "chain_id": "RC1", "policy_type": "confidentiality"}],
+        }
+
+        unified = build_unified_explanation(skill_id="sample-b", static_result=static_payload, dynamic_result=runtime).to_dict()
+
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "malicious")
+        self.assertEqual(unified["risk_chain_status"]["status"], "confirmed_violation")
+        self.assertEqual(unified["execution_completion"]["status"], "max_steps_exhausted")
+        self.assertEqual(unified["primary_static_path_status"], "complete")
+
+    def test_confirmed_allowed_with_only_auxiliary_gap_can_be_benign_when_execution_complete(self) -> None:
+        static_payload = {
+            "schema_version": "provloom-static-v2",
+            "extracted_actions": [{"action_id": "A1", "action_type": "WRITE", "modality": "required", "destination_mentions": ["activity.md"], "evidence": {"exact_text": "Write activity log."}}],
+            "static_chains": [{"chain_id": "SP1", "ordered_nodes": ["A1"], "review_priority": "low", "alert_status": "capability_only"}],
+        }
+        runtime = {
+            "schema_version": "runtime-analysis-v3",
+            "runtime_events": [{"event_id": "EV1", "event_type": "llm_request", "object_type": "network", "object_id": "NET:https://api.siliconflow.cn/v1", "operation": "send", "taint_ids": ["T1"], "carrier_type": "llm_context", "instrumentation_visibility": "payload_preview_observed", "metadata": {"provider": "siliconflow", "destination": "https://api.siliconflow.cn/v1"}}],
+            "runtime_chains": [{"chain_id": "RC1", "chain_type": "confidentiality_confirmed", "evidence_level": "confirmed", "sink": "network:NET:https://api.siliconflow.cn/v1", "metadata": {"carrier_types": ["llm_context"]}}],
+            "coverage": {"coverage_state": "runtime_confirmed"},
+            "policy_violations": [],
+        }
+
+        unified = build_unified_explanation(skill_id="sample-c", static_result=static_payload, dynamic_result=runtime).to_dict()
+
+        self.assertEqual(unified["risk_chain_status"]["status"], "confirmed_allowed")
+        self.assertEqual(unified["execution_completion"]["status"], "complete")
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "benign")
+        self.assertEqual(unified["primary_static_path_status"], "complete")
+
+    def test_candidate_and_no_flow_three_axis_decisions(self) -> None:
+        candidate_runtime = {
+            "schema_version": "runtime-analysis-v3",
+            "runtime_events": [{"event_id": "EV1", "event_type": "candidate_dependency", "object_type": "network", "operation": "connect"}],
+            "runtime_chains": [{"chain_id": "RC1", "chain_type": "confidentiality_candidate", "evidence_level": "candidate"}],
+            "coverage": {"coverage_state": "insufficient_coverage"},
+            "policy_violations": [],
+        }
+        no_flow_runtime = {
+            "schema_version": "runtime-analysis-v3",
+            "runtime_events": [{"event_id": "EV1", "event_type": "file_read", "object_type": "file", "object_path": "/workspace/skill/public.txt", "operation": "read"}],
+            "runtime_chains": [],
+            "coverage": {"coverage_state": "target_reached_no_flow"},
+            "policy_violations": [],
+        }
+        timeout_runtime = dict(no_flow_runtime)
+        timeout_runtime["coverage"] = {"coverage_state": "timeout"}
+
+        static_payload = {"schema_version": "provloom-static-v2", "extracted_actions": [], "static_chains": []}
+        candidate = build_unified_explanation(skill_id="same-name", static_result=static_payload, dynamic_result=candidate_runtime).to_dict()
+        no_flow = build_unified_explanation(skill_id="same-name", static_result=static_payload, dynamic_result=no_flow_runtime).to_dict()
+        timeout = build_unified_explanation(skill_id="different-name", static_result=static_payload, dynamic_result=timeout_runtime).to_dict()
+
+        self.assertEqual(candidate["canonical_assessment"]["canonical_final_decision"], "needs_review")
+        self.assertEqual(candidate["risk_chain_status"]["status"], "candidate_flow")
+        self.assertEqual(no_flow["canonical_assessment"]["canonical_final_decision"], "benign")
+        self.assertEqual(no_flow["risk_chain_status"]["status"], "no_sensitive_flow_observed")
+        self.assertEqual(timeout["canonical_assessment"]["canonical_final_decision"], "needs_review")
+        self.assertEqual(timeout["execution_completion"]["status"], "timeout")
+
+    def test_optional_conditional_and_markdown_three_axis_fields(self) -> None:
+        static_payload = {
+            "schema_version": "provloom-static-v2",
+            "extracted_actions": [
+                {"action_id": "A1", "action_type": "SEND", "modality": "optional", "destination_mentions": ["https://optional.test"]},
+                {"action_id": "A2", "action_type": "SEND", "modality": "conditional", "destination_mentions": ["https://conditional.test"]},
+            ],
+            "static_chains": [],
+        }
+        runtime = {"schema_version": "runtime-analysis-v3", "runtime_events": [], "runtime_chains": [], "coverage": {"coverage_state": "path_not_triggered"}, "policy_violations": []}
+
+        unified = build_unified_explanation(skill_id="probe", static_result=static_payload, dynamic_result=runtime).to_dict()
+        decisive = [item for item in unified["coverage_certificate"]["obligations"] if item["relevance"] == "decisive"]
+        markdown = generate_unified_markdown(unified)
+
+        self.assertFalse(decisive)
+        self.assertIn("Risk-Chain Evidence", markdown)
+        self.assertIn("Execution Completion", markdown)
+        self.assertIn("Primary Risk Path", markdown)
+        self.assertIn("path_completion_status", json.dumps(unified["coverage_certificate"]))
+        self.assertEqual(unified["canonical_assessment"]["risk_chain_status"], unified["risk_chain_status"]["status"])
 
 
 if __name__ == "__main__":

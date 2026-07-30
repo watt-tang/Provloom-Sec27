@@ -61,9 +61,12 @@ def analyze_skill_bundle(
     static_only: bool = False,
 ) -> UnifiedAnalysisResult:
     config = execution_config or ExecutionConfig()
-    timeout_resolution = resolve_total_timeout(config.timeout_seconds, fixture=config.fixture)
-    config.timeout_seconds = timeout_resolution.total_timeout_seconds
-    config.timeout_resolution = timeout_resolution.to_dict()
+    if config.timeout_resolution:
+        config.timeout_seconds = int(config.timeout_resolution.get("total_timeout_seconds") or config.timeout_seconds or 0) or None
+    else:
+        timeout_resolution = resolve_total_timeout(config.timeout_seconds, fixture=config.fixture)
+        config.timeout_seconds = timeout_resolution.total_timeout_seconds
+        config.timeout_resolution = timeout_resolution.to_dict()
     execution_id = config.run_id or uuid.uuid4().hex
     source_dir, skill_file = resolve_skill_target(str(skill_path))
     static_result = analyze_static_bundle(source_dir, skill_file, config=static_config)
@@ -398,6 +401,13 @@ def _unified_fields(unified: dict[str, Any], report_paths: dict[str, Path]) -> d
         "relevant_unresolved": unified.get("relevant_unresolved", []),
         "internal_unresolved": unified.get("internal_unresolved", []),
         "coverage_certificate": unified.get("coverage_certificate", {}),
+        "risk_chain_status": unified.get("risk_chain_status", {}),
+        "execution_completion": unified.get("execution_completion", {}),
+        "static_path_results": unified.get("static_path_results", []),
+        "primary_static_path_id": unified.get("primary_static_path_id", ""),
+        "primary_static_path_status": unified.get("primary_static_path_status", "not_applicable"),
+        "other_static_path_summary": unified.get("other_static_path_summary", {}),
+        "obligation_relevance_summary": unified.get("obligation_relevance_summary", {}),
         "policy_findings": unified.get("policy_findings", []),
         "minimal_witnesses": unified.get("minimal_witnesses", []),
         "limitations": unified.get("limitations", []),

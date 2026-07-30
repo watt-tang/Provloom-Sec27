@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -8,7 +9,7 @@ from app.runner.timeout_config import DEFAULT_TOTAL_TIMEOUT_SECONDS
 
 DEFAULT_LLM_PROVIDER = "siliconflow"
 DEFAULT_LLM_BASE_URL = "https://api.siliconflow.cn/v1"
-DEFAULT_LLM_API_KEY = "sk-iwrboivuqupzahrjrpmurlzwwafdretlqmdmttxcxxqdpvqt"
+DEFAULT_LLM_API_KEY = ""
 DEFAULT_LLM_MODEL = "deepseek-ai/DeepSeek-V3"
 LEGACY_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 LEGACY_DEEPSEEK_MODEL = "deepseek-chat"
@@ -46,7 +47,7 @@ def default_llm_model(provider: Any = DEFAULT_LLM_PROVIDER) -> str:
 def default_llm_api_key(provider: Any = DEFAULT_LLM_PROVIDER) -> str:
     normalized = normalize_llm_provider(provider)
     if normalized == "siliconflow":
-        return DEFAULT_LLM_API_KEY
+        return os.environ.get("PROVLOOM_SCAN_API_KEY") or os.environ.get("PROVLOOM_LLM_API_KEY") or DEFAULT_LLM_API_KEY
     return ""
 
 

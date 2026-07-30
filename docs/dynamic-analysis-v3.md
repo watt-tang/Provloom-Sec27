@@ -83,7 +83,7 @@ Each chain includes `minimal_witness` in metadata with edge type, event ids, raw
 
 ## Coverage Certificate
 
-Coverage states now distinguish:
+Coverage states now distinguish legacy runtime coverage outcomes:
 
 - `runtime_confirmed`
 - `target_reached_no_flow`
@@ -98,6 +98,18 @@ Coverage states now distinguish:
 - `insufficient_coverage`
 
 Old names are preserved in `metadata.legacy_coverage_state` where applicable.
+
+Dynamic v3 reports now use a three-axis explanation model instead of treating a single `path_completion_status` as the primary semantic result:
+
+- `risk_chain_status`: what runtime security evidence established (`confirmed_violation`, `confirmed_allowed`, `candidate_flow`, `no_sensitive_flow_observed`, or `none`).
+- `execution_completion`: whether the Agent/Skill execution completed (`complete`, `timeout`, `llm_request_timeout`, `max_steps_exhausted`, `environment_missing`, `execution_failed`, or related terminal states).
+- `static_path_results`: independent per-static-risk-path coverage, with `primary_static_path_id` and `primary_static_path_status` identifying the decisive path for the current verdict.
+
+`coverage_certificate.path_completion_status` is retained only as a deprecated compatibility field. It must not be used to decide whether a confirmed malicious chain is closed.
+
+Path-local `RuntimeObligation` records now include `static_path_id`, `path_role`, `relevance` (`decisive`, `supporting`, `auxiliary`), and booleans for risk-closure vs execution-completion relevance. Decisive obligations can block a path from being complete; supporting and auxiliary gaps improve explanation detail but do not downgrade a confirmed violation or block benign when security-relevant coverage is complete.
+
+Confirmed policy violations set `risk_chain_status.status=confirmed_violation` and `final_decision=malicious` even if `execution_completion.status` is `timeout`, `llm_request_timeout`, or `max_steps_exhausted`. Execution incompleteness is reported separately and does not invalidate already observed source-to-carrier-to-sink evidence.
 
 ## Policy Classification
 
@@ -119,6 +131,12 @@ Dynamic v3 is the canonical source for dynamic conclusions. `app.dynamic.assessm
 - `no_violation_observed`: no policy violation, no candidate chain, no instrumentation gap, and coverage is a completed no-flow or permitted-flow state. Top-level `final_decision` is `benign`.
 - `review_required`: candidate chains, instrumentation gaps, insufficient coverage, payload-not-observed states, instruction simulation-only paths, or hash-derived-only flows. Top-level `final_decision` is `needs_review` and is never `benign`.
 - `execution_incomplete`: timeout, crash, path-not-triggered, missing environment/source/sink, or unsupported operation without an already confirmed violation. Top-level `final_decision` is `needs_review`.
+
+The unified explanation layer recalibrates this with the three-axis model:
+
+- `confirmed_violation` risk-chain evidence always maps to `malicious`.
+- Candidate chains, unresolved decisive obligations, trusted confirmed flows with unresolved external-risk guards, and decisive instrumentation gaps map to `needs_review`.
+- Benign does not require all business actions, report writes, logs, or cleanup actions to complete. It requires no confirmed/candidate violation, complete execution, sufficient security-relevant path coverage, and no unresolved decisive obligation.
 
 Legacy scoring still runs for compatibility. Its outputs are preserved as `legacy_risk_score` and `legacy_final_decision`, while unprefixed `risk_score` and `final_decision` are overwritten from canonical Dynamic v3. Reports and API responses also expose `canonical_assessment`, `canonical_risk_score`, `canonical_final_decision`, `needs_review`, `policy_violation_count`, `confirmed_chain_count`, `candidate_chain_count`, `coverage_state`, `instrumentation_gaps`, and `consistency_status`.
 

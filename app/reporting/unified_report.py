@@ -31,6 +31,9 @@ def generate_unified_markdown(result: UnifiedExplanationResult | dict[str, Any])
         f"- Decision: {assessment.get('canonical_final_decision', assessment.get('final_decision', 'unknown'))}",
         f"- Risk score: {assessment.get('canonical_risk_score', assessment.get('risk_score', 0))}",
         f"- Coverage: {assessment.get('coverage_state', payload.get('coverage_certificate', {}).get('coverage_state', 'unknown'))}",
+        f"- Risk chain: {(payload.get('risk_chain_status') or {}).get('status', 'unknown')}",
+        f"- Execution completion: {(payload.get('execution_completion') or {}).get('status', 'unknown')}",
+        f"- Primary static path: {payload.get('primary_static_path_id', '')} / {payload.get('primary_static_path_status', 'unknown')}",
         "",
         "## Executive Explanation",
         _executive(payload),
@@ -46,6 +49,20 @@ def generate_unified_markdown(result: UnifiedExplanationResult | dict[str, Any])
         "",
         "## Runtime Evidence",
         *_runtime_lines(payload),
+        "",
+        "## Risk-Chain Evidence",
+        *_dict_lines(payload.get("risk_chain_status", {})),
+        "",
+        "## Primary Risk Path",
+        f"- Static path: {payload.get('primary_static_path_id', '') or 'None'}",
+        f"- Status: {payload.get('primary_static_path_status', 'not_applicable')}",
+        *_dict_lines((payload.get("coverage_certificate", {}) or {}).get("primary_risk_path_selection", {})),
+        "",
+        "## Execution Completion",
+        *_dict_lines(payload.get("execution_completion", {})),
+        "",
+        "## Other Static Paths",
+        *_dict_lines(payload.get("other_static_path_summary", {})),
         "",
         "## Aligned Risk Paths",
         *_short_records(payload.get("aligned_paths", []), "alignment_id"),
@@ -101,6 +118,9 @@ def _executive(payload: dict[str, Any]) -> str:
         "contradictions": len(payload.get("contradictions", []) or []),
         "policy_findings": len(payload.get("policy_findings", []) or []),
         "minimal_witnesses": len(payload.get("minimal_witnesses", []) or []),
+        "risk_chain_status": (payload.get("risk_chain_status") or {}).get("status", "unknown"),
+        "execution_completion": (payload.get("execution_completion") or {}).get("status", "unknown"),
+        "primary_static_path_status": payload.get("primary_static_path_status", "unknown"),
     }
     return "- " + "; ".join(f"{key}: {value}" for key, value in counts.items())
 
@@ -137,7 +157,11 @@ def _coverage_lines(payload: dict[str, Any]) -> list[str]:
     summary = coverage.get("summary", {}) or {}
     lines = [f"- State: {coverage.get('coverage_state', 'unknown')}"]
     if coverage.get("path_completion_status"):
-        lines.append(f"- Path completion: {coverage.get('path_completion_status')}")
+        lines.append(f"- Legacy path completion: {coverage.get('path_completion_status')} (deprecated compatibility field)")
+    if coverage.get("primary_static_path_status"):
+        lines.append(f"- Primary static path completion: {coverage.get('primary_static_path_status')}")
+    for key, value in (coverage.get("obligation_relevance_summary", {}) or {}).items():
+        lines.append(f"- obligation_relevance.{key}: {value}")
     if coverage.get("termination_reason"):
         lines.append(f"- Termination: {coverage.get('termination_reason')}")
     if coverage.get("chain_evidence_status"):
