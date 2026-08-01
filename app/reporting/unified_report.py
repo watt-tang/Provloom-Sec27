@@ -32,6 +32,7 @@ def generate_unified_markdown(result: UnifiedExplanationResult | dict[str, Any])
         f"- Risk score: {assessment.get('canonical_risk_score', assessment.get('risk_score', 0))}",
         f"- Coverage: {assessment.get('coverage_state', payload.get('coverage_certificate', {}).get('coverage_state', 'unknown'))}",
         f"- Risk chain: {(payload.get('risk_chain_status') or {}).get('status', 'unknown')}",
+        f"- Security resolution: {(payload.get('security_resolution') or {}).get('status', 'unknown')}",
         f"- Execution completion: {(payload.get('execution_completion') or {}).get('status', 'unknown')}",
         f"- Primary static path: {payload.get('primary_static_path_id', '')} / {payload.get('primary_static_path_status', 'unknown')}",
         "",
@@ -52,6 +53,9 @@ def generate_unified_markdown(result: UnifiedExplanationResult | dict[str, Any])
         "",
         "## Risk-Chain Evidence",
         *_dict_lines(payload.get("risk_chain_status", {})),
+        "",
+        "## Security Resolution",
+        *_dict_lines(payload.get("security_resolution", {})),
         "",
         "## Primary Risk Path",
         f"- Static path: {payload.get('primary_static_path_id', '') or 'None'}",
@@ -120,6 +124,7 @@ def _executive(payload: dict[str, Any]) -> str:
         "minimal_witnesses": len(payload.get("minimal_witnesses", []) or []),
         "risk_chain_status": (payload.get("risk_chain_status") or {}).get("status", "unknown"),
         "execution_completion": (payload.get("execution_completion") or {}).get("status", "unknown"),
+        "security_resolution": (payload.get("security_resolution") or {}).get("status", "unknown"),
         "primary_static_path_status": payload.get("primary_static_path_status", "unknown"),
     }
     return "- " + "; ".join(f"{key}: {value}" for key, value in counts.items())
@@ -160,6 +165,13 @@ def _coverage_lines(payload: dict[str, Any]) -> list[str]:
         lines.append(f"- Legacy path completion: {coverage.get('path_completion_status')} (deprecated compatibility field)")
     if coverage.get("primary_static_path_status"):
         lines.append(f"- Primary static path completion: {coverage.get('primary_static_path_status')}")
+    if coverage.get("security_resolution_status"):
+        lines.append(f"- Security resolution: {coverage.get('security_resolution_status')}")
+        lines.append(f"- Security decisive obligations resolved: {coverage.get('security_decisive_obligations_resolved')}")
+        lines.append(f"- Termination after security resolution: {coverage.get('termination_after_security_resolution')}")
+    for key in ("unresolved_decisive_obligations", "blocking_security_paths", "non_blocking_supporting_gaps", "non_blocking_auxiliary_gaps"):
+        if coverage.get(key):
+            lines.append(f"- {key}: {coverage.get(key)}")
     for key, value in (coverage.get("obligation_relevance_summary", {}) or {}).items():
         lines.append(f"- obligation_relevance.{key}: {value}")
     if coverage.get("termination_reason"):

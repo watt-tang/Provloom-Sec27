@@ -408,6 +408,8 @@ def _unified_fields(unified: dict[str, Any], report_paths: dict[str, Path]) -> d
         "primary_static_path_status": unified.get("primary_static_path_status", "not_applicable"),
         "other_static_path_summary": unified.get("other_static_path_summary", {}),
         "obligation_relevance_summary": unified.get("obligation_relevance_summary", {}),
+        "security_resolution": unified.get("security_resolution", {}),
+        "security_resolution_status": unified.get("security_resolution_status", "none"),
         "policy_findings": unified.get("policy_findings", []),
         "minimal_witnesses": unified.get("minimal_witnesses", []),
         "limitations": unified.get("limitations", []),

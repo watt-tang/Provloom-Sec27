@@ -432,8 +432,170 @@ class UnifiedPipelineTests(unittest.TestCase):
         self.assertEqual(candidate["risk_chain_status"]["status"], "candidate_flow")
         self.assertEqual(no_flow["canonical_assessment"]["canonical_final_decision"], "benign")
         self.assertEqual(no_flow["risk_chain_status"]["status"], "no_sensitive_flow_observed")
-        self.assertEqual(timeout["canonical_assessment"]["canonical_final_decision"], "needs_review")
+        self.assertEqual(timeout["canonical_assessment"]["canonical_final_decision"], "benign")
+        self.assertEqual(timeout["security_resolution_status"], "resolved_no_flow")
+        self.assertTrue(timeout["security_resolution"]["termination_after_resolution"])
         self.assertEqual(timeout["execution_completion"]["status"], "timeout")
+
+    def test_security_resolution_confirmed_allowed_timeout_before_decisive_sink_is_review(self) -> None:
+        static_payload = {
+            "schema_version": "provloom-static-v2",
+            "extracted_actions": [{"action_id": "A1", "action_type": "SEND", "modality": "required", "destination_mentions": ["https://mock-sink.test/collect"]}],
+            "static_chains": [],
+        }
+        runtime = {
+            "schema_version": "runtime-analysis-v3",
+            "runtime_events": [{"event_id": "EV1", "timestamp": 1, "event_type": "llm_request", "object_type": "network", "object_id": "NET:https://api.siliconflow.cn/v1", "operation": "send", "taint_ids": ["T1"], "carrier_type": "llm_context", "instrumentation_visibility": "payload_preview_observed", "metadata": {"provider": "siliconflow", "destination": "https://api.siliconflow.cn/v1"}}],
+            "runtime_chains": [{"chain_id": "RC1", "chain_type": "confidentiality_confirmed", "evidence_level": "confirmed", "sink": "network:NET:https://api.siliconflow.cn/v1", "supporting_event_ids": ["EV1"], "metadata": {"carrier_types": ["llm_context"]}}],
+            "coverage": {"coverage_state": "timeout"},
+            "policy_violations": [],
+        }
+
+        unified = build_unified_explanation(skill_id="probe", static_result=static_payload, dynamic_result=runtime).to_dict()
+
+        self.assertEqual(unified["risk_chain_status"]["status"], "confirmed_allowed")
+        self.assertEqual(unified["security_resolution_status"], "unresolved_before_sink")
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "needs_review")
+
+    def test_security_resolution_confirmed_allowed_timeout_after_resolution_is_benign(self) -> None:
+        runtime = {
+            "schema_version": "runtime-analysis-v3",
+            "runtime_events": [{"event_id": "EV1", "timestamp": 1, "event_type": "llm_request", "object_type": "network", "object_id": "NET:https://api.siliconflow.cn/v1", "operation": "send", "taint_ids": ["T1"], "carrier_type": "llm_context", "instrumentation_visibility": "payload_preview_observed", "metadata": {"provider": "siliconflow", "destination": "https://api.siliconflow.cn/v1"}}],
+            "runtime_chains": [{"chain_id": "RC1", "chain_type": "confidentiality_confirmed", "evidence_level": "confirmed", "sink": "network:NET:https://api.siliconflow.cn/v1", "supporting_event_ids": ["EV1"], "metadata": {"carrier_types": ["llm_context"]}}],
+            "coverage": {"coverage_state": "timeout"},
+            "policy_violations": [],
+        }
+        static_payload = {"schema_version": "provloom-static-v2", "extracted_actions": [], "static_chains": []}
+
+        unified = build_unified_explanation(skill_id="probe", static_result=static_payload, dynamic_result=runtime).to_dict()
+
+        self.assertEqual(unified["security_resolution_status"], "resolved_allowed")
+        self.assertTrue(unified["security_resolution"]["termination_after_resolution"])
+        self.assertEqual(unified["execution_completion"]["status"], "timeout")
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "benign")
+
+    def test_security_resolution_no_flow_timeout_before_sink_remains_review(self) -> None:
+        static_payload = {
+            "schema_version": "provloom-static-v2",
+            "extracted_actions": [{"action_id": "A1", "action_type": "SEND", "modality": "required", "destination_mentions": ["https://mock-sink.test/collect"]}],
+            "static_chains": [],
+        }
+        runtime = {
+            "schema_version": "runtime-analysis-v3",
+            "runtime_events": [{"event_id": "EV1", "timestamp": 1, "event_type": "file_read", "object_type": "file", "object_path": "/workspace/skill/request.md", "operation": "read"}],
+            "runtime_chains": [],
+            "coverage": {"coverage_state": "timeout"},
+            "policy_violations": [],
+        }
+
+        unified = build_unified_explanation(skill_id="probe", static_result=static_payload, dynamic_result=runtime).to_dict()
+
+        self.assertEqual(unified["risk_chain_status"]["status"], "no_sensitive_flow_observed")
+        self.assertEqual(unified["security_resolution_status"], "unresolved_before_sink")
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "needs_review")
+
+    def test_security_resolution_gaps_and_candidates_block_benign(self) -> None:
+        static_payload = {"schema_version": "provloom-static-v2", "extracted_actions": [], "static_chains": []}
+        candidate_runtime = {
+            "schema_version": "runtime-analysis-v3",
+            "runtime_events": [{"event_id": "EV1", "event_type": "candidate_dependency", "object_type": "network", "operation": "connect"}],
+            "runtime_chains": [{"chain_id": "RC1", "chain_type": "confidentiality_candidate", "evidence_level": "candidate"}],
+            "coverage": {"coverage_state": "complete"},
+            "policy_violations": [],
+        }
+        gap_runtime = {
+            "schema_version": "runtime-analysis-v3",
+            "runtime_events": [{"event_id": "EV1", "event_type": "network_send", "object_type": "network", "operation": "send", "instrumentation_visibility": "encrypted_payload_invisible", "metadata": {"encrypted_payload_invisible": True}}],
+            "runtime_chains": [],
+            "coverage": {"coverage_state": "instrumentation_gap"},
+            "policy_violations": [],
+        }
+
+        candidate = build_unified_explanation(skill_id="probe", static_result=static_payload, dynamic_result=candidate_runtime).to_dict()
+        gap = build_unified_explanation(skill_id="probe", static_result=static_payload, dynamic_result=gap_runtime).to_dict()
+
+        self.assertEqual(candidate["security_resolution_status"], "unresolved_candidate_flow")
+        self.assertEqual(candidate["canonical_assessment"]["canonical_final_decision"], "needs_review")
+        self.assertEqual(gap["security_resolution_status"], "unresolved_instrumentation")
+        self.assertEqual(gap["canonical_assessment"]["canonical_final_decision"], "needs_review")
+
+    def test_security_resolution_supporting_and_auxiliary_gaps_do_not_block_benign(self) -> None:
+        static_payload = {
+            "schema_version": "provloom-static-v2",
+            "extracted_actions": [{"action_id": "A1", "action_type": "WRITE", "modality": "required", "destination_mentions": ["activity.md"], "evidence": {"exact_text": "Write a local activity report."}}],
+            "static_chains": [{"chain_id": "SP1", "ordered_nodes": ["A1"], "review_priority": "low", "alert_status": "capability_only"}],
+        }
+        runtime = {
+            "schema_version": "runtime-analysis-v3",
+            "runtime_events": [{"event_id": "EV1", "timestamp": 1, "event_type": "file_read", "object_type": "file", "object_path": "/workspace/skill/request.md", "operation": "read"}],
+            "runtime_chains": [],
+            "coverage": {"coverage_state": "target_reached_no_flow"},
+            "policy_violations": [],
+        }
+
+        unified = build_unified_explanation(skill_id="probe", static_result=static_payload, dynamic_result=runtime).to_dict()
+
+        self.assertEqual(unified["security_resolution_status"], "resolved_no_flow")
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "benign")
+        self.assertTrue(unified["security_resolution"]["non_blocking_auxiliary_gaps"] or unified["security_resolution"]["non_blocking_supporting_gaps"])
+
+    def test_security_resolution_relevant_unresolved_guard_blocks_benign(self) -> None:
+        static_payload = {
+            "schema_version": "provloom-static-v2",
+            "extracted_actions": [{"action_id": "A1", "action_type": "SEND", "modality": "prohibited", "object_mentions": ["credential"]}],
+            "static_chains": [],
+        }
+        runtime = {
+            "schema_version": "runtime-analysis-v3",
+            "runtime_events": [{"event_id": "EV1", "timestamp": 1, "event_type": "llm_request", "object_type": "network", "object_id": "NET:https://api.siliconflow.cn/v1", "operation": "send", "taint_ids": ["T1"], "carrier_type": "llm_context", "instrumentation_visibility": "payload_preview_observed", "metadata": {"provider": "siliconflow", "destination": "https://api.siliconflow.cn/v1"}}],
+            "runtime_chains": [{"chain_id": "RC1", "chain_type": "confidentiality_confirmed", "evidence_level": "confirmed", "sink": "network:NET:https://api.siliconflow.cn/v1", "supporting_event_ids": ["EV1"], "metadata": {"carrier_types": ["llm_context"]}}],
+            "coverage": {"coverage_state": "runtime_confirmed"},
+            "policy_violations": [],
+        }
+
+        unified = build_unified_explanation(skill_id="probe", static_result=static_payload, dynamic_result=runtime).to_dict()
+
+        self.assertEqual(unified["security_resolution_status"], "unresolved_before_guard")
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "needs_review")
+
+    def test_security_resolution_boundary_guard_can_resolve_after_complete_execution(self) -> None:
+        static_payload = {
+            "schema_version": "provloom-static-v2",
+            "extracted_actions": [{"action_id": "A1", "action_type": "SEND", "modality": "prohibited", "evidence": {"exact_text": "Do not use live services or public webhooks; a local model summary may be used for owner notes."}}],
+            "static_chains": [],
+        }
+        runtime = {
+            "schema_version": "runtime-analysis-v3",
+            "runtime_events": [{"event_id": "EV1", "timestamp": 1, "event_type": "llm_request", "object_type": "network", "object_id": "NET:https://api.siliconflow.cn/v1", "operation": "send", "taint_ids": ["T1"], "carrier_type": "llm_context", "instrumentation_visibility": "payload_preview_observed", "metadata": {"provider": "siliconflow", "destination": "https://api.siliconflow.cn/v1"}}],
+            "runtime_chains": [{"chain_id": "RC1", "chain_type": "confidentiality_confirmed", "evidence_level": "confirmed", "sink": "network:NET:https://api.siliconflow.cn/v1", "supporting_event_ids": ["EV1"], "metadata": {"carrier_types": ["llm_context"]}}],
+            "coverage": {"coverage_state": "runtime_confirmed"},
+            "policy_violations": [],
+        }
+
+        unified = build_unified_explanation(skill_id="probe", static_result=static_payload, dynamic_result=runtime).to_dict()
+
+        self.assertEqual(unified["security_resolution_status"], "resolved_allowed")
+        self.assertEqual(unified["primary_static_path_status"], "complete")
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "benign")
+
+    def test_security_resolution_fields_are_in_markdown_and_legacy_does_not_override(self) -> None:
+        static_payload = {"schema_version": "provloom-static-v2", "extracted_actions": [], "static_chains": []}
+        runtime = {
+            "schema_version": "runtime-analysis-v3",
+            "runtime_events": [{"event_id": "EV1", "timestamp": 1, "event_type": "file_read", "object_type": "file", "object_path": "/workspace/skill/request.md", "operation": "read"}],
+            "runtime_chains": [],
+            "coverage": {"coverage_state": "timeout"},
+            "policy_violations": [],
+        }
+
+        unified = build_unified_explanation(skill_id="BV3-A", static_result=static_payload, dynamic_result=runtime).to_dict()
+        renamed = build_unified_explanation(skill_id="not-a-sample-id", static_result=static_payload, dynamic_result=runtime).to_dict()
+        markdown = generate_unified_markdown(unified)
+
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], renamed["canonical_assessment"]["canonical_final_decision"])
+        self.assertEqual(unified["security_resolution_status"], "resolved_no_flow")
+        self.assertIn("Security Resolution", markdown)
+        self.assertIn("security_resolution_status", json.dumps(unified["coverage_certificate"]))
 
     def test_optional_conditional_and_markdown_three_axis_fields(self) -> None:
         static_payload = {

@@ -33,6 +33,7 @@ Unified reports show the three primary Dynamic v3 axes separately:
 - Security/risk-chain evidence: `risk_chain_status`
 - Runtime execution completeness: `execution_completion`
 - Per-static-path security coverage: `static_path_results` and `primary_static_path_status`
+- Security verdict sufficiency: `security_resolution` and `security_resolution_status`
 
 `export` prefers unified artifacts when present:
 
@@ -45,5 +46,6 @@ Notes:
 - Dynamic CLI defaults to the official `skill-runtime-sandbox:dynamic-v3` image.
 - Dynamic CLI defaults to a 600 second total sandbox timeout. Override it with `--timeout-seconds`; fixture/runtime and environment defaults are used only when no explicit value is provided.
 - Override with `--image-name` or `PROVLOOM_SANDBOX_IMAGE` when running development images.
-- Candidate flows, instrumentation gaps, timeouts, and execution failures require review; they are not mapped to benign.
+- Candidate flows, instrumentation gaps, and unresolved security-decisive obligations require review; they are not mapped to benign.
+- Provider timeout or max steps are split by timing: before security resolution remains review, after `resolved_allowed` or `resolved_no_flow` may still be benign with execution marked incomplete.
 - Confirmed violations remain malicious even if execution later times out or exhausts agent steps; those conditions are reported under execution completion.

@@ -19,6 +19,7 @@ from app.explanation.models import (
     PolicyFinding,
     RiskChainStatus,
     RuntimeObligation,
+    SecurityResolutionStatus,
     StaticPathCompletion,
     UnifiedAlignment,
     UnifiedContradiction,
@@ -114,6 +115,8 @@ def build_unified_explanation(
         primary_static_path_status=coverage_certificate.primary_static_path_status,
         other_static_path_summary=dict(coverage_certificate.other_static_path_summary),
         obligation_relevance_summary=dict(coverage_certificate.obligation_relevance_summary),
+        security_resolution=coverage_certificate.security_resolution.to_dict(),
+        security_resolution_status=coverage_certificate.security_resolution.status,
     )
     unified.versions.update(
         {
@@ -479,6 +482,16 @@ def _build_coverage_certificate(
     path_completion = _path_completion_results(static_payload, obligations, runtime_chains, execution, dynamic_state, static_path_results)
     state = _coverage_state_from_obligations(obligations, runtime_events, runtime_chains, gaps, dynamic_state, execution, sensitive_artifacts, path_completion)
     reasons = _coverage_reasons(state, obligations, gaps, dynamic_state, execution)
+    security_resolution = _security_resolution_status(
+        obligations=obligations,
+        runtime_events=runtime_events,
+        runtime_chains=runtime_chains,
+        risk_status=risk_chain_status,
+        execution_completion=execution_completion,
+        static_path_results=static_path_results,
+        primary_path_id=str(primary_selection.get("primary_static_path_id") or ""),
+        instrumentation_gaps=sorted(set(gaps)),
+    )
     obligation_summary = {
         "total": len(obligations),
         "satisfied": satisfied,
@@ -531,6 +544,18 @@ def _build_coverage_certificate(
             "supporting_unresolved": obligation_summary["supporting_unresolved"],
             "auxiliary_unresolved": obligation_summary["auxiliary_unresolved"],
         },
+        security_resolution=security_resolution,
+        security_resolution_status=security_resolution.status,
+        security_decisive_obligations_resolved=security_resolution.security_decisive_obligations_resolved,
+        security_resolution_event_index=security_resolution.resolution_event_index,
+        security_resolution_timestamp=security_resolution.resolution_timestamp,
+        termination_event_index=security_resolution.termination_event_index,
+        termination_timestamp=security_resolution.termination_timestamp,
+        termination_after_security_resolution=security_resolution.termination_after_resolution,
+        unresolved_decisive_obligations=list(security_resolution.unresolved_decisive_obligation_ids),
+        blocking_security_paths=list(security_resolution.blocking_security_paths),
+        non_blocking_supporting_gaps=list(security_resolution.non_blocking_supporting_gaps),
+        non_blocking_auxiliary_gaps=list(security_resolution.non_blocking_auxiliary_gaps),
     )
 
 
@@ -616,7 +641,7 @@ def _runtime_obligations(static_payload: dict[str, Any], runtime_events: list[di
                 risk_relevance="high",
                 required_for_path_completion=True,
                 required_for_risk_closure=True,
-                blocking_condition="trusted_llm_chain_without_untrusted_sink_resolution",
+                blocking_condition="trusted_llm_boundary_pending" if _trusted_llm_boundary_guard(action) else "trusted_llm_chain_without_untrusted_sink_resolution",
             )
         )
     for chain in static_chains:
@@ -626,6 +651,7 @@ def _runtime_obligations(static_payload: dict[str, Any], runtime_events: list[di
         expected = _expected_chain_obligation(chain)
         matches = [event for event in runtime_events if _runtime_chain_action_match(event, expected)]
         risk = "high" if expected in {"network_send", "process_exec", "file_write"} and str(chain.get("review_priority") or "") != "low" else "medium"
+        relevance = _static_chain_obligation_relevance(chain, static_payload)
         obligations.append(
             RuntimeObligation(
                 obligation_id=f"OBL-{len(obligations) + 1:04d}",
@@ -640,10 +666,10 @@ def _runtime_obligations(static_payload: dict[str, Any], runtime_events: list[di
                 reason="static risk path target operation reached" if matches else "static risk path target operation not observed",
                 obligation_type=_obligation_type_for_expected(expected),
                 path_role=_path_role_for_expected(expected),
-                relevance="supporting" if str(chain.get("alert_status") or "") == "capability_only" else "decisive",
+                relevance=relevance,
                 risk_relevance=risk,
-                required_for_path_completion=risk in {"high", "critical"} and str(chain.get("alert_status") or "") != "capability_only",
-                required_for_risk_closure=risk in {"high", "critical"} and str(chain.get("alert_status") or "") != "capability_only",
+                required_for_path_completion=relevance == "decisive" and risk in {"high", "critical"},
+                required_for_risk_closure=relevance == "decisive" and risk in {"high", "critical"},
                 blocking_condition=None if matches else "static_path_target_missing",
             )
         )
@@ -835,6 +861,7 @@ def _canonical_assessment(
     risk_status = coverage.risk_chain_status.status
     execution_status = coverage.execution_completion.status
     primary_status = coverage.primary_static_path_status
+    security_status = coverage.security_resolution.status
     if dynamic_result is not None:
         assessment = assess_dynamic_result(dynamic_result).to_dict()
     else:
@@ -852,6 +879,10 @@ def _canonical_assessment(
     if risk_status == "confirmed_violation" or any(item.status == "violation" and item.evidence_status == "runtime_confirmed" for item in findings):
         assessment.update({"status": "violation_confirmed", "canonical_final_decision": "malicious", "canonical_risk_score": max(80, int(assessment.get("canonical_risk_score", 0) or 0)), "needs_review": False})
     elif risk_status in {"candidate_violation", "candidate_flow"}:
+        assessment.update({"status": "review_required", "canonical_final_decision": "needs_review", "canonical_risk_score": max(30, int(assessment.get("canonical_risk_score", 0) or 0)), "needs_review": True})
+    elif security_status in {"resolved_allowed", "resolved_no_flow"}:
+        assessment.update({"status": "no_violation_observed", "canonical_final_decision": "benign", "canonical_risk_score": min(assessment.get("canonical_risk_score", 0) or 0, 10), "needs_review": False})
+    elif security_status.startswith("unresolved_"):
         assessment.update({"status": "review_required", "canonical_final_decision": "needs_review", "canonical_risk_score": max(30, int(assessment.get("canonical_risk_score", 0) or 0)), "needs_review": True})
     elif _has_unresolved_decisive_obligation(coverage):
         assessment.update({"status": "review_required", "canonical_final_decision": "needs_review", "canonical_risk_score": max(30, int(assessment.get("canonical_risk_score", 0) or 0)), "needs_review": True})
@@ -890,12 +921,16 @@ def _canonical_assessment(
     assessment["execution_completion_status"] = execution_status
     assessment["primary_static_path_status"] = primary_status
     assessment["primary_static_path_id"] = coverage.primary_static_path_id
+    assessment["security_resolution_status"] = security_status
+    assessment["termination_after_security_resolution"] = coverage.security_resolution.termination_after_resolution
     assessment["assessment_version"] = ASSESSMENT_VERSION
     return assessment
 
 
 def _has_unresolved_decisive_obligation(coverage: CoverageCertificate) -> bool:
     if coverage.risk_chain_status.status == "confirmed_violation":
+        return False
+    if coverage.security_resolution.status in {"resolved_allowed", "resolved_no_flow"}:
         return False
     for result in coverage.static_path_results:
         if result.status in {"partial", "unresolved"} and result.unresolved_obligation_ids:
@@ -1179,6 +1214,259 @@ def _execution_completion_reason(status: str, termination: str) -> str:
     return "execution completion could not be fully determined"
 
 
+def _security_resolution_status(
+    *,
+    obligations: list[RuntimeObligation],
+    runtime_events: list[dict[str, Any]],
+    runtime_chains: list[dict[str, Any]],
+    risk_status: RiskChainStatus,
+    execution_completion: ExecutionCompletion,
+    static_path_results: list[StaticPathCompletion],
+    primary_path_id: str,
+    instrumentation_gaps: list[str],
+) -> SecurityResolutionStatus:
+    event_indexes = {str(event.get("event_id") or ""): index for index, event in enumerate(runtime_events) if event.get("event_id")}
+    event_timestamps = {str(event.get("event_id") or ""): _float_or_none(event.get("timestamp")) for event in runtime_events if event.get("event_id")}
+    termination_index = len(runtime_events) if execution_completion.status in {"timeout", "llm_request_timeout", "max_steps_exhausted", "provider_failure", "execution_failed", "unknown"} else (len(runtime_events) - 1 if runtime_events else None)
+    termination_timestamp = _float_or_none(runtime_events[-1].get("timestamp")) if runtime_events else None
+    support_ids = _security_supporting_event_ids(runtime_chains, obligations, risk_status)
+    resolution_index = _max_event_index(support_ids, event_indexes)
+    resolution_timestamp = _max_event_timestamp(support_ids, event_timestamps)
+    supporting_gaps = [
+        item.obligation_id
+        for item in obligations
+        if item.relevance == "supporting" and item.status in {"unsatisfied", "unresolved", "unverifiable"}
+    ]
+    auxiliary_gaps = [
+        item.obligation_id
+        for item in obligations
+        if item.relevance == "auxiliary" and item.status in {"unsatisfied", "unresolved", "unverifiable"}
+    ]
+    security_decisive = [item for item in obligations if _is_security_decisive_obligation(item)]
+    unresolved = [
+        item
+        for item in security_decisive
+        if item.status in {"unsatisfied", "unresolved", "unverifiable"}
+        and not _decisive_obligation_resolved_by_security_evidence(item, risk_status, execution_completion, runtime_chains)
+    ]
+    blocking_paths = _blocking_security_paths(static_path_results, primary_path_id, unresolved)
+    termination_after = bool(
+        resolution_index is not None
+        and termination_index is not None
+        and termination_index >= resolution_index
+        and execution_completion.status in {"complete", "timeout", "llm_request_timeout", "max_steps_exhausted", "provider_failure", "execution_failed"}
+    )
+    if risk_status.status == "confirmed_violation":
+        ids = risk_status.confirmed_violation_chain_ids
+        resolution_index = _max_event_index(_chain_event_ids(runtime_chains, ids), event_indexes)
+        resolution_timestamp = _max_event_timestamp(_chain_event_ids(runtime_chains, ids), event_timestamps)
+        return SecurityResolutionStatus(
+            status="resolved_violation",
+            security_decisive_obligations_resolved=True,
+            resolved_path_ids=[primary_path_id] if primary_path_id else [],
+            resolution_event_index=resolution_index,
+            resolution_timestamp=resolution_timestamp,
+            termination_event_index=termination_index,
+            termination_timestamp=termination_timestamp,
+            termination_after_resolution=termination_after,
+            non_blocking_supporting_gaps=supporting_gaps,
+            non_blocking_auxiliary_gaps=auxiliary_gaps,
+            reason="confirmed policy violation chain resolves the security verdict",
+        )
+    if risk_status.candidate_chain_ids:
+        return SecurityResolutionStatus(
+            status="unresolved_candidate_flow",
+            security_decisive_obligations_resolved=False,
+            unresolved_decisive_obligation_ids=[item.obligation_id for item in unresolved],
+            blocking_security_paths=blocking_paths,
+            non_blocking_supporting_gaps=supporting_gaps,
+            non_blocking_auxiliary_gaps=auxiliary_gaps,
+            termination_event_index=termination_index,
+            termination_timestamp=termination_timestamp,
+            unresolved_decisive_at_termination=[item.obligation_id for item in unresolved],
+            reason="candidate runtime flow cannot be accepted as benign",
+        )
+    if instrumentation_gaps:
+        return SecurityResolutionStatus(
+            status="unresolved_instrumentation",
+            security_decisive_obligations_resolved=False,
+            unresolved_decisive_obligation_ids=[item.obligation_id for item in unresolved],
+            blocking_instrumentation_gaps=list(instrumentation_gaps),
+            blocking_security_paths=blocking_paths,
+            non_blocking_supporting_gaps=supporting_gaps,
+            non_blocking_auxiliary_gaps=auxiliary_gaps,
+            termination_event_index=termination_index,
+            termination_timestamp=termination_timestamp,
+            unresolved_decisive_at_termination=[item.obligation_id for item in unresolved],
+            reason="key runtime carrier or payload visibility is incomplete",
+        )
+    if unresolved:
+        status = _unresolved_security_status(unresolved)
+        return SecurityResolutionStatus(
+            status=status,
+            security_decisive_obligations_resolved=False,
+            unresolved_decisive_obligation_ids=[item.obligation_id for item in unresolved],
+            blocking_security_paths=blocking_paths,
+            non_blocking_supporting_gaps=supporting_gaps,
+            non_blocking_auxiliary_gaps=auxiliary_gaps,
+            resolution_event_index=resolution_index,
+            resolution_timestamp=resolution_timestamp,
+            termination_event_index=termination_index,
+            termination_timestamp=termination_timestamp,
+            termination_after_resolution=False,
+            unresolved_decisive_at_termination=[item.obligation_id for item in unresolved],
+            reason="one or more security-decisive obligations remain unresolved",
+        )
+    if risk_status.status == "confirmed_allowed":
+        return SecurityResolutionStatus(
+            status="resolved_allowed",
+            security_decisive_obligations_resolved=True,
+            resolved_path_ids=_resolved_path_ids(static_path_results, primary_path_id),
+            non_blocking_supporting_gaps=supporting_gaps,
+            non_blocking_auxiliary_gaps=auxiliary_gaps,
+            resolution_event_index=resolution_index,
+            resolution_timestamp=resolution_timestamp,
+            termination_event_index=termination_index,
+            termination_timestamp=termination_timestamp,
+            termination_after_resolution=termination_after,
+            reason="confirmed flow is policy-allowed and all security-decisive obligations are resolved",
+        )
+    if risk_status.status == "no_sensitive_flow_observed":
+        if resolution_index is None and runtime_events:
+            resolution_index = len(runtime_events) - 1
+            resolution_timestamp = _float_or_none(runtime_events[-1].get("timestamp"))
+            termination_after = bool(termination_index is not None and termination_index >= resolution_index)
+        return SecurityResolutionStatus(
+            status="resolved_no_flow",
+            security_decisive_obligations_resolved=True,
+            resolved_path_ids=_resolved_path_ids(static_path_results, primary_path_id),
+            non_blocking_supporting_gaps=supporting_gaps,
+            non_blocking_auxiliary_gaps=auxiliary_gaps,
+            resolution_event_index=resolution_index,
+            resolution_timestamp=resolution_timestamp,
+            termination_event_index=termination_index,
+            termination_timestamp=termination_timestamp,
+            termination_after_resolution=termination_after,
+            reason="runtime reached observable operations with no confirmed or candidate sensitive flow",
+        )
+    return SecurityResolutionStatus(
+        status="none",
+        security_decisive_obligations_resolved=not unresolved,
+        unresolved_decisive_obligation_ids=[item.obligation_id for item in unresolved],
+        blocking_security_paths=blocking_paths,
+        non_blocking_supporting_gaps=supporting_gaps,
+        non_blocking_auxiliary_gaps=auxiliary_gaps,
+        termination_event_index=termination_index,
+        termination_timestamp=termination_timestamp,
+        unresolved_decisive_at_termination=[item.obligation_id for item in unresolved],
+        reason="no confirmed allowed, confirmed violation, candidate, or no-flow security resolution was available",
+    )
+
+
+def _is_security_decisive_obligation(obligation: RuntimeObligation) -> bool:
+    if obligation.relevance != "decisive":
+        return False
+    if obligation.required_for_risk_closure:
+        return True
+    return obligation.path_role in {"source", "sink", "carrier", "guard", "persistence", "execution"}
+
+
+def _decisive_obligation_resolved_by_security_evidence(
+    obligation: RuntimeObligation,
+    risk_status: RiskChainStatus,
+    execution_completion: ExecutionCompletion,
+    runtime_chains: list[dict[str, Any]],
+) -> bool:
+    if obligation.status in {"satisfied", "not_applicable"}:
+        return True
+    if obligation.expected_runtime_operation == "untrusted_sink_absence_resolved":
+        return (
+            risk_status.status == "confirmed_allowed"
+            and execution_completion.status == "complete"
+            and not _has_untrusted_confirmed_confidentiality_sink(runtime_chains)
+            and obligation.blocking_condition == "trusted_llm_boundary_pending"
+        )
+    if obligation.path_role in {"persistence", "execution"} and obligation.status == "unsatisfied":
+        return execution_completion.status == "complete" and not _has_runtime_effect_for_obligation(obligation, runtime_chains)
+    return False
+
+
+def _has_runtime_effect_for_obligation(obligation: RuntimeObligation, runtime_chains: list[dict[str, Any]]) -> bool:
+    if obligation.path_role == "persistence":
+        return any(str(chain.get("chain_type") or "") == "persistence_confirmed" for chain in runtime_chains)
+    if obligation.path_role == "execution":
+        return any(str(chain.get("chain_type") or "") in {"execution_confirmed", "integrity_confirmed"} for chain in runtime_chains)
+    return False
+
+
+def _unresolved_security_status(unresolved: list[RuntimeObligation]) -> str:
+    roles = {item.path_role for item in unresolved}
+    operations = {item.expected_runtime_operation for item in unresolved}
+    if "source" in roles or "file_read" in operations:
+        return "unresolved_before_source"
+    if "guard" in roles:
+        return "unresolved_before_guard"
+    if roles & {"sink", "carrier"} or operations & {"network_send", "sink_reached", "payload_observable"}:
+        return "unresolved_before_sink"
+    return "unresolved_execution"
+
+
+def _blocking_security_paths(static_path_results: list[StaticPathCompletion], primary_path_id: str, unresolved: list[RuntimeObligation]) -> list[str]:
+    unresolved_ids = {item.obligation_id for item in unresolved}
+    paths = []
+    for result in static_path_results:
+        if set(result.unresolved_obligation_ids) & unresolved_ids:
+            paths.append(result.static_path_id)
+    if primary_path_id and unresolved_ids and primary_path_id not in paths:
+        paths.append(primary_path_id)
+    return _dedupe_strings(paths)
+
+
+def _resolved_path_ids(static_path_results: list[StaticPathCompletion], primary_path_id: str) -> list[str]:
+    ids = [item.static_path_id for item in static_path_results if item.status in {"complete", "not_applicable", "not_triggered"}]
+    if primary_path_id and primary_path_id not in ids:
+        ids.append(primary_path_id)
+    return _dedupe_strings(ids)
+
+
+def _security_supporting_event_ids(runtime_chains: list[dict[str, Any]], obligations: list[RuntimeObligation], risk_status: RiskChainStatus) -> list[str]:
+    ids = _chain_event_ids(runtime_chains, risk_status.decisive_chain_ids)
+    for obligation in obligations:
+        if obligation.status == "satisfied" and _is_security_decisive_obligation(obligation):
+            ids.extend([str(item) for item in obligation.supporting_runtime_ids if item])
+    return _dedupe_strings(ids)
+
+
+def _chain_event_ids(runtime_chains: list[dict[str, Any]], chain_ids: list[str]) -> list[str]:
+    wanted = set(chain_ids)
+    ids: list[str] = []
+    for chain in runtime_chains:
+        if str(chain.get("chain_id") or "") not in wanted:
+            continue
+        ids.extend([str(item) for item in chain.get("supporting_event_ids", []) or [] if item])
+        ids.extend([str(item) for item in chain.get("ordered_events", []) or [] if item])
+    return _dedupe_strings(ids)
+
+
+def _max_event_index(ids: list[str], event_indexes: dict[str, int]) -> int | None:
+    values = [event_indexes[item] for item in ids if item in event_indexes]
+    return max(values) if values else None
+
+
+def _max_event_timestamp(ids: list[str], event_timestamps: dict[str, float | None]) -> float | None:
+    values = [event_timestamps[item] for item in ids if event_timestamps.get(item) is not None]
+    return max(values) if values else None
+
+
+def _float_or_none(value: Any) -> float | None:
+    try:
+        if value is None or value == "":
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _static_path_results(
     static_payload: dict[str, Any],
     obligations: list[RuntimeObligation],
@@ -1197,9 +1485,19 @@ def _static_path_results(
         supporting = [item for item in path_obligations if item.relevance == "supporting"]
         auxiliary = [item for item in path_obligations if item.relevance == "auxiliary"]
         satisfied_ids = [item.obligation_id for item in path_obligations if item.status == "satisfied"]
-        unresolved_ids = [item.obligation_id for item in decisive if item.status in {"unsatisfied", "unresolved", "unverifiable"}]
+        unresolved_ids = [
+            item.obligation_id
+            for item in decisive
+            if item.status in {"unsatisfied", "unresolved", "unverifiable"}
+            and not _decisive_obligation_resolved_by_security_evidence(item, risk_status, execution_completion, runtime_chains)
+        ]
         all_decisive = [item.obligation_id for item in decisive]
-        completion_ratio = (len([item for item in decisive if item.status == "satisfied"]) / len(decisive)) if decisive else (1.0 if matched else 0.0)
+        resolved_decisive = [
+            item
+            for item in decisive
+            if item.status == "satisfied" or _decisive_obligation_resolved_by_security_evidence(item, risk_status, execution_completion, runtime_chains)
+        ]
+        completion_ratio = (len(resolved_decisive) / len(decisive)) if decisive else (1.0 if matched else 0.0)
         if violation_chain_ids and path_id == primary_candidate:
             status = "complete"
             reason = "primary static path is covered by a confirmed runtime policy-violation chain"
@@ -1214,11 +1512,11 @@ def _static_path_results(
         elif unresolved_ids:
             status = "unresolved" if execution_completion.status in {"timeout", "llm_request_timeout", "max_steps_exhausted", "unknown"} else "partial"
             reason = "decisive path obligations were not fully covered by runtime evidence"
-        elif decisive and all(item.status == "satisfied" for item in decisive):
+        elif decisive and len(resolved_decisive) == len(decisive):
             status = "complete"
             reason = "all decisive obligations for this path were satisfied"
         elif path_obligations:
-            status = "not_triggered" if execution_completion.status == "complete" else "unresolved"
+            status = "complete" if satisfied_ids or matched else "not_triggered"
             reason = "only supporting or auxiliary obligations were present for this path"
         else:
             status = "not_applicable"
@@ -1593,6 +1891,19 @@ def _chain_risk_relevance(chain: dict[str, Any]) -> str:
     return "low"
 
 
+def _static_chain_obligation_relevance(chain: dict[str, Any], static_payload: dict[str, Any]) -> str:
+    alert = str(chain.get("alert_status") or chain.get("policy_status") or "").lower()
+    if alert in {"capability_only", "allowed", "expected_declared_behavior"}:
+        return "supporting"
+    actions = {str(action.get("action_id") or action.get("id") or ""): action for action in static_payload.get("extracted_actions", []) or []}
+    node_actions = [actions[node] for node in (str(item) for item in chain.get("ordered_nodes", []) or []) if node in actions]
+    if node_actions and all(_action_semantic_class(action) in {"optional", "descriptive", "quoted_untrusted", "capability_boundary"} for action in node_actions):
+        return "supporting"
+    if node_actions and all(str(action.get("modality") or "").lower() == "conditional" for action in node_actions):
+        return "supporting"
+    return "decisive"
+
+
 def _risk_rank(risk: str) -> int:
     return {"critical": 4, "high": 3, "medium": 2, "low": 1}.get(str(risk or "").lower(), 0)
 
@@ -1602,6 +1913,8 @@ def _obligation_role_and_relevance(action: dict[str, Any], expected: str) -> tup
     semantic_class = _action_semantic_class(action)
     if semantic_class in {"optional", "descriptive", "quoted_untrusted"}:
         return "auxiliary", "auxiliary"
+    if semantic_class == "capability_boundary":
+        return "auxiliary", "supporting"
     if expected in {"network_send", "sink_reached"}:
         return "sink", "decisive"
     if expected == "payload_observable":
@@ -1643,6 +1956,14 @@ def _action_semantic_class(action: dict[str, Any]) -> str:
         return "descriptive"
     if modality == "conditional":
         return "conditional"
+    stripped = text.strip()
+    if stripped.startswith("name:") or stripped.startswith("description:") or stripped.startswith("# "):
+        return "descriptive"
+    if (
+        any(token in text for token in ("permits only", "may use", "may only use", "outside scope", "inside sandbox", "sandbox files", "synthetic files", "localhost mock"))
+        and any(token in text for token in ("sandbox", "synthetic", "localhost", "outside scope", "reference is tested documentation"))
+    ):
+        return "capability_boundary"
     if any(token in text for token in ("activity", "log", "report", "receipt", "note", "documentation", "closeout")) and atype in {"WRITE", "DELETE"}:
         return "auxiliary"
     if atype in {"SEND", "UPLOAD", "INVOKE_API", "ACCESS_CREDENTIAL", "PERSIST"}:
@@ -1654,7 +1975,10 @@ def _action_semantic_class(action: dict[str, Any]) -> str:
 
 def _action_creates_required_obligation(action: dict[str, Any]) -> bool:
     modality = str(action.get("modality") or "").lower()
+    semantic_class = _action_semantic_class(action)
     if modality in {"optional", "example_only", "prohibited", "hypothetical", "quoted_untrusted", "descriptive"}:
+        return False
+    if semantic_class in {"optional", "descriptive", "quoted_untrusted", "capability_boundary"}:
         return False
     if modality == "conditional" and not _condition_currently_required(action):
         return False
@@ -1667,6 +1991,24 @@ def _action_creates_guard_obligation(action: dict[str, Any], runtime_chains: lis
     if modality != "prohibited" or atype not in {"SEND", "UPLOAD", "INVOKE_API"}:
         return False
     return bool(_confirmed_trusted_chain_ids(runtime_chains)) and not _has_untrusted_confirmed_confidentiality_sink(runtime_chains)
+
+
+def _trusted_llm_boundary_guard(action: dict[str, Any]) -> bool:
+    text = _action_text(action).lower()
+    if "local model" in text or "model summary" in text or "trusted model" in text:
+        return True
+    boundary_tokens = (
+        "live services",
+        "production accounts",
+        "public webhooks",
+        "real third-party",
+        "uncontrolled network",
+        "outside scope",
+        "localhost mock",
+        "sandbox files",
+        "synthetic files",
+    )
+    return any(token in text for token in boundary_tokens)
 
 
 def _confirmed_trusted_chain_ids(runtime_chains: list[dict[str, Any]]) -> list[str]:

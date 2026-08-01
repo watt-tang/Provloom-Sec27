@@ -233,6 +233,7 @@ Current dynamic entry points should use `app.analysis.pipeline.analyze_skill_bun
 - `analyze_skill_bundle()` performs Static v2 first, then optional Docker execution, then normalized runtime event construction, Dynamic v3, reconciliation, coverage certificate, policy findings, canonical assessment, and unified reports.
 - `analyze_completed_execution()` consumes an existing `SandboxExecution` and guarantees normalized events and `DynamicRuntimeAnalyzer` are built once for that execution.
 - API dynamic, API static_only, Dynamic CLI, batch scan, and benchmark runner now emit `unified-analysis.json`, `unified-explanation.md`, and `canonical-analysis-result.json`.
-- `connect()` alone remains insufficient for confirmed confidentiality. Candidate/gap/incomplete coverage maps to review, not benign.
+- `connect()` alone remains insufficient for confirmed confidentiality. Candidate flows, security-decisive gaps, and key instrumentation gaps map to review, not benign.
+- `security_resolution.status` separates verdict sufficiency from execution completion. `resolved_allowed` and `resolved_no_flow` can produce benign when timeout/max-steps happened after the security decision; timeout before source/guard/sink/carrier resolution remains review.
 
 Source policy is narrower than the original `/root/**` default. `/etc/hosts` is public, `/etc/passwd` is low/account metadata, `/root/.cache/**` is runtime/package cache, and high/critical taint sources are explicit secrets such as `/etc/shadow`, SSH private keys, cloud credentials, `.env`, and `.provloom/private/**`.

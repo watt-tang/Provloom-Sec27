@@ -135,6 +135,28 @@ class StaticPathCompletion:
 
 
 @dataclass
+class SecurityResolutionStatus:
+    status: str = "none"
+    security_decisive_obligations_resolved: bool = False
+    resolved_path_ids: list[str] = field(default_factory=list)
+    unresolved_decisive_obligation_ids: list[str] = field(default_factory=list)
+    blocking_instrumentation_gaps: list[str] = field(default_factory=list)
+    blocking_security_paths: list[str] = field(default_factory=list)
+    non_blocking_supporting_gaps: list[str] = field(default_factory=list)
+    non_blocking_auxiliary_gaps: list[str] = field(default_factory=list)
+    resolution_event_index: int | None = None
+    resolution_timestamp: float | None = None
+    termination_event_index: int | None = None
+    termination_timestamp: float | None = None
+    termination_after_resolution: bool = False
+    unresolved_decisive_at_termination: list[str] = field(default_factory=list)
+    reason: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class CoverageCertificate:
     schema_version: str = "coverage-certificate-v1"
     coverage_state: str = "insufficient_coverage"
@@ -158,6 +180,18 @@ class CoverageCertificate:
     primary_risk_path_selection: dict[str, Any] = field(default_factory=dict)
     other_static_path_summary: dict[str, Any] = field(default_factory=dict)
     obligation_relevance_summary: dict[str, Any] = field(default_factory=dict)
+    security_resolution: SecurityResolutionStatus = field(default_factory=SecurityResolutionStatus)
+    security_resolution_status: str = "none"
+    security_decisive_obligations_resolved: bool = False
+    security_resolution_event_index: int | None = None
+    security_resolution_timestamp: float | None = None
+    termination_event_index: int | None = None
+    termination_timestamp: float | None = None
+    termination_after_security_resolution: bool = False
+    unresolved_decisive_obligations: list[str] = field(default_factory=list)
+    blocking_security_paths: list[str] = field(default_factory=list)
+    non_blocking_supporting_gaps: list[str] = field(default_factory=list)
+    non_blocking_auxiliary_gaps: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -166,6 +200,7 @@ class CoverageCertificate:
         payload["risk_chain_status"] = self.risk_chain_status.to_dict() if hasattr(self.risk_chain_status, "to_dict") else self.risk_chain_status
         payload["execution_completion"] = self.execution_completion.to_dict() if hasattr(self.execution_completion, "to_dict") else self.execution_completion
         payload["static_path_results"] = [item.to_dict() if hasattr(item, "to_dict") else item for item in self.static_path_results]
+        payload["security_resolution"] = self.security_resolution.to_dict() if hasattr(self.security_resolution, "to_dict") else self.security_resolution
         return payload
 
 
@@ -209,6 +244,8 @@ class UnifiedExplanationResult:
     primary_static_path_status: str = "not_applicable"
     other_static_path_summary: dict[str, Any] = field(default_factory=dict)
     obligation_relevance_summary: dict[str, Any] = field(default_factory=dict)
+    security_resolution: dict[str, Any] = field(default_factory=dict)
+    security_resolution_status: str = "none"
     schema_version: str = SCHEMA_VERSION
     versions: dict[str, str] = field(
         default_factory=lambda: {
@@ -241,6 +278,8 @@ class UnifiedExplanationResult:
             "primary_static_path_status": self.primary_static_path_status,
             "other_static_path_summary": dict(self.other_static_path_summary),
             "obligation_relevance_summary": dict(self.obligation_relevance_summary),
+            "security_resolution": dict(self.security_resolution),
+            "security_resolution_status": self.security_resolution_status,
             "policy_violations": list(self.policy_violations),
             "policy_findings": [item.to_dict() for item in self.policy_findings],
             "canonical_assessment": dict(self.canonical_assessment),

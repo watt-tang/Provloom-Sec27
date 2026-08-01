@@ -168,16 +168,28 @@
 
 ## 11. benign 的 security-relevant coverage 条件
 
-benign 只在以下条件同时满足时产生：
+三轴模型之后新增 `SecurityResolutionStatus`，用于回答“当前证据是否已足以做出安全结论”。benign 只在以下条件同时满足时产生：
 
 - 无 confirmed violation；
 - 无 candidate flow；
-- execution complete 或动态 coverage 明确为 target reached no flow；
-- primary decisive obligations 已满足或不适用；
-- 没有 security-relevant review finding；
-- instrumentation gap 不影响关键 carrier/source/sink。
+- `security_resolution.status` 为 `resolved_allowed` 或 `resolved_no_flow`；
+- security-decisive obligations 已满足、not applicable，或被完整 runtime evidence 证明危险效果未发生；
+- 没有关键 instrumentation gap；
+- timeout/max steps 若存在，必须发生在 security resolution 之后。
+
+不再要求所有 supporting/auxiliary obligations、日志、清理、普通业务输出或 final response 完成。
 
 trusted LLM prompt 或 trusted Authorization header 可以是 `confirmed_allowed`，但如果静态风险路径仍 partial/unresolved，则仍为 review。
+
+新增字段：
+
+- `security_resolution`
+- `security_resolution_status`
+- `coverage_certificate.security_resolution_status`
+- `coverage_certificate.termination_after_security_resolution`
+- `coverage_certificate.unresolved_decisive_obligations`
+- `coverage_certificate.non_blocking_supporting_gaps`
+- `coverage_certificate.non_blocking_auxiliary_gaps`
 
 ## 12. Legacy 字段兼容
 
