@@ -19,6 +19,7 @@ Current behavior:
 - Dynamic modes use the same canonical pipeline after Docker execution.
 - Total sandbox timeout resolves as: explicit request value, then fixture/runtime value, then `PROVLOOM_TIMEOUT_SECONDS` or `PROVLOOM_TOTAL_TIMEOUT_SECONDS`, then the 600 second default. LLM provider request timeout remains separate from the total sandbox timeout.
 - Top-level `risk_score`, `final_decision`, `canonical_*`, `coverage_state`, and report paths are canonical fields.
+- Top-level `llm_model_name` and `llm_token_usage` report the observed model name and aggregate provider-reported usage for dynamic runs.
 - Top-level `risk_chain_status`, `execution_completion`, `static_path_results`, `primary_static_path_id`, `primary_static_path_status`, `security_resolution`, `security_resolution_status`, `other_static_path_summary`, and `obligation_relevance_summary` are the primary explanation fields for Dynamic v3.
 - Legacy fields are retained as compatibility fields: `legacy_static_result`, `legacy_risk_score`, `legacy_final_decision`.
 
@@ -32,6 +33,8 @@ Unified fields:
 - `unified_analysis`
 - `unified_analysis_path`
 - `unified_explanation_report_path`
+- `llm_model_name`
+- `llm_token_usage`
 - `alignments`
 - `contradictions`
 - `aligned_paths`
@@ -65,3 +68,4 @@ Compatibility:
 Privacy:
 - `llm_config.to_public_dict()` excludes API keys.
 - Runtime LLM context telemetry stores taint ids, hashes, counts, and redacted previews, not full prompts.
+- Token usage is copied from the provider response `usage` object when available. It does not include the API key or full prompt text.

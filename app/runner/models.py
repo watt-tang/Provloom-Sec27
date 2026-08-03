@@ -230,6 +230,8 @@ class SandboxExecution:
     max_agent_steps: int = 0
     max_steps_exhausted: bool = False
     llm_request_timeout_count: int = 0
+    llm_token_usage: dict[str, Any] = field(default_factory=dict)
+    llm_model_name: str = ""
     provider_retry_count: int = 0
     final_response_emitted: bool = False
     pending_tool_call: str | None = None

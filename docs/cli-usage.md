@@ -35,6 +35,8 @@ Unified reports show the three primary Dynamic v3 axes separately:
 - Per-static-path security coverage: `static_path_results` and `primary_static_path_status`
 - Security verdict sufficiency: `security_resolution` and `security_resolution_status`
 
+Dynamic JSON outputs also include `llm_model_name` and `llm_token_usage` when an enabled provider returns token usage metadata. The usage summary is aggregated across LLM response events.
+
 `export` prefers unified artifacts when present:
 
 ```bash

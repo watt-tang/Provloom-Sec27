@@ -711,6 +711,12 @@ class LLMAgentSkillRuntime:
             content_preview, content_privacy = _privacy_preserving_text_preview(response.content, response_taint_ids)
             self._emit("llm", "response", {
                 "step": step,
+                "provider": self.llm_config.get("provider", "openai-compatible"),
+                "model": response.model,
+                "configured_model": self.llm_config["model"],
+                "base_url": self.client.base_url,
+                "endpoint_host": urlparse(self.client.base_url).hostname,
+                "token_usage": response.token_usage,
                 "content_preview": content_preview,
                 **content_privacy,
             }, step_id=step_id, parent_event_id=request_event_id)

@@ -342,6 +342,8 @@ class DockerRunner:
                     max_agent_steps=int(llm_execution_summary.get("max_agent_steps", 0) or 0),
                     max_steps_exhausted=bool(llm_execution_summary.get("max_steps_exhausted", False)),
                     llm_request_timeout_count=int(llm_execution_summary.get("llm_request_timeout_count", 0) or 0),
+                    llm_token_usage=dict(llm_execution_summary.get("token_usage", {}) or {}),
+                    llm_model_name=str(llm_execution_summary.get("model") or ""),
                     provider_retry_count=int(llm_execution_summary.get("provider_retry_count", 0) or 0),
                     final_response_emitted=bool(llm_execution_summary.get("final_response_emitted", False)),
                     pending_tool_call=llm_execution_summary.get("pending_tool_call"),
@@ -495,6 +497,15 @@ class DockerRunner:
             "max_agent_steps": 0,
             "max_steps_exhausted": False,
             "llm_request_timeout_count": 0,
+            "token_usage": {
+                "model": "",
+                "provider": "",
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "request_count": 0,
+            },
+            "model": "",
             "provider_retry_count": 0,
             "final_response_emitted": False,
             "pending_tool_call": None,
@@ -517,6 +528,16 @@ class DockerRunner:
                 summary["llm_request_timeout_count"] = int(summary["llm_request_timeout_count"]) + 1
                 if not summary["termination_reason"]:
                     summary["termination_reason"] = "llm_request_timeout"
+            usage = metadata.get("token_usage") if isinstance(metadata.get("token_usage"), dict) else {}
+            if usage:
+                token_usage = summary["token_usage"]
+                token_usage["request_count"] = int(token_usage.get("request_count", 0) or 0) + 1
+                token_usage["prompt_tokens"] = int(token_usage.get("prompt_tokens", 0) or 0) + _safe_int(usage.get("prompt_tokens"))
+                token_usage["completion_tokens"] = int(token_usage.get("completion_tokens", 0) or 0) + _safe_int(usage.get("completion_tokens"))
+                token_usage["total_tokens"] = int(token_usage.get("total_tokens", 0) or 0) + _safe_int(usage.get("total_tokens"))
+                token_usage["model"] = str(usage.get("model") or metadata.get("model") or token_usage.get("model") or "")
+                token_usage["provider"] = str(usage.get("provider") or metadata.get("provider") or token_usage.get("provider") or "")
+                summary["model"] = str(token_usage.get("model") or "")
             if metadata.get("retry_count") is not None:
                 try:
                     summary["provider_retry_count"] = max(int(summary["provider_retry_count"]), int(metadata["retry_count"]))
@@ -886,3 +907,12 @@ exit 0
 
 def datetime_from_epoch(value: float) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(value)) + f".{int((value % 1) * 1000):03d}Z"
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        if value is None or value == "":
+            return 0
+        return int(value)
+    except (TypeError, ValueError):
+        return 0

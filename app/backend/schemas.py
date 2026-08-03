@@ -152,6 +152,8 @@ class AnalyzeSkillResponse:
     network_policy: str
     analysis_mode: str
     llm_config: dict[str, Any]
+    llm_model_name: str
+    llm_token_usage: dict[str, Any]
     exit_code: int | None
     timed_out: bool
     stdout: str

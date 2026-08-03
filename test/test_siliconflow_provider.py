@@ -14,6 +14,22 @@ from app.backend.schemas import (
     LLMConfig,
 )
 from app.runtime.llm_client import OpenAICompatibleClient
+from app.runner.docker_runner import DockerRunner
+from app.runner.models import LLMEvent
+
+
+class _FakeHTTPResponse:
+    def __init__(self, body: bytes) -> None:
+        self.body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def read(self) -> bytes:
+        return self.body
 
 
 class SiliconFlowProviderTests(unittest.TestCase):
@@ -58,6 +74,64 @@ class SiliconFlowProviderTests(unittest.TestCase):
         with patch("urllib.request.urlopen", side_effect=error):
             with self.assertRaisesRegex(RuntimeError, "HTTP 401"):
                 client.chat([{"role": "user", "content": "hello"}])
+
+    def test_llm_client_uses_chat_completions_endpoint_and_extracts_token_usage(self) -> None:
+        client = OpenAICompatibleClient(
+            provider="autos",
+            base_url="https://sec.llm.autos/v1/chat/completions",
+            api_key="unit-api-key",
+            model="glm-5.2",
+        )
+        body = (
+            b'{"model":"glm-5.2","choices":[{"message":{"content":"{\\\\\\"action\\\\\\":{\\\\\\"tool\\\\\\":\\\\\\"finish\\\\\\"}}"}}],'
+            b'"usage":{"prompt_tokens":11,"completion_tokens":7,"total_tokens":18}}'
+        )
+        captured = {}
+
+        def fake_urlopen(request, timeout):
+            captured["url"] = request.full_url
+            return _FakeHTTPResponse(body)
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            response = client.chat([{"role": "user", "content": "hello"}])
+
+        self.assertEqual(captured["url"], "https://sec.llm.autos/v1/chat/completions")
+        self.assertEqual(response.model, "glm-5.2")
+        self.assertEqual(response.token_usage["prompt_tokens"], 11)
+        self.assertEqual(response.token_usage["completion_tokens"], 7)
+        self.assertEqual(response.token_usage["total_tokens"], 18)
+
+    def test_runner_summarizes_llm_token_usage(self) -> None:
+        runner = DockerRunner(image_name="unit-image")
+        summary = runner._llm_execution_summary(
+            [
+                LLMEvent(
+                    timestamp="t1",
+                    event="response",
+                    metadata={
+                        "model": "glm-5.2",
+                        "provider": "autos",
+                        "token_usage": {"model": "glm-5.2", "provider": "autos", "prompt_tokens": 3, "completion_tokens": 4, "total_tokens": 7},
+                    },
+                ),
+                LLMEvent(
+                    timestamp="t2",
+                    event="response",
+                    metadata={
+                        "model": "glm-5.2",
+                        "provider": "autos",
+                        "token_usage": {"model": "glm-5.2", "provider": "autos", "prompt_tokens": 5, "completion_tokens": 6, "total_tokens": 11},
+                    },
+                ),
+            ],
+            {},
+        )
+
+        self.assertEqual(summary["model"], "glm-5.2")
+        self.assertEqual(summary["token_usage"]["request_count"], 2)
+        self.assertEqual(summary["token_usage"]["prompt_tokens"], 8)
+        self.assertEqual(summary["token_usage"]["completion_tokens"], 10)
+        self.assertEqual(summary["token_usage"]["total_tokens"], 18)
 
 
 if __name__ == "__main__":

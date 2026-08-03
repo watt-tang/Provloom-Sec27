@@ -208,6 +208,8 @@ def _build_static_response(
         network_policy=payload.network_policy,
         analysis_mode=payload.analysis_mode,
         llm_config=payload.llm_config.to_public_dict(),
+        llm_model_name="",
+        llm_token_usage={"model": "", "provider": "", "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "request_count": 0},
         exit_code=None,
         timed_out=False,
         stdout="",

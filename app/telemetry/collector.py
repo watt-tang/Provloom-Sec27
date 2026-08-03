@@ -125,6 +125,8 @@ def build_execution_report(
         "process_events": [event.to_dict() for event in execution.process_events],
         "tool_calls": [event.to_dict() for event in execution.tool_calls],
         "llm_events": [event.to_dict() for event in execution.llm_events],
+        "llm_model_name": execution.llm_model_name,
+        "llm_token_usage": dict(execution.llm_token_usage or {}),
         "data_flows": [event.to_dict() for event in execution.data_flows],
         "taint_events": [event.to_dict() for event in normalized_events if event.event_type.startswith("taint_") or event.event_type == "candidate_dependency"],
         "normalized_events": [event.to_dict() for event in normalized_events],
