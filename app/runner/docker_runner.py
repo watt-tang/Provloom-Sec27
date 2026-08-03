@@ -342,6 +342,8 @@ class DockerRunner:
                     max_agent_steps=int(llm_execution_summary.get("max_agent_steps", 0) or 0),
                     max_steps_exhausted=bool(llm_execution_summary.get("max_steps_exhausted", False)),
                     llm_request_timeout_count=int(llm_execution_summary.get("llm_request_timeout_count", 0) or 0),
+                    llm_request_retry_count=int(llm_execution_summary.get("llm_request_retry_count", 0) or 0),
+                    llm_request_retry_reasons=list(llm_execution_summary.get("llm_request_retry_reasons", []) or []),
                     llm_token_usage=dict(llm_execution_summary.get("token_usage", {}) or {}),
                     llm_model_name=str(llm_execution_summary.get("model") or ""),
                     provider_retry_count=int(llm_execution_summary.get("provider_retry_count", 0) or 0),
@@ -497,6 +499,8 @@ class DockerRunner:
             "max_agent_steps": 0,
             "max_steps_exhausted": False,
             "llm_request_timeout_count": 0,
+            "llm_request_retry_count": 0,
+            "llm_request_retry_reasons": [],
             "token_usage": {
                 "model": "",
                 "provider": "",
@@ -528,6 +532,21 @@ class DockerRunner:
                 summary["llm_request_timeout_count"] = int(summary["llm_request_timeout_count"]) + 1
                 if not summary["termination_reason"]:
                     summary["termination_reason"] = "llm_request_timeout"
+            retry_value = metadata.get("llm_request_retry_count", metadata.get("retry_count"))
+            if retry_value is not None:
+                try:
+                    retry_count = int(retry_value)
+                    summary["llm_request_retry_count"] = max(int(summary["llm_request_retry_count"]), retry_count)
+                    summary["provider_retry_count"] = max(int(summary["provider_retry_count"]), retry_count)
+                except (TypeError, ValueError):
+                    pass
+            retry_reasons = metadata.get("llm_request_retry_reasons")
+            if isinstance(retry_reasons, list):
+                existing_reasons = list(summary.get("llm_request_retry_reasons", []))
+                for reason in retry_reasons:
+                    if str(reason) and str(reason) not in existing_reasons:
+                        existing_reasons.append(str(reason))
+                summary["llm_request_retry_reasons"] = existing_reasons
             usage = metadata.get("token_usage") if isinstance(metadata.get("token_usage"), dict) else {}
             if usage:
                 token_usage = summary["token_usage"]

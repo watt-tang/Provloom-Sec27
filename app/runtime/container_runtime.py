@@ -13,13 +13,20 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlparse
 
-from app.runtime.llm_client import OpenAICompatibleClient
+from app.runtime.llm_client import LLMRequestError, OpenAICompatibleClient
 from app.runtime.skill_parser import SkillAction, SkillDefinition, load_skill_definition
 from app.taint.models import TaintEvidenceLevel, TaintLabel, TaintSet
 from app.taint.propagation import collect_action_refs
 from app.taint.sink_tracker import classify_http_sink
 from app.taint.source_registry import SourceRegistry, normalize_path
 from app.taint.state import TaintState
+
+JSON_REPAIR_INSTRUCTION = (
+    "Your previous response was not valid JSON.\n\n"
+    "The runtime requires a JSON object only.\n\n"
+    "Return ONLY the required JSON object.\n"
+    "Do not include explanations, markdown, or extra text."
+)
 
 
 def utc_now() -> str:
@@ -695,7 +702,14 @@ class LLMAgentSkillRuntime:
                 response = self.client.chat(messages)
             except RuntimeError as exc:
                 message = str(exc)
-                error_type = "llm_request_timeout" if "timed out" in message.lower() else "llm_request_failed"
+                error_type = getattr(
+                    exc,
+                    "error_type",
+                    "llm_request_timeout" if "timed out" in message.lower() else "llm_request_failed",
+                )
+                retry_count = int(getattr(exc, "retry_count", 0) or 0)
+                retry_reasons = list(getattr(exc, "retry_reasons", []) or [])
+                initial_failure = str(getattr(exc, "initial_failure", "") or error_type if retry_count else "")
                 self._emit("llm", "error", {
                     "step": step,
                     "provider": self.llm_config.get("provider", "openai-compatible"),
@@ -704,12 +718,16 @@ class LLMAgentSkillRuntime:
                     "endpoint_host": urlparse(self.client.base_url).hostname,
                     "error_type": error_type,
                     "coverage_state": "timeout" if error_type == "llm_request_timeout" else "environment_missing",
+                    "llm_request_retry_count": retry_count,
+                    "llm_request_retry_reasons": retry_reasons,
+                    "llm_initial_failure": initial_failure,
+                    "retry_count": retry_count,
                     "error_preview": message[:240],
                 }, step_id=step_id, parent_event_id=request_event_id)
                 return 70
             response_taint_ids = self._taint_ids_in_value(response.content)
             content_preview, content_privacy = _privacy_preserving_text_preview(response.content, response_taint_ids)
-            self._emit("llm", "response", {
+            response_event_id = self._emit("llm", "response", {
                 "step": step,
                 "provider": self.llm_config.get("provider", "openai-compatible"),
                 "model": response.model,
@@ -717,11 +735,127 @@ class LLMAgentSkillRuntime:
                 "base_url": self.client.base_url,
                 "endpoint_host": urlparse(self.client.base_url).hostname,
                 "token_usage": response.token_usage,
+                "llm_request_retry_count": int(response.retry_count or 0),
+                "llm_request_retry_reasons": list(response.retry_reasons or []),
+                "llm_initial_failure": response.initial_failure,
+                "retry_count": int(response.retry_count or 0),
+                "llm_json_repair_attempted": False,
+                "llm_json_repair_success": False,
                 "content_preview": content_preview,
                 **content_privacy,
             }, step_id=step_id, parent_event_id=request_event_id)
 
-            parsed = _extract_json_object(response.content)
+            try:
+                parsed = _extract_json_object(response.content)
+            except RuntimeError as initial_parse_error:
+                repair_event_id = self._emit("llm", "json_repair", {
+                    "step": step,
+                    "provider": self.llm_config.get("provider", "openai-compatible"),
+                    "model": self.llm_config["model"],
+                    "base_url": self.client.base_url,
+                    "endpoint_host": urlparse(self.client.base_url).hostname,
+                    "llm_json_repair_attempted": True,
+                    "llm_json_repair_success": False,
+                    "llm_initial_failure": "invalid_json_action",
+                    "error_preview": str(initial_parse_error)[:240],
+                }, step_id=step_id, parent_event_id=response_event_id)
+                repair_messages = [
+                    *messages,
+                    {"role": "assistant", "content": response.content},
+                    {"role": "user", "content": JSON_REPAIR_INSTRUCTION},
+                ]
+                repair_request_event_id = self._emit("llm", "request", {
+                    "step": step,
+                    "provider": self.llm_config.get("provider", "openai-compatible"),
+                    "model": self.llm_config["model"],
+                    "base_url": self.client.base_url,
+                    "endpoint_host": urlparse(self.client.base_url).hostname,
+                    "message_count": len(repair_messages),
+                    "llm_json_repair_attempted": True,
+                    "llm_json_repair_success": False,
+                    "repair_for_event_id": response_event_id,
+                    **self._llm_context_metadata(repair_messages),
+                }, step_id=step_id, parent_event_id=repair_event_id)
+                try:
+                    repair_response = self.client.chat(repair_messages)
+                except RuntimeError as exc:
+                    message = str(exc)
+                    error_type = getattr(
+                        exc,
+                        "error_type",
+                        "llm_request_timeout" if "timed out" in message.lower() else "llm_request_failed",
+                    )
+                    retry_count = int(getattr(exc, "retry_count", 0) or 0)
+                    retry_reasons = list(getattr(exc, "retry_reasons", []) or [])
+                    initial_failure = str(getattr(exc, "initial_failure", "") or error_type if retry_count else "")
+                    self._emit("llm", "error", {
+                        "step": step,
+                        "provider": self.llm_config.get("provider", "openai-compatible"),
+                        "model": self.llm_config["model"],
+                        "base_url": self.client.base_url,
+                        "endpoint_host": urlparse(self.client.base_url).hostname,
+                        "error_type": error_type,
+                        "coverage_state": "timeout" if error_type == "llm_request_timeout" else "environment_missing",
+                        "llm_request_retry_count": retry_count,
+                        "llm_request_retry_reasons": retry_reasons,
+                        "llm_initial_failure": initial_failure or "invalid_json_action",
+                        "llm_json_repair_attempted": True,
+                        "llm_json_repair_success": False,
+                        "retry_count": retry_count,
+                        "repair_for_event_id": response_event_id,
+                        "error_preview": message[:240],
+                    }, step_id=step_id, parent_event_id=repair_request_event_id)
+                    raise initial_parse_error from exc
+
+                repair_taint_ids = self._taint_ids_in_value(repair_response.content)
+                repair_preview, repair_privacy = _privacy_preserving_text_preview(repair_response.content, repair_taint_ids)
+                repair_response_event_id = self._emit("llm", "response", {
+                    "step": step,
+                    "provider": self.llm_config.get("provider", "openai-compatible"),
+                    "model": repair_response.model,
+                    "configured_model": self.llm_config["model"],
+                    "base_url": self.client.base_url,
+                    "endpoint_host": urlparse(self.client.base_url).hostname,
+                    "token_usage": repair_response.token_usage,
+                    "llm_request_retry_count": int(repair_response.retry_count or 0),
+                    "llm_request_retry_reasons": list(repair_response.retry_reasons or []),
+                    "llm_initial_failure": repair_response.initial_failure or "invalid_json_action",
+                    "llm_json_repair_attempted": True,
+                    "llm_json_repair_success": False,
+                    "retry_count": int(repair_response.retry_count or 0),
+                    "repair_for_event_id": response_event_id,
+                    "content_preview": repair_preview,
+                    **repair_privacy,
+                }, step_id=step_id, parent_event_id=repair_request_event_id)
+                try:
+                    parsed = _extract_json_object(repair_response.content)
+                except RuntimeError as repair_parse_error:
+                    self._emit("llm", "json_repair", {
+                        "step": step,
+                        "provider": self.llm_config.get("provider", "openai-compatible"),
+                        "model": repair_response.model,
+                        "base_url": self.client.base_url,
+                        "endpoint_host": urlparse(self.client.base_url).hostname,
+                        "llm_json_repair_attempted": True,
+                        "llm_json_repair_success": False,
+                        "llm_initial_failure": "invalid_json_action",
+                        "repair_for_event_id": response_event_id,
+                        "error_preview": str(repair_parse_error)[:240],
+                    }, step_id=step_id, parent_event_id=repair_response_event_id)
+                    raise repair_parse_error from initial_parse_error
+                self._emit("llm", "json_repair", {
+                    "step": step,
+                    "provider": self.llm_config.get("provider", "openai-compatible"),
+                    "model": repair_response.model,
+                    "base_url": self.client.base_url,
+                    "endpoint_host": urlparse(self.client.base_url).hostname,
+                    "llm_json_repair_attempted": True,
+                    "llm_json_repair_success": True,
+                    "llm_initial_failure": "invalid_json_action",
+                    "repair_for_event_id": response_event_id,
+                }, step_id=step_id, parent_event_id=repair_response_event_id)
+                response = repair_response
+                response_taint_ids = repair_taint_ids
             action = parsed.get("action", {})
             action_name = action.get("tool", "finish")
             arguments = action.get("arguments", {}) or {}

@@ -174,6 +174,8 @@ class AnalyzeSkillResponse:
     llm_events: list[dict[str, Any]]
     data_flows: list[dict[str, Any]]
     resource_usage: dict[str, Any]
+    llm_request_retry_count: int = 0
+    llm_request_retry_reasons: list[str] = field(default_factory=list)
     sandbox_image_id: str = ""
     source_fingerprint: str = ""
     runtime_build_info: dict[str, Any] = field(default_factory=dict)

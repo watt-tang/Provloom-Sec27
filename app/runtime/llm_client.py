@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import socket
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -15,6 +16,26 @@ class LLMResponse:
     raw: dict[str, Any]
     model: str
     token_usage: dict[str, Any]
+    retry_count: int = 0
+    retry_reasons: list[str] | None = None
+    initial_failure: str = ""
+
+
+class LLMRequestError(RuntimeError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_type: str,
+        retry_count: int = 0,
+        retry_reasons: list[str] | None = None,
+        initial_failure: str = "",
+    ) -> None:
+        super().__init__(message)
+        self.error_type = error_type
+        self.retry_count = retry_count
+        self.retry_reasons = list(retry_reasons or [])
+        self.initial_failure = initial_failure
 
 
 class OpenAICompatibleClient:
@@ -38,36 +59,7 @@ class OpenAICompatibleClient:
             "temperature": self.temperature,
             "messages": messages,
         }
-        request = urllib.request.Request(
-            self._request_url(),
-            method="POST",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-            },
-            data=json.dumps(payload).encode("utf-8"),
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=120) as response:
-                raw_body = response.read().decode("utf-8")
-        except TimeoutError as exc:
-            raise RuntimeError(
-                f"LLM request timed out for provider={self.provider} model={self.model} "
-                f"base_url={self.base_url}"
-            ) from exc
-        except socket.timeout as exc:
-            raise RuntimeError(
-                f"LLM request timed out for provider={self.provider} model={self.model} "
-                f"base_url={self.base_url}"
-            ) from exc
-        except urllib.error.HTTPError as exc:
-            raise RuntimeError(self._format_http_error(exc)) from exc
-        except urllib.error.URLError as exc:
-            reason = getattr(exc, "reason", exc)
-            raise RuntimeError(
-                f"LLM request failed for provider={self.provider} model={self.model} "
-                f"base_url={self.base_url}: {reason}"
-            ) from exc
+        raw_body, retry_count, retry_reasons, initial_failure = self._post_with_retries(payload)
 
         try:
             data = json.loads(raw_body)
@@ -91,7 +83,87 @@ class OpenAICompatibleClient:
             raw=data,
             model=str(data.get("model") or self.model),
             token_usage=self._extract_token_usage(data),
+            retry_count=retry_count,
+            retry_reasons=retry_reasons,
+            initial_failure=initial_failure,
         )
+
+    def _post_with_retries(self, payload: dict[str, Any]) -> tuple[str, int, list[str], str]:
+        retry_reasons: list[str] = []
+        initial_failure = ""
+        delays = [5, 15]
+        last_exc: BaseException | None = None
+        last_error_type = "llm_request_failed"
+        last_message = ""
+
+        for attempt in range(0, len(delays) + 1):
+            request = urllib.request.Request(
+                self._request_url(),
+                method="POST",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}",
+                },
+                data=json.dumps(payload).encode("utf-8"),
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=120) as response:
+                    return response.read().decode("utf-8"), attempt, retry_reasons, initial_failure
+            except urllib.error.HTTPError as exc:
+                last_exc = exc
+                last_error_type = "llm_request_failed"
+                last_message = self._format_http_error(exc)
+                retry_reason = "http_5xx" if 500 <= int(exc.code) <= 599 else ""
+                if not retry_reason:
+                    break
+            except (TimeoutError, socket.timeout) as exc:
+                last_exc = exc
+                last_error_type = "llm_request_timeout"
+                retry_reason = "timeout"
+                last_message = (
+                    f"LLM request timed out for provider={self.provider} model={self.model} "
+                    f"base_url={self.base_url}"
+                )
+            except urllib.error.URLError as exc:
+                last_exc = exc
+                retry_reason, last_error_type = self._classify_url_error(exc)
+                reason = getattr(exc, "reason", exc)
+                if last_error_type == "llm_request_timeout":
+                    last_message = (
+                        f"LLM request timed out for provider={self.provider} model={self.model} "
+                        f"base_url={self.base_url}"
+                    )
+                else:
+                    last_message = (
+                        f"LLM request failed for provider={self.provider} model={self.model} "
+                        f"base_url={self.base_url}: {reason}"
+                    )
+                if not retry_reason:
+                    break
+            except ConnectionResetError as exc:
+                last_exc = exc
+                last_error_type = "llm_request_failed"
+                retry_reason = "connection_reset"
+                last_message = (
+                    f"LLM request failed for provider={self.provider} model={self.model} "
+                    f"base_url={self.base_url}: connection reset"
+                )
+
+            if retry_reason and not initial_failure:
+                initial_failure = last_error_type
+            if retry_reason and attempt < len(delays):
+                retry_reasons.append(retry_reason)
+                time.sleep(delays[attempt])
+                continue
+            break
+
+        raise LLMRequestError(
+            last_message or f"LLM request failed for provider={self.provider} model={self.model} base_url={self.base_url}",
+            error_type=last_error_type,
+            retry_count=len(retry_reasons),
+            retry_reasons=retry_reasons,
+            initial_failure=initial_failure,
+        ) from last_exc
 
     def _request_url(self) -> str:
         parsed = urlparse(self.base_url)
@@ -153,6 +225,22 @@ class OpenAICompatibleClient:
             f"LLM request returned HTTP {error.code} for provider={self.provider} "
             f"model={self.model} base_url={self.base_url}: {detail}"
         )
+
+    def _classify_url_error(self, error: urllib.error.URLError) -> tuple[str, str]:
+        reason = getattr(error, "reason", error)
+        if isinstance(reason, socket.timeout):
+            return "timeout", "llm_request_timeout"
+        if isinstance(reason, ConnectionResetError):
+            return "connection_reset", "llm_request_failed"
+        if isinstance(reason, OSError):
+            message = str(reason).lower()
+            if "timed out" in message or "timeout" in message:
+                return "timeout", "llm_request_timeout"
+            if "connection reset" in message:
+                return "connection_reset", "llm_request_failed"
+            if "temporarily unavailable" in message or "temporary failure" in message:
+                return "temporary_network_error", "llm_request_failed"
+        return "", "llm_request_failed"
 
 
 def _int_or_none(value: Any) -> int | None:

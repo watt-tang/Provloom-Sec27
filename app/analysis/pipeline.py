@@ -262,6 +262,8 @@ def _merge_dynamic_report(
             "max_agent_steps": execution.max_agent_steps,
             "max_steps_exhausted": execution.max_steps_exhausted,
             "llm_request_timeout_count": execution.llm_request_timeout_count,
+            "llm_request_retry_count": execution.llm_request_retry_count,
+            "llm_request_retry_reasons": list(execution.llm_request_retry_reasons or []),
             "provider_retry_count": execution.provider_retry_count,
             "final_response_emitted": execution.final_response_emitted,
             "pending_tool_call": execution.pending_tool_call,
