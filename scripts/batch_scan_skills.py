@@ -685,7 +685,7 @@ def llm_config_for_skill(
         api_key=resolved_api_key if llm_enabled else "",
         model=resolved_model,
         temperature=0.0,
-        max_steps=8,
+        max_steps=16,
     )
 
 

@@ -96,7 +96,7 @@ def main() -> int:
         api_key=args.api_key,
         model=args.model,
         temperature=0.0,
-        max_steps=8,
+        max_steps=16,
     )
 
     test_cases = [

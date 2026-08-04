@@ -679,7 +679,7 @@ class LLMAgentSkillRuntime:
         )
 
     def execute(self) -> int:
-        max_steps = int(self.llm_config.get("max_steps", 8))
+        max_steps = int(self.llm_config.get("max_steps", 16))
         messages = [
             {"role": "system", "content": self._system_prompt()},
             {"role": "user", "content": self._user_prompt()},

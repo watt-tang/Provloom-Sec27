@@ -59,7 +59,7 @@ class LLMConfig:
     api_key: str = DEFAULT_LLM_API_KEY
     model: str = DEFAULT_LLM_MODEL
     temperature: float = 0.0
-    max_steps: int = 8
+    max_steps: int = 16
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "LLMConfig":
@@ -69,7 +69,7 @@ class LLMConfig:
         api_key = str(payload.get("api_key") or default_llm_api_key(provider)).strip()
         model = str(payload.get("model") or default_llm_model(provider)).strip()
         temperature = float(payload.get("temperature", 0.0))
-        max_steps = int(payload.get("max_steps", 8))
+        max_steps = int(payload.get("max_steps", 16))
         if enabled and not api_key:
             raise ValueError("`llm_config.api_key` is required when llm_config.enabled=true.")
         return cls(
