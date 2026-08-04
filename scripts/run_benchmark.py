@@ -233,6 +233,12 @@ def run_case(
             "root_cause_evidence": analysis.get("root_cause_evidence", {}),
             "graph_summary": analysis.get("graph_summary", {}),
             "final_decision": analysis.get("final_decision", "unknown"),
+            "review_required": bool(analysis.get("review_required", analysis.get("needs_review", False))),
+            "review_lean": analysis.get("review_lean", "none"),
+            "binary_prediction": analysis.get("binary_prediction", "malicious" if analysis.get("final_decision") != "benign" else "benign"),
+            "decision_score": analysis.get("decision_score", analysis.get("lean_score", 0.0)),
+            "review_reason": analysis.get("review_reason", analysis.get("lean_reason", "")),
+            "operating_thresholds": analysis.get("operating_thresholds", {}),
             "triggered_factors": analysis.get("triggered_factors", []),
             "suppression_factors": analysis.get("suppression_factors", []),
             "decision_evidence": analysis.get("decision_evidence", {}),
@@ -291,6 +297,12 @@ def run_case(
         "root_cause_evidence": analysis.get("root_cause_evidence", {}),
         "graph_summary": analysis.get("graph_summary", {}),
         "final_decision": analysis.get("final_decision", "unknown"),
+        "review_required": bool(analysis.get("review_required", analysis.get("needs_review", False))),
+        "review_lean": analysis.get("review_lean", "none"),
+        "binary_prediction": analysis.get("binary_prediction", "malicious" if analysis.get("final_decision") != "benign" else "benign"),
+        "decision_score": analysis.get("decision_score", analysis.get("lean_score", 0.0)),
+        "review_reason": analysis.get("review_reason", analysis.get("lean_reason", "")),
+        "operating_thresholds": analysis.get("operating_thresholds", {}),
         "triggered_factors": analysis.get("triggered_factors", []),
         "suppression_factors": analysis.get("suppression_factors", []),
         "decision_evidence": analysis.get("decision_evidence", {}),
@@ -347,6 +359,12 @@ def evaluate_case(case: BenchmarkCase, prediction: dict[str, Any]) -> dict[str, 
         "predicted_root_cause_detail": root_cause_detail,
         "root_cause_evidence": prediction.get("root_cause_evidence", {}),
         "final_decision": prediction.get("final_decision", "unknown"),
+        "review_required": bool(prediction.get("review_required", prediction.get("needs_review", False))),
+        "review_lean": prediction.get("review_lean", "none"),
+        "binary_prediction": prediction.get("binary_prediction", "malicious" if prediction.get("final_decision") != "benign" else "benign"),
+        "decision_score": prediction.get("decision_score", prediction.get("lean_score", 0.0)),
+        "review_reason": prediction.get("review_reason", prediction.get("lean_reason", "")),
+        "operating_thresholds": prediction.get("operating_thresholds", {}),
         "triggered_factors": prediction.get("triggered_factors", []),
         "suppression_factors": prediction.get("suppression_factors", []),
         "decision_evidence": prediction.get("decision_evidence", {}),
@@ -491,6 +509,16 @@ def aggregate_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
     benign = [row for row in completed if not row["is_malicious"]]
     detection_hits = [row for row in malicious if row["behaviors_match"]]
     false_positives = [row for row in benign if row["predicted_malicious"]]
+    tp = sum(1 for row in malicious if row["predicted_malicious"])
+    fn = sum(1 for row in malicious if not row["predicted_malicious"])
+    fp = sum(1 for row in benign if row["predicted_malicious"])
+    tn = sum(1 for row in benign if not row["predicted_malicious"])
+    precision = tp / (tp + fp) if tp + fp else 0.0
+    recall = tp / (tp + fn) if tp + fn else 0.0
+    binary_f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    review_rows = [row for row in completed if row.get("review_required")]
+    malicious_review = [row for row in malicious if row.get("review_required")]
+    benign_review = [row for row in benign if row.get("review_required")]
 
     def avg_metric(name: str, subset: list[dict[str, Any]]) -> float:
         values = [float(row[name]) for row in subset if row.get(name) is not None]
@@ -507,6 +535,15 @@ def aggregate_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "benign_case_count": len(benign),
         "detection_rate": round(len(detection_hits) / len(malicious), 4) if malicious else 0.0,
         "false_positive_rate": round(len(false_positives) / len(benign), 4) if benign else 0.0,
+        "binary_precision": round(precision, 4),
+        "binary_recall": round(recall, 4),
+        "binary_f1": round(binary_f1, 4),
+        "binary_fpr": round(fp / (fp + tn), 4) if fp + tn else 0.0,
+        "review_required_rate": round(len(review_rows) / len(completed), 4) if completed else 0.0,
+        "malicious_with_review_count": len(malicious_review),
+        "benign_with_review_count": len(benign_review),
+        "malicious_review_rate": round(len(malicious_review) / len(malicious), 4) if malicious else 0.0,
+        "benign_review_rate": round(len(benign_review) / len(benign), 4) if benign else 0.0,
         "endpoint_accuracy": avg_metric("endpoint_accuracy", malicious),
         "edge_level_f1": avg_metric("edge_level_f1", malicious),
         "complete_chain_rate": avg_metric("complete_chain_rate", malicious),
@@ -534,6 +571,15 @@ def write_summary_files(benchmark_root: Path, csv_rows: list[dict[str, Any]], pa
                 "benign_case_count",
                 "detection_rate",
                 "false_positive_rate",
+                "binary_precision",
+                "binary_recall",
+                "binary_f1",
+                "binary_fpr",
+                "review_required_rate",
+                "malicious_with_review_count",
+                "benign_with_review_count",
+                "malicious_review_rate",
+                "benign_review_rate",
                 "endpoint_accuracy",
                 "edge_level_f1",
                 "complete_chain_rate",
@@ -558,6 +604,15 @@ def _flatten_summary_row(summary: dict[str, Any], analysis_mode: str) -> dict[st
         "benign_case_count": summary["benign_case_count"],
         "detection_rate": summary["detection_rate"],
         "false_positive_rate": summary["false_positive_rate"],
+        "binary_precision": summary["binary_precision"],
+        "binary_recall": summary["binary_recall"],
+        "binary_f1": summary["binary_f1"],
+        "binary_fpr": summary["binary_fpr"],
+        "review_required_rate": summary["review_required_rate"],
+        "malicious_with_review_count": summary["malicious_with_review_count"],
+        "benign_with_review_count": summary["benign_with_review_count"],
+        "malicious_review_rate": summary["malicious_review_rate"],
+        "benign_review_rate": summary["benign_review_rate"],
         "endpoint_accuracy": summary["endpoint_accuracy"],
         "edge_level_f1": summary["edge_level_f1"],
         "complete_chain_rate": summary["complete_chain_rate"],
@@ -592,6 +647,12 @@ def _skipped_case_result(case: BenchmarkCase, analysis_mode: str) -> dict[str, A
         "artifact_dir": None,
         "benchmark_case_dir": None,
         "graph_summary": {},
+        "final_decision": "benign",
+        "review_required": False,
+        "review_lean": "none",
+        "binary_prediction": "benign",
+        "decision_score": 0.0,
+        "review_reason": "skipped",
         "primary_chain": [],
         "notes": case.notes,
         "skip_reason": "dynamic_runnable=false",
@@ -613,6 +674,9 @@ def _is_alerting_prediction(
     expected_behaviors: set[str],
 ) -> bool:
     final_decision = prediction.get("final_decision")
+    binary_prediction = prediction.get("binary_prediction")
+    if binary_prediction in {"malicious", "benign"}:
+        return binary_prediction == "malicious"
     if final_decision in {"malicious", "needs_review", "benign"}:
         return final_decision in {"malicious", "needs_review"}
     return _is_predicted_malicious(

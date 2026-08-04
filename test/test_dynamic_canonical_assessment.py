@@ -118,15 +118,16 @@ class DynamicCanonicalAssessmentTests(unittest.TestCase):
         assessment = assess_dynamic_result(dynamic)
 
         self.assertEqual(assessment.status, "review_required")
-        self.assertEqual(assessment.canonical_final_decision, "needs_review")
-        self.assertTrue(assessment.needs_review)
+        self.assertEqual(assessment.canonical_final_decision, "malicious")
+        self.assertTrue(assessment.review_required)
 
     def test_target_reached_no_flow_is_benign_and_execution_failed_is_review(self) -> None:
         no_flow = DynamicAnalysisResult([], RuntimeProvenanceGraph(session_id="RUN"), [], CoverageReport("target_reached_no_flow"), [], [])
         failed = DynamicAnalysisResult([], RuntimeProvenanceGraph(session_id="RUN"), [], CoverageReport("execution_failed"), [], [])
 
         self.assertEqual(assess_dynamic_result(no_flow).canonical_final_decision, "benign")
-        self.assertEqual(assess_dynamic_result(failed).canonical_final_decision, "needs_review")
+        self.assertEqual(assess_dynamic_result(failed).canonical_final_decision, "benign")
+        self.assertTrue(assess_dynamic_result(failed).review_required)
 
     def test_llm_context_request_becomes_confirmed_carrier_without_plaintext(self) -> None:
         normalized = [

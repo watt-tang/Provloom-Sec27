@@ -28,7 +28,13 @@ def generate_unified_markdown(result: UnifiedExplanationResult | dict[str, Any])
         "",
         "## Canonical Assessment",
         f"- Status: {assessment.get('status', 'unknown')}",
-        f"- Decision: {assessment.get('canonical_final_decision', assessment.get('final_decision', 'unknown'))}",
+        f"- Final decision: {assessment.get('canonical_final_decision', assessment.get('final_decision', 'unknown'))}",
+        f"- Decision score: {assessment.get('decision_score', assessment.get('lean_score', 0.0))}",
+        f"- Review required: {assessment.get('review_required', assessment.get('needs_review', False))}",
+        f"- Review leaning: {assessment.get('review_lean', 'none')}",
+        f"- Binary prediction: {assessment.get('binary_prediction', 'malicious')}",
+        f"- Review reason: {assessment.get('review_reason', assessment.get('lean_reason', ''))}",
+        f"- Operating thresholds: {assessment.get('operating_thresholds', {})}",
         f"- Risk score: {assessment.get('canonical_risk_score', assessment.get('risk_score', 0))}",
         f"- Coverage: {assessment.get('coverage_state', payload.get('coverage_certificate', {}).get('coverage_state', 'unknown'))}",
         f"- Risk chain: {(payload.get('risk_chain_status') or {}).get('status', 'unknown')}",
@@ -102,16 +108,11 @@ def generate_unified_markdown(result: UnifiedExplanationResult | dict[str, Any])
 
 
 def _title_for(assessment: dict[str, Any]) -> str:
-    status = str(assessment.get("status") or "")
     decision = str(assessment.get("canonical_final_decision") or assessment.get("final_decision") or "")
-    coverage = str(assessment.get("coverage_state") or "")
-    if status == "violation_confirmed" or decision == "malicious":
-        return "Violation Confirmed"
-    if coverage in {"timeout", "execution_failed", "path_not_triggered", "max_steps_exhausted", "path_incomplete", "partially_complete"}:
-        return "Execution Incomplete"
-    if status == "review_required" or decision == "needs_review":
-        return "Review Required"
-    return "No Violation Observed"
+    review_required = bool(assessment.get("review_required", assessment.get("needs_review", False)))
+    if decision == "malicious":
+        return "Malicious — Review Recommended" if review_required else "Malicious"
+    return "Benign — Review Recommended" if review_required else "Benign"
 
 
 def _executive(payload: dict[str, Any]) -> str:

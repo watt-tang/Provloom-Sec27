@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from app.dynamic.models import PolicyViolation, RuntimeChain
+from app.dynamic.review_lean import apply_review_lean
 
 
 VIOLATION_SCORE = 80
@@ -26,6 +27,13 @@ class CanonicalAssessment:
     needs_review: bool = False
     canonical_risk_score: int = 0
     canonical_final_decision: str = "benign"
+    review_required: bool = False
+    review_lean: str = "none"
+    binary_prediction: str = "benign"
+    decision_score: float = 0.0
+    review_reason: str = ""
+    lean_reason: str = ""
+    lean_score: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -35,12 +43,14 @@ def assess_dynamic_result(dynamic_result: Any | None) -> CanonicalAssessment:
     """Map canonical Dynamic v3 evidence into the top-level decision contract."""
 
     if dynamic_result is None:
-        return CanonicalAssessment(
-            status="execution_incomplete",
-            reason="dynamic_v3_result_missing",
-            needs_review=True,
-            canonical_risk_score=REVIEW_SCORE,
-            canonical_final_decision="needs_review",
+        return _finalize_assessment(
+            CanonicalAssessment(
+                status="execution_incomplete",
+                reason="dynamic_v3_result_missing",
+                needs_review=True,
+                canonical_risk_score=REVIEW_SCORE,
+                canonical_final_decision="needs_review",
+            )
         )
 
     chains: list[RuntimeChain] = list(getattr(dynamic_result, "chains", []) or [])
@@ -67,7 +77,7 @@ def assess_dynamic_result(dynamic_result: Any | None) -> CanonicalAssessment:
             canonical_risk_score=VIOLATION_SCORE,
             canonical_final_decision="malicious",
         )
-        return assessment
+        return _finalize_assessment(assessment, chains=chains, coverage=coverage)
 
     incomplete_states = {
         "timeout",
@@ -88,47 +98,59 @@ def assess_dynamic_result(dynamic_result: Any | None) -> CanonicalAssessment:
     has_hash_only = bool(chains) and all("hash_derived" in set(chain.evidence_strengths or []) for chain in chains)
 
     if coverage_state in incomplete_states:
-        return CanonicalAssessment(
-            status="execution_incomplete",
-            reason=f"dynamic execution incomplete: {coverage_state}",
-            policy_violation_count=0,
-            confirmed_chain_count=len(confirmed),
-            candidate_chain_count=len(candidates),
-            coverage_state=coverage_state,
-            supporting_chain_ids=[chain.chain_id for chain in chains],
-            instrumentation_gaps=gaps,
-            needs_review=True,
-            canonical_risk_score=REVIEW_SCORE,
-            canonical_final_decision="needs_review",
+        return _finalize_assessment(
+            CanonicalAssessment(
+                status="execution_incomplete",
+                reason=f"dynamic execution incomplete: {coverage_state}",
+                policy_violation_count=0,
+                confirmed_chain_count=len(confirmed),
+                candidate_chain_count=len(candidates),
+                coverage_state=coverage_state,
+                supporting_chain_ids=[chain.chain_id for chain in chains],
+                instrumentation_gaps=gaps,
+                needs_review=True,
+                canonical_risk_score=REVIEW_SCORE,
+                canonical_final_decision="needs_review",
+            ),
+            chains=chains,
+            coverage=coverage,
         )
 
     if coverage_state in review_states or gaps or has_review_chain or has_hash_only:
-        return CanonicalAssessment(
-            status="review_required",
-            reason=_review_reason(coverage_state, gaps, has_review_chain, has_hash_only),
-            policy_violation_count=0,
-            confirmed_chain_count=len(confirmed),
-            candidate_chain_count=len(candidates),
-            coverage_state=coverage_state,
-            supporting_chain_ids=[chain.chain_id for chain in chains],
-            instrumentation_gaps=gaps,
-            needs_review=True,
-            canonical_risk_score=REVIEW_SCORE,
-            canonical_final_decision="needs_review",
+        return _finalize_assessment(
+            CanonicalAssessment(
+                status="review_required",
+                reason=_review_reason(coverage_state, gaps, has_review_chain, has_hash_only),
+                policy_violation_count=0,
+                confirmed_chain_count=len(confirmed),
+                candidate_chain_count=len(candidates),
+                coverage_state=coverage_state,
+                supporting_chain_ids=[chain.chain_id for chain in chains],
+                instrumentation_gaps=gaps,
+                needs_review=True,
+                canonical_risk_score=REVIEW_SCORE,
+                canonical_final_decision="needs_review",
+            ),
+            chains=chains,
+            coverage=coverage,
         )
 
-    return CanonicalAssessment(
-        status="no_violation_observed",
-        reason="canonical dynamic v3 observed no policy violation",
-        policy_violation_count=0,
-        confirmed_chain_count=len(confirmed),
-        candidate_chain_count=0,
-        coverage_state=coverage_state,
-        supporting_chain_ids=[chain.chain_id for chain in confirmed],
-        instrumentation_gaps=gaps,
-        needs_review=False,
-        canonical_risk_score=0,
-        canonical_final_decision="benign",
+    return _finalize_assessment(
+        CanonicalAssessment(
+            status="no_violation_observed",
+            reason="canonical dynamic v3 observed no policy violation",
+            policy_violation_count=0,
+            confirmed_chain_count=len(confirmed),
+            candidate_chain_count=0,
+            coverage_state=coverage_state,
+            supporting_chain_ids=[chain.chain_id for chain in confirmed],
+            instrumentation_gaps=gaps,
+            needs_review=False,
+            canonical_risk_score=0,
+            canonical_final_decision="benign",
+        ),
+        chains=chains,
+        coverage=coverage,
     )
 
 
@@ -161,8 +183,9 @@ def apply_canonical_assessment(report: dict[str, Any], assessment: CanonicalAsse
         report["canonical_assessment"]["needs_review"] = True
         report["risk_score"] = max(int(report.get("risk_score", 0) or 0), REVIEW_SCORE)
         report["canonical_risk_score"] = report["risk_score"]
-        report["final_decision"] = "needs_review"
-        report["canonical_final_decision"] = "needs_review"
+        report["review_required"] = True
+        report["canonical_assessment"]["review_required"] = True
+    _sync_review_lean_fields(report)
 
 
 def validate_consistency(report: dict[str, Any]) -> list[str]:
@@ -189,14 +212,54 @@ def canonical_from_dict(payload: dict[str, Any] | None) -> CanonicalAssessment:
     """Compatibility helper for old reports that do not yet contain the field."""
 
     if not payload:
-        return CanonicalAssessment(
-            status="review_required",
-            reason="canonical assessment missing from legacy artifact",
-            needs_review=True,
-            canonical_risk_score=REVIEW_SCORE,
-            canonical_final_decision="needs_review",
+        return _finalize_assessment(
+            CanonicalAssessment(
+                status="review_required",
+                reason="canonical assessment missing from legacy artifact",
+                needs_review=True,
+                canonical_risk_score=REVIEW_SCORE,
+                canonical_final_decision="needs_review",
+            )
         )
-    return CanonicalAssessment(**{key: value for key, value in payload.items() if key in CanonicalAssessment.__dataclass_fields__})
+    return _finalize_assessment(CanonicalAssessment(**{key: value for key, value in payload.items() if key in CanonicalAssessment.__dataclass_fields__}))
+
+
+def _finalize_assessment(
+    assessment: CanonicalAssessment,
+    *,
+    chains: list[RuntimeChain] | None = None,
+    coverage: Any | None = None,
+) -> CanonicalAssessment:
+    lean_payload = apply_review_lean(
+        assessment.to_dict(),
+        runtime_chains=chains or [],
+        coverage_certificate=coverage.to_dict() if hasattr(coverage, "to_dict") else coverage,
+    )
+    for key in ("review_required", "review_lean", "binary_prediction", "decision_score", "review_reason", "lean_reason", "lean_score"):
+        setattr(assessment, key, lean_payload.get(key, getattr(assessment, key)))
+    assessment.needs_review = bool(lean_payload.get("review_required", assessment.needs_review))
+    assessment.canonical_final_decision = str(lean_payload.get("canonical_final_decision", assessment.canonical_final_decision))
+    return assessment
+
+
+def _sync_review_lean_fields(report: dict[str, Any]) -> None:
+    assessment = dict(report.get("canonical_assessment") or {})
+    assessment["canonical_final_decision"] = report.get("canonical_final_decision", report.get("final_decision", assessment.get("canonical_final_decision", "unknown")))
+    assessment["canonical_risk_score"] = int(report.get("canonical_risk_score", report.get("risk_score", assessment.get("canonical_risk_score", 0))) or 0)
+    assessment["needs_review"] = bool(report.get("needs_review", assessment.get("needs_review", False)))
+    assessment = apply_review_lean(
+        assessment,
+        runtime_chains=report.get("runtime_chains", []),
+        runtime_events=report.get("runtime_events_v2", report.get("normalized_events", [])),
+        coverage_certificate=report.get("coverage_certificate", report.get("runtime_coverage", {})),
+        dynamic_payload=report,
+    )
+    report["canonical_assessment"] = assessment
+    for key in ("review_required", "review_lean", "binary_prediction", "decision_score", "review_reason", "lean_reason", "lean_score", "classification_threshold", "review_lower_bound", "review_upper_bound", "operating_thresholds"):
+        report[key] = assessment.get(key)
+    report["needs_review"] = bool(assessment.get("review_required", False))
+    report["final_decision"] = assessment.get("final_decision", report.get("final_decision"))
+    report["canonical_final_decision"] = assessment.get("canonical_final_decision", report.get("canonical_final_decision"))
 
 
 def _append_triggered_factor(report: dict[str, Any], assessment: CanonicalAssessment) -> None:

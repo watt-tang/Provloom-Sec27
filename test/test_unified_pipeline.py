@@ -226,7 +226,8 @@ class UnifiedPipelineTests(unittest.TestCase):
         unified = build_unified_explanation(skill_id="probe", static_result=static_payload, dynamic_result=runtime).to_dict()
 
         self.assertEqual(unified["coverage_certificate"]["coverage_state"], "path_incomplete")
-        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "needs_review")
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "malicious")
+        self.assertTrue(unified["canonical_assessment"]["review_required"])
         self.assertGreaterEqual(unified["coverage_certificate"]["obligation_summary"]["high_risk_unresolved"], 1)
         self.assertTrue(unified["coverage_certificate"]["sensitive_artifacts"])
 
@@ -255,7 +256,8 @@ class UnifiedPipelineTests(unittest.TestCase):
         self.assertEqual(guarded["coverage_certificate"]["coverage_state"], "path_incomplete")
         self.assertEqual(guarded["risk_chain_status"]["status"], "confirmed_allowed")
         self.assertIn(guarded["primary_static_path_status"], {"partial", "unresolved"})
-        self.assertEqual(guarded["canonical_assessment"]["canonical_final_decision"], "needs_review")
+        self.assertEqual(guarded["canonical_assessment"]["canonical_final_decision"], "benign")
+        self.assertTrue(guarded["canonical_assessment"]["review_required"])
         self.assertTrue([item for item in guarded["coverage_certificate"]["obligations"] if item["expected_runtime_operation"] == "untrusted_sink_absence_resolved"])
         self.assertEqual(unguarded["canonical_assessment"]["canonical_final_decision"], "benign")
 
@@ -280,7 +282,8 @@ class UnifiedPipelineTests(unittest.TestCase):
 
         self.assertEqual(send_obligations[0]["status"], "unsatisfied")
         self.assertEqual(unified["coverage_certificate"]["coverage_state"], "path_incomplete")
-        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "needs_review")
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "malicious")
+        self.assertTrue(unified["canonical_assessment"]["review_required"])
 
     def test_max_steps_exhausted_is_review_not_benign(self) -> None:
         static_payload = {
@@ -301,7 +304,8 @@ class UnifiedPipelineTests(unittest.TestCase):
         unified = build_unified_explanation(skill_id="probe", static_result=static_payload, dynamic_result=runtime).to_dict()
 
         self.assertEqual(unified["coverage_certificate"]["coverage_state"], "max_steps_exhausted")
-        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "needs_review")
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "benign")
+        self.assertTrue(unified["canonical_assessment"]["review_required"])
 
     def test_total_timeout_defaults_and_precedence_are_canonicalized(self) -> None:
         self.assertEqual(DEFAULT_TOTAL_TIMEOUT_SECONDS, 600)
@@ -428,7 +432,8 @@ class UnifiedPipelineTests(unittest.TestCase):
         no_flow = build_unified_explanation(skill_id="same-name", static_result=static_payload, dynamic_result=no_flow_runtime).to_dict()
         timeout = build_unified_explanation(skill_id="different-name", static_result=static_payload, dynamic_result=timeout_runtime).to_dict()
 
-        self.assertEqual(candidate["canonical_assessment"]["canonical_final_decision"], "needs_review")
+        self.assertEqual(candidate["canonical_assessment"]["canonical_final_decision"], "malicious")
+        self.assertTrue(candidate["canonical_assessment"]["review_required"])
         self.assertEqual(candidate["risk_chain_status"]["status"], "candidate_flow")
         self.assertEqual(no_flow["canonical_assessment"]["canonical_final_decision"], "benign")
         self.assertEqual(no_flow["risk_chain_status"]["status"], "no_sensitive_flow_observed")
@@ -455,7 +460,8 @@ class UnifiedPipelineTests(unittest.TestCase):
 
         self.assertEqual(unified["risk_chain_status"]["status"], "confirmed_allowed")
         self.assertEqual(unified["security_resolution_status"], "unresolved_before_sink")
-        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "needs_review")
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "malicious")
+        self.assertTrue(unified["canonical_assessment"]["review_required"])
 
     def test_security_resolution_confirmed_allowed_timeout_after_resolution_is_benign(self) -> None:
         runtime = {
@@ -492,7 +498,8 @@ class UnifiedPipelineTests(unittest.TestCase):
 
         self.assertEqual(unified["risk_chain_status"]["status"], "no_sensitive_flow_observed")
         self.assertEqual(unified["security_resolution_status"], "unresolved_before_sink")
-        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "needs_review")
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "malicious")
+        self.assertTrue(unified["canonical_assessment"]["review_required"])
 
     def test_security_resolution_gaps_and_candidates_block_benign(self) -> None:
         static_payload = {"schema_version": "provloom-static-v2", "extracted_actions": [], "static_chains": []}
@@ -515,9 +522,11 @@ class UnifiedPipelineTests(unittest.TestCase):
         gap = build_unified_explanation(skill_id="probe", static_result=static_payload, dynamic_result=gap_runtime).to_dict()
 
         self.assertEqual(candidate["security_resolution_status"], "unresolved_candidate_flow")
-        self.assertEqual(candidate["canonical_assessment"]["canonical_final_decision"], "needs_review")
+        self.assertEqual(candidate["canonical_assessment"]["canonical_final_decision"], "malicious")
+        self.assertTrue(candidate["canonical_assessment"]["review_required"])
         self.assertEqual(gap["security_resolution_status"], "unresolved_instrumentation")
-        self.assertEqual(gap["canonical_assessment"]["canonical_final_decision"], "needs_review")
+        self.assertEqual(gap["canonical_assessment"]["canonical_final_decision"], "malicious")
+        self.assertTrue(gap["canonical_assessment"]["review_required"])
 
     def test_security_resolution_supporting_and_auxiliary_gaps_do_not_block_benign(self) -> None:
         static_payload = {
@@ -556,7 +565,8 @@ class UnifiedPipelineTests(unittest.TestCase):
         unified = build_unified_explanation(skill_id="probe", static_result=static_payload, dynamic_result=runtime).to_dict()
 
         self.assertEqual(unified["security_resolution_status"], "unresolved_before_guard")
-        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "needs_review")
+        self.assertEqual(unified["canonical_assessment"]["canonical_final_decision"], "benign")
+        self.assertTrue(unified["canonical_assessment"]["review_required"])
 
     def test_security_resolution_boundary_guard_can_resolve_after_complete_execution(self) -> None:
         static_payload = {

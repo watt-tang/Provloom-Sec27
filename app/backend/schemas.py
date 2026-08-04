@@ -214,6 +214,14 @@ class AnalyzeSkillResponse:
     legacy_final_decision: str = "unknown"
     legacy_risk_score: int = 0
     needs_review: bool = False
+    review_required: bool = False
+    review_lean: str = "none"
+    binary_prediction: str = "malicious"
+    decision_score: float = 0.0
+    review_reason: str = ""
+    lean_reason: str = ""
+    lean_score: float = 0.0
+    operating_thresholds: dict[str, Any] = field(default_factory=dict)
     policy_violation_count: int = 0
     confirmed_chain_count: int = 0
     candidate_chain_count: int = 0

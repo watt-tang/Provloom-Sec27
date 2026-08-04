@@ -84,8 +84,9 @@ def _run(args) -> int:
     output_dir = ARTIFACTS_ROOT / run_id
     output_dir.mkdir(parents=True, exist_ok=True)
     _write_result(result, output_dir)
-    unified = build_unified_explanation(skill_id=Path(args.skill_path).name, static_result=result, dynamic_result=None)
+    unified = build_unified_explanation(skill_id=Path(args.skill_path).name, static_result=result, dynamic_result=None, analysis_mode="static_only")
     report_paths = write_unified_reports(unified, output_dir)
+    canonical = unified.to_dict().get("canonical_assessment", {})
     print(
         json.dumps(
             {
@@ -93,6 +94,13 @@ def _run(args) -> int:
                 "artifacts_dir": str(output_dir),
                 "unified_analysis_path": str(report_paths["json"]),
                 "unified_explanation_report_path": str(report_paths["markdown"]),
+                "final_decision": canonical.get("final_decision", canonical.get("canonical_final_decision", "unknown")),
+                "binary_prediction": canonical.get("binary_prediction", "unknown"),
+                "decision_score": canonical.get("decision_score", 0.0),
+                "review_required": canonical.get("review_required", False),
+                "review_lean": canonical.get("review_lean", "none"),
+                "review_reason": canonical.get("review_reason", ""),
+                "operating_thresholds": canonical.get("operating_thresholds", {}),
                 "review_priority": result.static_analysis_summary.get("review_priority", "informational"),
                 "chain_status_counts": result.static_analysis_summary.get("chain_status_counts", {}),
                 "alert_status_counts": result.static_analysis_summary.get("alert_status_counts", {}),

@@ -143,6 +143,7 @@ def analyze_completed_execution(
         dynamic_result=dynamic_result,
         execution=execution,
         legacy_report=legacy_report,
+        analysis_mode=config.analysis_mode,
     )
     report_paths = write_unified_reports(unified, execution.artifacts_dir)
     report = _merge_dynamic_report(
@@ -188,6 +189,7 @@ def _analyze_static_only(
         dynamic_result=None,
         execution=None,
         legacy_report={"legacy_static_result": legacy_static, "legacy_risk_score": legacy_static.get("risk_score", 0), "legacy_final_decision": legacy_static.get("final_decision", "unknown")},
+        analysis_mode="static_only",
     )
     report_paths = write_unified_reports(unified, artifacts_dir)
     (artifacts_dir / "normalized-events.jsonl").write_text("", encoding="utf-8")
@@ -280,6 +282,14 @@ def _merge_dynamic_report(
             "canonical_final_decision": canonical.get("canonical_final_decision", "unknown"),
             "canonical_assessment": canonical,
             "needs_review": bool(canonical.get("needs_review", False)),
+            "review_required": bool(canonical.get("review_required", canonical.get("needs_review", False))),
+            "review_lean": canonical.get("review_lean", "none"),
+            "binary_prediction": canonical.get("binary_prediction", "malicious" if canonical.get("canonical_final_decision") != "benign" else "benign"),
+            "decision_score": float(canonical.get("decision_score", canonical.get("lean_score", 0.0)) or 0.0),
+            "review_reason": canonical.get("review_reason", canonical.get("lean_reason", "")),
+            "lean_reason": canonical.get("lean_reason", ""),
+            "lean_score": float(canonical.get("lean_score", 0.0) or 0.0),
+            "operating_thresholds": canonical.get("operating_thresholds", {}),
             "coverage_state": canonical.get("coverage_state", report.get("coverage_state", "unknown")),
         }
     )
@@ -350,6 +360,14 @@ def _merge_static_report(
         "canonical_final_decision": canonical.get("canonical_final_decision", "unknown"),
         "canonical_assessment": canonical,
         "needs_review": bool(canonical.get("needs_review", False)),
+        "review_required": bool(canonical.get("review_required", canonical.get("needs_review", False))),
+        "review_lean": canonical.get("review_lean", "none"),
+        "binary_prediction": canonical.get("binary_prediction", "malicious" if canonical.get("canonical_final_decision") != "benign" else "benign"),
+        "decision_score": float(canonical.get("decision_score", canonical.get("lean_score", 0.0)) or 0.0),
+        "review_reason": canonical.get("review_reason", canonical.get("lean_reason", "")),
+        "lean_reason": canonical.get("lean_reason", ""),
+        "lean_score": float(canonical.get("lean_score", 0.0) or 0.0),
+        "operating_thresholds": canonical.get("operating_thresholds", {}),
         "coverage_state": canonical.get("coverage_state", "unknown"),
         "artifacts_dir": str(artifacts_dir),
     }

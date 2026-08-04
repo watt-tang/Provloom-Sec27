@@ -8,6 +8,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from app.dynamic.assessment import assess_dynamic_result
+from app.dynamic.review_lean import apply_review_lean
 from app.explanation.models import (
     ALIGNMENT_VERSION,
     ASSESSMENT_VERSION,
@@ -60,6 +61,7 @@ def build_unified_explanation(
     dynamic_result: Any | None,
     execution: Any | None = None,
     legacy_report: dict[str, Any] | None = None,
+    analysis_mode: str = "full_system",
 ) -> UnifiedExplanationResult:
     static_payload = _payload(static_result)
     dynamic_payload = _payload(dynamic_result)
@@ -77,7 +79,7 @@ def build_unified_explanation(
         execution=execution,
     )
     policy_findings = _build_policy_findings(static_payload, dynamic_payload, runtime_chains, contradictions, coverage_certificate)
-    canonical = _canonical_assessment(dynamic_result, static_payload, dynamic_payload, policy_findings, coverage_certificate)
+    canonical = _canonical_assessment(dynamic_result, static_payload, dynamic_payload, policy_findings, coverage_certificate, analysis_mode=analysis_mode)
     witnesses = _minimal_witnesses(static_payload, runtime_chains)
     relevant_unresolved = [item.to_dict() for item in alignments if item.status == "relevant_unresolved"]
     internal_unresolved = [item.to_dict() for item in alignments if item.status == "internal_unresolved"]
@@ -857,6 +859,8 @@ def _canonical_assessment(
     dynamic_payload: dict[str, Any],
     findings: list[PolicyFinding],
     coverage: CoverageCertificate,
+    *,
+    analysis_mode: str = "full_system",
 ) -> dict[str, Any]:
     risk_status = coverage.risk_chain_status.status
     execution_status = coverage.execution_completion.status
@@ -924,7 +928,16 @@ def _canonical_assessment(
     assessment["security_resolution_status"] = security_status
     assessment["termination_after_security_resolution"] = coverage.security_resolution.termination_after_resolution
     assessment["assessment_version"] = ASSESSMENT_VERSION
-    return assessment
+    return apply_review_lean(
+        assessment,
+        runtime_chains=_runtime_chains(dynamic_result, dynamic_payload),
+        runtime_events=_runtime_events(dynamic_result, dynamic_payload),
+        policy_findings=[item.to_dict() if hasattr(item, "to_dict") else item for item in findings],
+        coverage_certificate=coverage.to_dict(),
+        dynamic_payload=dynamic_payload,
+        static_payload=static_payload,
+        analysis_mode=analysis_mode,
+    )
 
 
 def _has_unresolved_decisive_obligation(coverage: CoverageCertificate) -> bool:
