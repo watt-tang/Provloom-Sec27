@@ -46,6 +46,9 @@ CONSISTENCY_FIELDS = [
     "confirmed_chain_count",
     "complete_chain_count",
 ]
+EVENT_ONLY_CONSISTENCY_FIELDS = CONSISTENCY_FIELDS + ["candidate_chain_count"]
+EVENT_ONLY_MAX_EVENT_GAP = 180
+EVENT_ONLY_STRONG_CONFIDENCE = 0.62
 TAINT_FORBIDDEN_KEYS = {
     "taint_id",
     "taint_ids",
@@ -55,6 +58,7 @@ TAINT_FORBIDDEN_KEYS = {
     "marker_matches",
     "taint_propagation_rule",
     "derived_from_hash",
+    "taint_evidence_level",
 }
 NO_ALIGNMENT_FORBIDDEN_KEYS = {
     "static_path_id",
@@ -324,10 +328,15 @@ def replay_event_only(full: FullArtifact) -> dict[str, Any]:
     execution = load_frozen_execution(full)
     normalized = sanitize_normalized_events(build_normalized_events(execution), remove_taint_events=True)
     runtime_events = sanitize_runtime_events(runtime_events_from_normalized(normalized, session_id=execution.execution_id, skill_id=full.sample_id))
-    graph, chains = build_event_only_graph_and_chains(runtime_events, execution.execution_id)
+    graph, chains = build_event_only_graph_and_chains(
+        runtime_events,
+        execution.execution_id,
+        source_registry=SourceRegistry.from_artifacts(full.artifacts_dir),
+    )
     coverage = CoverageAnalyzer().analyze(events=runtime_events, chains=chains, timed_out=execution.timed_out, exit_code=execution.exit_code)
     dynamic = DynamicAnalysisResult(runtime_events, graph, chains, coverage, [], [], None)
     assessment = assess_dynamic_result(dynamic).to_dict()
+    final = event_only_decision(assessment, chains, coverage)
     clean_intermediate = strip_forbidden_keys(
         {
             "runtime_events": [event.to_dict() for event in runtime_events],
@@ -340,18 +349,22 @@ def replay_event_only(full: FullArtifact) -> dict[str, Any]:
     return base_completed(
         full,
         "event_only",
-        binary_prediction=assessment.get("binary_prediction"),
-        final_decision=assessment.get("canonical_final_decision"),
-        review_required=bool(assessment.get("review_required", False)),
-        decision_score=assessment.get("decision_score"),
-        risk_chain_status=event_only_risk_status(chains, coverage),
+        binary_prediction=final["binary_prediction"],
+        final_decision=final["final_decision"],
+        review_required=final["review_required"],
+        decision_score=final["decision_score"],
+        risk_chain_status=final["risk_chain_status"],
         security_resolution_status="event_only_no_taint_flow_identity",
         confirmed_chain_count=len([chain for chain in chains if chain.chain_type.endswith("_confirmed")]),
         complete_chain_count=count_complete_chains([chain.to_dict() for chain in chains]),
         extra={
             "ablation_scope": "analysis_stage",
             "execution_trace": "frozen_taint_instrumented_execution",
+            "evidence_mode": "event_only",
             "event_only_name": "Event-only Provenance",
+            "candidate_chain_count": len([chain for chain in chains if "candidate" in chain.chain_type]),
+            "source_sink_candidate_count": len([chain for chain in chains if chain.source and chain.sink]),
+            "event_only_decision_contract": event_only_decision_contract(),
             "intermediate_audit": {
                 "source_inputs": ["runtime-events.jsonl", "trace.log.*", "mock-service-records.json"],
                 "reused_taint_aware_graph": False,
@@ -584,12 +597,14 @@ def strip_tool_taint(events: list[Any]) -> list[Any]:
         event.taint_evidence_level = None
         event.taint_propagation_rule = None
         event.metadata = strip_forbidden_keys(event.metadata, TAINT_FORBIDDEN_KEYS)
+        event.metadata.pop("taint_evidence_level", None)
     return events
 
 
 def strip_llm_taint(events: list[Any]) -> list[Any]:
     for event in events:
         event.metadata = strip_forbidden_keys(event.metadata, TAINT_FORBIDDEN_KEYS)
+        event.metadata.pop("taint_evidence_level", None)
     return events
 
 
@@ -622,18 +637,28 @@ def sanitize_runtime_events(events: list[RuntimeEvent]) -> list[RuntimeEvent]:
         if event.evidence_strength in {"exact_value", "encoded_value", "reconstructed_value", "hash_derived"}:
             event.evidence_strength = "structured_relation"
         event.metadata = strip_forbidden_keys(event.metadata, TAINT_FORBIDDEN_KEYS)
+        event.metadata.pop("taint_evidence_level", None)
         sanitized.append(event)
     return sanitized
 
 
-def build_event_only_graph_and_chains(events: list[RuntimeEvent], session_id: str) -> tuple[RuntimeProvenanceGraph, list[RuntimeChain]]:
+def build_event_only_graph_and_chains(
+    events: list[RuntimeEvent],
+    session_id: str,
+    *,
+    source_registry: SourceRegistry | None = None,
+) -> tuple[RuntimeProvenanceGraph, list[RuntimeChain]]:
     from app.dynamic.models import RuntimeEdge, RuntimeNode
 
-    registry = SourceRegistry()
+    registry = source_registry or SourceRegistry()
     nodes: dict[str, RuntimeNode] = {}
     edges: list[RuntimeEdge] = []
-    sensitive_reads: list[RuntimeEvent] = []
-    network_events: list[RuntimeEvent] = []
+    edge_ids_by_event: dict[str, list[str]] = {}
+    event_positions = {event.event_id: index for index, event in enumerate(events)}
+    sensitive_reads: list[tuple[RuntimeEvent, dict[str, Any]]] = []
+    sink_events: list[tuple[RuntimeEvent, dict[str, Any]]] = []
+    file_writes: list[RuntimeEvent] = []
+    file_reads: list[RuntimeEvent] = []
 
     def node(node_id: str, node_type: str, label: str, metadata: dict[str, Any] | None = None) -> str:
         if node_id not in nodes:
@@ -642,6 +667,15 @@ def build_event_only_graph_and_chains(events: list[RuntimeEvent], session_id: st
 
     def edge(source: str, target: str, edge_type: str, event: RuntimeEvent, reason: str) -> str:
         edge_id = f"EOE{len(edges) + 1:06d}"
+        metadata = strip_forbidden_keys(
+            {
+                "event_type": event.event_type,
+                "operation": event.operation,
+                "evidence_mode": "event_only",
+                "event_index": event_positions.get(event.event_id),
+            },
+            TAINT_FORBIDDEN_KEYS,
+        )
         edges.append(
             RuntimeEdge(
                 edge_id=edge_id,
@@ -659,65 +693,321 @@ def build_event_only_graph_and_chains(events: list[RuntimeEvent], session_id: st
                 raw_references=[event.raw_reference] if event.raw_reference else [],
                 timestamp_start=event.timestamp,
                 timestamp_end=event.timestamp,
-                metadata={"event_type": event.event_type, "operation": event.operation},
+                metadata=metadata,
             )
         )
+        edge_ids_by_event.setdefault(event.event_id, []).append(edge_id)
         return edge_id
 
-    for event in sorted(events, key=lambda item: (item.timestamp, item.event_id)):
+    for event in events:
         actor = node(event.actor_id, event.actor_type.title(), event.actor_id, {"process_id": event.process_id})
         if event.object_type == "file":
             path = event.object_path or event.object_id
             obj = node(f"file:{path}", "File", str(path), {"path": path})
             if event.operation == "read":
                 edge(obj, actor, "READ", event, "event-only file read")
-                match = registry.match_path(str(path))
-                if match and str(match.sensitivity).lower() in {"medium", "high", "critical"}:
-                    source = node(f"source:{path}", "SensitiveSource", str(path), {"source_type": match.source_type, "sensitivity": match.sensitivity})
+                file_reads.append(event)
+                match = event_only_source_match(registry, str(path))
+                if match:
+                    source = node(f"source:{match['normalized_path']}", "SensitiveSource", str(match["normalized_path"]), {"source_type": match["source_type"], "sensitivity": match["sensitivity"]})
                     edge(source, obj, "SOURCE_OBJECT", event, "sensitive source semantics without taint identity")
-                    sensitive_reads.append(event)
-            elif event.operation == "write":
+                    sensitive_reads.append((event, match))
+            elif event.operation in {"write", "create"}:
                 edge(actor, obj, "WRITE", event, "event-only file write")
+                file_writes.append(event)
         elif event.object_type == "network":
             endpoint = str(event.metadata.get("sink_url") or event.metadata.get("url") or event.object_id)
             obj = node(f"network:{endpoint}", "NetworkEndpoint", endpoint, {"endpoint": endpoint})
             edge(actor, obj, "SEND" if event.operation in {"send", "upload", "write"} else "CONNECT", event, "event-only network observation")
-            network_events.append(event)
+            sink = event_only_sink_match(event)
+            if sink:
+                sink_events.append((event, sink))
         elif event.object_type == "process":
             obj = node(str(event.object_id or event.actor_id), "Process", str(event.object_id or event.actor_id), {})
             edge(actor, obj, "EXEC", event, "event-only process observation")
+        elif event.object_type == "tool":
+            tool = node(event.object_id, "Tool", event.object_id, {"tool_type": event.metadata.get("tool_type")})
+            edge(actor, tool, "TOOL_INVOKE", event, "event-only tool invocation")
+            source = event_only_tool_source_match(registry, event)
+            if source:
+                source_node = node(f"source:{source['normalized_path']}", "SensitiveSource", str(source["normalized_path"]), {"source_type": source["source_type"], "sensitivity": source["sensitivity"]})
+                edge(source_node, tool, "SOURCE_TOOL_INPUT", event, "sensitive source read requested by tool without taint identity")
+                sensitive_reads.append((event, source))
+            sink = event_only_tool_sink_match(event)
+            if sink:
+                sink_events.append((event, sink))
+        elif event.object_type == "value":
+            value = node(event.object_id, "Value", event.object_id, {"operation": event.operation})
+            edge(actor, value, "TOOL_RETURN", event, "event-only tool return")
 
     chains: list[RuntimeChain] = []
-    for read_event in sensitive_reads:
-        later_networks = [event for event in network_events if event.timestamp >= read_event.timestamp]
-        if not later_networks:
+    for read_event, source in sensitive_reads:
+        candidate_links: list[tuple[RuntimeEvent, dict[str, Any], list[str], float]] = []
+        for sink_event, sink in sink_events:
+            basis = event_only_causality_basis(read_event, sink_event, event_positions, file_writes, file_reads)
+            if not basis:
+                continue
+            confidence = event_only_confidence(basis, sink)
+            candidate_links.append((sink_event, sink, basis, confidence))
+        if not candidate_links:
             continue
-        sink_event = later_networks[0]
-        read_path = read_event.object_path or read_event.object_id
-        endpoint = str(sink_event.metadata.get("sink_url") or sink_event.metadata.get("url") or sink_event.object_id)
-        source_node = f"source:{read_path}"
-        sink_node = f"network:{endpoint}"
+        sink_event, sink, basis, confidence = sorted(candidate_links, key=lambda item: (-item[3], event_positions.get(item[0].event_id, 10**9)))[0]
+        source_node = f"source:{source['normalized_path']}"
+        sink_node = f"network:{sink['endpoint']}"
         supporting = [read_event.event_id, sink_event.event_id]
+        ordered_edges = sorted(
+            {edge_id for event_id in supporting for edge_id in edge_ids_by_event.get(event_id, [])}
+        )
         chains.append(
             RuntimeChain(
                 chain_id=f"EOC{len(chains) + 1:06d}",
-                chain_type="confidentiality_candidate",
+                chain_type="event_correlated_candidate",
                 source=source_node,
                 sink=sink_node,
                 taint_ids=[],
-                ordered_nodes=[source_node, f"file:{read_path}", read_event.actor_id, sink_node],
-                ordered_edges=[edge.edge_id for edge in edges if set(edge.event_ids) & set(supporting)],
+                ordered_nodes=[source_node, read_event.actor_id, sink_event.actor_id, sink_node],
+                ordered_edges=ordered_edges,
                 supporting_event_ids=supporting,
                 evidence_level="candidate",
                 missing_observation_points=["taint_flow_identity", "payload_or_carrier_continuity"],
-                coverage_status="insufficient_coverage",
-                explanation="Event-only temporal source-to-network candidate without taint-aware flow identity.",
-                evidence_strengths=["temporal_cooccurrence"],
-                confidence=0.35,
-                metadata={"ablation": "event_only", "chain_validation": "actor_object_temporal_only"},
+                coverage_status="event_correlated",
+                explanation="Event-only source-to-sink candidate using actor/object/process/tool causality without taint-aware flow identity.",
+                evidence_strengths=sorted(set(basis)),
+                confidence=confidence,
+                metadata=strip_forbidden_keys(
+                    {
+                        "ablation": "event_only",
+                        "evidence_mode": "event_only",
+                        "chain_validation": "actor_object_temporal_only",
+                        "confidence_basis": sorted(set(basis)),
+                        "source_path": source["normalized_path"],
+                        "source_type": source["source_type"],
+                        "sink_endpoint": sink["endpoint"],
+                        "sink_kind": sink["sink_kind"],
+                        "sink_is_controlled": sink["is_controlled"],
+                        "event_gap": abs(event_positions.get(sink_event.event_id, 0) - event_positions.get(read_event.event_id, 0)),
+                    },
+                    TAINT_FORBIDDEN_KEYS,
+                ),
             )
         )
     return RuntimeProvenanceGraph(session_id=session_id, nodes=list(nodes.values()), edges=edges), chains
+
+
+def event_only_source_match(registry: SourceRegistry, path: str) -> dict[str, Any] | None:
+    variants = event_only_path_variants(path)
+    for candidate in variants:
+        match = registry.match_path(candidate)
+        if match and str(match.sensitivity).lower() in {"medium", "high", "critical"}:
+            return {
+                "normalized_path": str(match.normalized_path or candidate),
+                "source_type": str(match.source_type or "sensitive_file"),
+                "sensitivity": str(match.sensitivity or "high"),
+                "matcher": (match.metadata or {}).get("matcher"),
+            }
+    return None
+
+
+def event_only_tool_source_match(registry: SourceRegistry, event: RuntimeEvent) -> dict[str, Any] | None:
+    if str(event.metadata.get("tool_type") or event.metadata.get("tool_id") or "").lower() not in {"read_file", "read"}:
+        return None
+    config = event.metadata.get("config") if isinstance(event.metadata.get("config"), dict) else {}
+    path = str(config.get("path") or event.metadata.get("path") or "")
+    return event_only_source_match(registry, path)
+
+
+def event_only_path_variants(path: str) -> list[str]:
+    text = str(path or "").strip()
+    if not text:
+        return []
+    variants = [text]
+    prefixes = ["/workspace/skill/", "/workspace/", "./"]
+    for prefix in prefixes:
+        if text.startswith(prefix):
+            variants.append(text[len(prefix) :])
+    parts = [part for part in text.split("/") if part]
+    for index in range(max(0, len(parts) - 4), len(parts)):
+        variants.append("/".join(parts[index:]))
+    return sorted({item for item in variants if item})
+
+
+def event_only_tool_sink_match(event: RuntimeEvent) -> dict[str, Any] | None:
+    tool = str(event.metadata.get("tool_type") or event.metadata.get("tool_id") or "").lower()
+    if tool not in {"http_request", "web_request", "curl"}:
+        return None
+    config = event.metadata.get("config") if isinstance(event.metadata.get("config"), dict) else {}
+    endpoint = str(
+        config.get("url")
+        or event.metadata.get("url")
+        or event.metadata.get("sink_url")
+        or event.metadata.get("address")
+        or ""
+    )
+    if not endpoint:
+        host = str(config.get("host") or event.metadata.get("host") or "")
+        path = str(config.get("path") or event.metadata.get("path") or "")
+        port = event.metadata.get("port") or config.get("port")
+        endpoint = f"http://{host}:{port}{path}" if host and port else f"http://{host}{path}" if host else ""
+    if not endpoint:
+        return None
+    return {
+        "endpoint": endpoint,
+        "sink_kind": "tool_http_request",
+        "is_controlled": "localhost:" in endpoint or "127.0.0.1:" in endpoint,
+        "request_observed": bool(event.metadata.get("request_attempted", True)),
+    }
+
+
+def event_only_sink_match(event: RuntimeEvent) -> dict[str, Any] | None:
+    if event.object_type != "network":
+        return None
+    operation = str(event.operation or "")
+    if operation == "connect":
+        return None
+    endpoint = str(event.metadata.get("sink_url") or event.metadata.get("url") or event.metadata.get("address") or event.object_id or "")
+    if not endpoint:
+        return None
+    raw_port = str(event.metadata.get("raw_port") or "")
+    if raw_port == "53" and str(event.metadata.get("network_evidence_level") or "") != "request_observed":
+        return None
+    if operation in {"sendmmsg", "sendto"} and raw_port == "53":
+        return None
+    request_observed = str(event.metadata.get("network_evidence_level") or "") == "request_observed" or operation in {"send", "upload", "write", "request_failed"}
+    if not request_observed:
+        return None
+    return {
+        "endpoint": endpoint.replace("NET:", ""),
+        "sink_kind": "network_request",
+        "is_controlled": bool(event.metadata.get("is_controlled_sink")) or "localhost:" in endpoint or "127.0.0.1:" in endpoint,
+        "request_observed": True,
+    }
+
+
+def event_only_causality_basis(
+    source_event: RuntimeEvent,
+    sink_event: RuntimeEvent,
+    event_positions: dict[str, int],
+    file_writes: list[RuntimeEvent],
+    file_reads: list[RuntimeEvent],
+) -> list[str]:
+    source_index = event_positions.get(source_event.event_id)
+    sink_index = event_positions.get(sink_event.event_id)
+    if source_index is None or sink_index is None or sink_index <= source_index:
+        return []
+    gap = sink_index - source_index
+    if gap > EVENT_ONLY_MAX_EVENT_GAP:
+        return []
+    basis: list[str] = ["temporal_correlation"]
+    if source_event.actor_id and source_event.actor_id == sink_event.actor_id:
+        basis.append("same_actor")
+    if source_event.process_id and source_event.process_id == sink_event.process_id:
+        basis.append("same_process")
+    if source_event.object_type == "tool" and sink_event.object_type == "tool":
+        basis.append("tool_lineage")
+    if source_event.object_type == "file" and sink_event.object_type == "network" and source_event.process_id == sink_event.process_id:
+        basis.append("process_causality")
+    if event_only_has_file_dependency(source_event, sink_event, event_positions, file_writes, file_reads):
+        basis.append("file_dependency")
+    strong = {"same_actor", "same_process", "tool_lineage", "process_causality", "file_dependency"}
+    return basis if set(basis) & strong else []
+
+
+def event_only_has_file_dependency(
+    source_event: RuntimeEvent,
+    sink_event: RuntimeEvent,
+    event_positions: dict[str, int],
+    file_writes: list[RuntimeEvent],
+    file_reads: list[RuntimeEvent],
+) -> bool:
+    source_index = event_positions.get(source_event.event_id, -1)
+    sink_index = event_positions.get(sink_event.event_id, -1)
+    if source_index < 0 or sink_index <= source_index:
+        return False
+    writes = [
+        event
+        for event in file_writes
+        if source_index < event_positions.get(event.event_id, -1) < sink_index
+        and source_event.process_id
+        and event.process_id == source_event.process_id
+    ]
+    if not writes:
+        return False
+    written = {str(event.object_path or event.object_id or "") for event in writes}
+    return any(
+        str(event.object_path or event.object_id or "") in written
+        and event_positions.get(event.event_id, -1) < sink_index
+        for event in file_reads
+    )
+
+
+def event_only_confidence(basis: list[str], sink: dict[str, Any]) -> float:
+    score = 0.35
+    if "tool_lineage" in basis:
+        score += 0.2
+    if "same_actor" in basis:
+        score += 0.12
+    if "same_process" in basis or "process_causality" in basis:
+        score += 0.18
+    if "file_dependency" in basis:
+        score += 0.12
+    if sink.get("request_observed"):
+        score += 0.08
+    if sink.get("is_controlled"):
+        score += 0.05
+    return round(min(score, 0.86), 4)
+
+
+def event_only_decision(assessment: dict[str, Any], chains: list[RuntimeChain], coverage: CoverageReport) -> dict[str, Any]:
+    strong = [chain for chain in chains if chain.confidence >= EVENT_ONLY_STRONG_CONFIDENCE]
+    if strong:
+        return {
+            "binary_prediction": "malicious",
+            "final_decision": "malicious",
+            "review_required": True,
+            "decision_score": 0.72,
+            "risk_chain_status": "event_correlated_violation",
+            "reason": "strong event-correlated source-to-sink candidate without taint flow identity",
+        }
+    if chains:
+        return {
+            "binary_prediction": "benign",
+            "final_decision": "needs_review",
+            "review_required": True,
+            "decision_score": 0.48,
+            "risk_chain_status": "event_correlated_candidate",
+            "reason": "weak event-correlated source-to-sink candidate without taint flow identity",
+        }
+    return {
+        "binary_prediction": str(assessment.get("binary_prediction") or "benign"),
+        "final_decision": str(assessment.get("canonical_final_decision") or "benign"),
+        "review_required": bool(assessment.get("review_required", False)),
+        "decision_score": assessment.get("decision_score"),
+        "risk_chain_status": event_only_risk_status(chains, coverage),
+        "reason": "no event-correlated source-to-sink candidate",
+    }
+
+
+def event_only_decision_contract() -> dict[str, Any]:
+    return {
+        "frozen_before_evaluation": True,
+        "ground_truth_independent": True,
+        "evidence_mode": "event_only",
+        "strong_candidate_threshold": EVENT_ONLY_STRONG_CONFIDENCE,
+        "strong_candidate_prediction": "malicious_with_review",
+        "weak_candidate_prediction": "benign_with_review",
+        "no_candidate_prediction": "dynamic_assessment_without_taint_policy_violation",
+        "not_taint_confirmed": True,
+        "allowed_inputs": [
+            "sensitive source classification",
+            "sink classification",
+            "actor/object relation",
+            "same process relation",
+            "tool lineage",
+            "bounded event order",
+            "request-observed network/mock facts",
+        ],
+        "forbidden_inputs": sorted(TAINT_FORBIDDEN_KEYS),
+    }
 
 
 def dynamic_from_full_without_alignment(full: FullArtifact) -> DynamicAnalysisResult:
