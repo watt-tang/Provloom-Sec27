@@ -1,0 +1,42 @@
+{
+  "reason_counts": {
+    "runtime_execution_or_path_incomplete_suppressed_static_risk": 101,
+    "runtime_false_closure_or_trust_resolution_added_false_positive": 29,
+    "runtime_observed_allowed_or_no_flow_overrode_static_risk": 6,
+    "runtime_policy_or_no_flow_corrected_static_false_positive": 62
+  },
+  "scope": "formal_776_common_success",
+  "static_only_f1_observation": "Static-only has higher binary F1 in current artifacts because it recalls every malicious GT case, while Full suppresses 107 malicious cases under incomplete/allowed/no-flow runtime evidence but also corrects some static benign false positives.",
+  "transition_counts": {
+    "GT=benign|static=benign|full=benign|coverage=complete|risk=confirmed_allowed|security=resolved_allowed": 3,
+    "GT=benign|static=benign|full=benign|coverage=environment_missing|risk=confirmed_allowed|security=unresolved_before_guard": 3,
+    "GT=benign|static=benign|full=benign|coverage=environment_missing|risk=no_sensitive_flow_observed|security=resolved_no_flow": 10,
+    "GT=benign|static=benign|full=benign|coverage=execution_failed|risk=no_sensitive_flow_observed|security=resolved_no_flow": 66,
+    "GT=benign|static=benign|full=benign|coverage=path_incomplete|risk=confirmed_allowed|security=resolved_allowed": 123,
+    "GT=benign|static=benign|full=benign|coverage=path_incomplete|risk=confirmed_allowed|security=unresolved_before_guard": 32,
+    "GT=benign|static=benign|full=benign|coverage=path_not_triggered|risk=no_sensitive_flow_observed|security=resolved_no_flow": 5,
+    "GT=benign|static=benign|full=benign|coverage=target_reached_no_flow|risk=no_sensitive_flow_observed|security=resolved_no_flow": 17,
+    "GT=benign|static=benign|full=benign|coverage=timeout|risk=no_sensitive_flow_observed|security=resolved_no_flow": 18,
+    "GT=benign|static=benign|full=malicious|coverage=complete|risk=confirmed_violation|security=resolved_violation": 29,
+    "GT=benign|static=malicious|full=benign|coverage=environment_missing|risk=no_sensitive_flow_observed|security=resolved_no_flow": 1,
+    "GT=benign|static=malicious|full=benign|coverage=execution_failed|risk=no_sensitive_flow_observed|security=resolved_no_flow": 10,
+    "GT=benign|static=malicious|full=benign|coverage=path_incomplete|risk=confirmed_allowed|security=resolved_allowed": 38,
+    "GT=benign|static=malicious|full=benign|coverage=path_incomplete|risk=confirmed_allowed|security=unresolved_before_guard": 11,
+    "GT=benign|static=malicious|full=benign|coverage=target_reached_no_flow|risk=no_sensitive_flow_observed|security=resolved_no_flow": 2,
+    "GT=benign|static=malicious|full=malicious|coverage=complete|risk=confirmed_violation|security=resolved_violation": 10,
+    "GT=malicious|static=malicious|full=benign|coverage=complete|risk=confirmed_allowed|security=resolved_allowed": 3,
+    "GT=malicious|static=malicious|full=benign|coverage=environment_missing|risk=confirmed_allowed|security=unresolved_before_guard": 1,
+    "GT=malicious|static=malicious|full=benign|coverage=max_steps_exhausted|risk=confirmed_allowed|security=unresolved_before_guard": 1,
+    "GT=malicious|static=malicious|full=benign|coverage=path_incomplete|risk=confirmed_allowed|security=resolved_allowed": 80,
+    "GT=malicious|static=malicious|full=benign|coverage=path_incomplete|risk=confirmed_allowed|security=unresolved_execution": 20,
+    "GT=malicious|static=malicious|full=benign|coverage=target_reached_no_flow|risk=no_sensitive_flow_observed|security=resolved_no_flow": 2,
+    "GT=malicious|static=malicious|full=malicious|coverage=complete|risk=confirmed_violation|security=resolved_violation": 245,
+    "GT=malicious|static=malicious|full=malicious|coverage=environment_missing|risk=no_sensitive_flow_observed|security=unresolved_before_sink": 10,
+    "GT=malicious|static=malicious|full=malicious|coverage=execution_failed|risk=no_sensitive_flow_observed|security=unresolved_before_sink": 7,
+    "GT=malicious|static=malicious|full=malicious|coverage=max_steps_exhausted|risk=confirmed_allowed|security=unresolved_before_guard": 1,
+    "GT=malicious|static=malicious|full=malicious|coverage=max_steps_exhausted|risk=confirmed_violation|security=resolved_violation": 1,
+    "GT=malicious|static=malicious|full=malicious|coverage=path_incomplete|risk=confirmed_allowed|security=unresolved_execution": 2,
+    "GT=malicious|static=malicious|full=malicious|coverage=path_incomplete|risk=no_sensitive_flow_observed|security=unresolved_before_sink": 3,
+    "GT=malicious|static=malicious|full=malicious|coverage=timeout|risk=no_sensitive_flow_observed|security=unresolved_before_sink": 22
+  }
+}

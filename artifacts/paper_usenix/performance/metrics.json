@@ -1,0 +1,50 @@
+{
+  "artifact_bytes_per_sample": {
+    "mean": 22093830.518,
+    "median": 21802734.5,
+    "p95": 31436650.25
+  },
+  "completed_with_summary": 776,
+  "completion_tokens_per_sample": {
+    "mean": 2762.874,
+    "median": 2853.0,
+    "p95": 5377.0
+  },
+  "elapsed_seconds": {
+    "mean": 130.316,
+    "median": 80.695,
+    "p95": 391.165
+  },
+  "llm_requests_per_sample": {
+    "mean": 8.352,
+    "median": 9.0,
+    "p95": 14.0
+  },
+  "prompt_tokens_per_sample": {
+    "mean": 21509.466,
+    "median": 21538.0,
+    "p95": 48591.25
+  },
+  "runtime_graph_edge_events_proxy": {
+    "mean": 330.961,
+    "median": 287.0,
+    "p95": 502.25
+  },
+  "runtime_graph_edges": {
+    "mean": 330.961,
+    "median": 287.0,
+    "p95": 502.25
+  },
+  "runtime_graph_nodes": {
+    "mean": 269.906,
+    "median": 259.0,
+    "p95": 306.0
+  },
+  "samples": 776,
+  "timeout_or_failed_count": 0,
+  "total_tokens_per_sample": {
+    "mean": 24272.34,
+    "median": 24545.5,
+    "p95": 53644.25
+  }
+}

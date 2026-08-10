@@ -1,0 +1,3 @@
+multi_file,n,confirmed_chain_recall,complete_chain_recall,exact_chain_match_rate,coverage_failure_rate
+False,577,0.30155979202772965,0.2322357019064125,0.0,0.6932409012131716
+True,199,0.5577889447236181,0.5577889447236181,0.0,0.4321608040201005

@@ -1,0 +1,15 @@
+{
+  "false_negative_taxonomy": {
+    "bounded_execution_not_completed": 1,
+    "branch_or_execution_path_incomplete": 20,
+    "environment_missing": 1,
+    "other_false_negative": 3,
+    "policy_or_authorization_mismatch_after_partial_path": 80,
+    "target_reached_no_carrier_flow": 2
+  },
+  "false_positive_taxonomy": {
+    "trust_or_authorization_resolution_error": 39
+  },
+  "fn_count": 107,
+  "fp_count": 39
+}

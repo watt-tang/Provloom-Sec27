@@ -1,0 +1,9 @@
+{
+  "fn_count": 107,
+  "taxonomy_v2": {
+    "authorization_or_trust_model_downgraded_expected_violation": 103,
+    "environment_or_dependency_missing": 1,
+    "execution_budget_exhausted_before_decisive_sink": 1,
+    "target_reached_but_taint_carrier_not_observed": 2
+  }
+}

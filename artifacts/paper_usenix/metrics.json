@@ -1,0 +1,500 @@
+{
+  "ablation": [
+    {
+      "benign_lookalike_fpr": 0.0,
+      "complete_chain_recall": 0.615578,
+      "confirmed_chain_recall": 0.61809,
+      "f1": 0.799451,
+      "fn": 107,
+      "fp": 39,
+      "fpr": 0.103175,
+      "n": 776,
+      "precision": 0.881818,
+      "recall": 0.731156,
+      "tn": 339,
+      "tp": 291,
+      "trusted_allowed_fpr": 0.325,
+      "variant": "Full"
+    },
+    {
+      "benign_lookalike_fpr": 0.173184,
+      "complete_chain_recall": 0.0,
+      "confirmed_chain_recall": 0.0,
+      "f1": 0.917051,
+      "fn": 0,
+      "fp": 72,
+      "fpr": 0.190476,
+      "n": 776,
+      "precision": 0.846809,
+      "recall": 1.0,
+      "tn": 306,
+      "tp": 398,
+      "trusted_allowed_fpr": 0.241667,
+      "variant": "Static-only"
+    },
+    {
+      "benign_lookalike_fpr": 0.03352,
+      "complete_chain_recall": 0.0,
+      "confirmed_chain_recall": 0.0,
+      "f1": 0.699301,
+      "fn": 148,
+      "fp": 67,
+      "fpr": 0.177249,
+      "n": 776,
+      "precision": 0.788644,
+      "recall": 0.628141,
+      "tn": 311,
+      "tp": 250,
+      "trusted_allowed_fpr": 0.508333,
+      "variant": "Event-only"
+    },
+    {
+      "benign_lookalike_fpr": 0.022346,
+      "complete_chain_recall": 0.0,
+      "confirmed_chain_recall": 0.61809,
+      "f1": 0.741797,
+      "fn": 138,
+      "fp": 43,
+      "fpr": 0.113757,
+      "n": 776,
+      "precision": 0.858086,
+      "recall": 0.653266,
+      "tn": 335,
+      "tp": 260,
+      "trusted_allowed_fpr": 0.325,
+      "variant": "No alignment"
+    },
+    {
+      "benign_lookalike_fpr": 0.793296,
+      "complete_chain_recall": 0.0,
+      "confirmed_chain_recall": 0.0,
+      "f1": 0.720461,
+      "fn": 23,
+      "fp": 268,
+      "fpr": 0.708995,
+      "n": 776,
+      "precision": 0.583204,
+      "recall": 0.942211,
+      "tn": 110,
+      "tp": 375,
+      "trusted_allowed_fpr": 0.833333,
+      "variant": "No policy"
+    }
+  ],
+  "alignment_analysis": {
+    "alignment_status_counts": {
+      "aligned": 233195,
+      "internal_unresolved": 342442,
+      "partially_aligned": 2061,
+      "relevant_unresolved": 267945
+    },
+    "alignment_type_status_counts": {
+      "action|aligned": 229478,
+      "action|internal_unresolved": 25627,
+      "action|partially_aligned": 1879,
+      "action|relevant_unresolved": 71562,
+      "entity|aligned": 3717,
+      "entity|internal_unresolved": 316815,
+      "entity|partially_aligned": 3,
+      "entity|relevant_unresolved": 195667,
+      "path|partially_aligned": 179,
+      "path|relevant_unresolved": 716
+    }
+  },
+  "benchmark": {
+    "complete_pairs_in_formal_776": 143,
+    "counterfactual_pair_count": 160,
+    "expected_policy_outcome": {
+      "benign_lookalike": 179,
+      "confirmed_violation": 398,
+      "review_coverage": 79,
+      "trusted_allowed": 120
+    },
+    "llm_mediated": {
+      "False": 460,
+      "True": 316
+    },
+    "multi_file": {
+      "False": 577,
+      "True": 199
+    },
+    "n": 776,
+    "network_or_external": {
+      "False": 197,
+      "True": 579
+    },
+    "risk_family": {
+      "Credential access and exfiltration": 67,
+      "Destructive modification / ransomware": 50,
+      "Instruction override and hidden behavior": 49,
+      "LLM-mediated disclosure": 56,
+      "Multi-stage compositional behavior": 148,
+      "Permission or privilege expansion": 49,
+      "Persistence": 49,
+      "Private data collection and upload": 57,
+      "Resource abuse": 39,
+      "Reverse shell / remote control": 49,
+      "Supply-chain or dependency abuse": 47,
+      "Unauthorized external actions": 49,
+      "Untrusted download and execute": 67
+    },
+    "split": {
+      "blind-heldout": 462,
+      "challenge-heldout": 195,
+      "development": 119
+    },
+    "writing_style_family": {
+      "FAQ": 65,
+      "data handling guide": 61,
+      "incident procedure": 64,
+      "integration guide": 65,
+      "maintenance note": 64,
+      "migration guide": 64,
+      "onboarding note": 65,
+      "operator checklist": 66,
+      "policy memo": 67,
+      "release note": 66,
+      "runbook": 64,
+      "troubleshooting page": 65
+    }
+  },
+  "case_studies": {
+    "case_ids": [
+      "BV3-0001",
+      "BV3-0401",
+      "BV3-0008"
+    ]
+  },
+  "chain_metrics": {
+    "complete_chain": {
+      "f1": 0.7620528771384136,
+      "gold": 398,
+      "precision": 1.0,
+      "predicted": 245,
+      "recall": 0.6155778894472361,
+      "tp": 245
+    },
+    "confirmed_violation_chain": {
+      "f1": 0.7203513909224011,
+      "gold": 398,
+      "precision": 0.8631578947368421,
+      "predicted": 285,
+      "recall": 0.6180904522613065,
+      "tp": 246
+    },
+    "counts": {
+      "complete_chain_gold_samples": 398,
+      "confirmed_violation_samples": 398,
+      "samples": 776
+    },
+    "edge_operation": {
+      "f1": 0.5767820773930753,
+      "gold": 1661,
+      "precision": 0.8916876574307305,
+      "predicted": 794,
+      "recall": 0.42624924744130044,
+      "tp": 708
+    },
+    "exact_chain_match": {
+      "f1": 0.0,
+      "gold": 398,
+      "precision": 0.0,
+      "predicted": 393,
+      "recall": 0.0,
+      "tp": 0
+    },
+    "matching_policy": "Conservative ontology-level string matching between GT objects and frozen ProvLoom evidence objects; not a manual edge audit.",
+    "metric_scope": "formal_776",
+    "minimal_witness": {
+      "f1": 0.2939130434782609,
+      "gold": 776,
+      "precision": 0.22178477690288714,
+      "predicted": 1524,
+      "recall": 0.43556701030927836,
+      "tp": 338
+    },
+    "relay_or_intermediate": {
+      "f1": 0.0,
+      "gold": 1473,
+      "precision": 0.0,
+      "predicted": 1187,
+      "recall": 0.0,
+      "tp": 0
+    },
+    "sink": {
+      "f1": 0.4859335038363172,
+      "gold": 776,
+      "precision": 0.7178841309823678,
+      "predicted": 397,
+      "recall": 0.36726804123711343,
+      "tp": 285
+    },
+    "source": {
+      "f1": 0.5032010243277849,
+      "gold": 776,
+      "precision": 0.5,
+      "predicted": 786,
+      "recall": 0.5064432989690721,
+      "tp": 393
+    }
+  },
+  "cooccurrence_baseline": {
+    "any_network": {
+      "f1": 0.6780238500851788,
+      "fn": 0,
+      "fp": 378,
+      "fpr": 1.0,
+      "precision": 0.5128865979381443,
+      "recall": 1.0,
+      "tn": 0,
+      "tp": 398
+    },
+    "any_taint_chain": {
+      "f1": 0.7072927072927073,
+      "fn": 44,
+      "fp": 249,
+      "fpr": 0.6587301587301587,
+      "precision": 0.5870646766169154,
+      "recall": 0.8894472361809045,
+      "tn": 129,
+      "tp": 354
+    },
+    "source_and_network": {
+      "f1": 0.7082096933728982,
+      "fn": 40,
+      "fp": 255,
+      "fpr": 0.6746031746031746,
+      "precision": 0.5840130505709625,
+      "recall": 0.8994974874371859,
+      "tn": 123,
+      "tp": 358
+    }
+  },
+  "counterfactual_pairs": {
+    "category_counts": {
+      "consistent_or_mixed": 99,
+      "insensitive_to_counterfactual_label_change": 43
+    },
+    "pair_count_with_at_least_two_formal_samples": 142
+  },
+  "coverage_evaluation": {
+    "coverage_state_by_outcome_prediction": {
+      "complete|benign_lookalike|pred=benign": 3,
+      "complete|confirmed_violation|pred=benign": 3,
+      "complete|confirmed_violation|pred=malicious": 245,
+      "complete|trusted_allowed|pred=malicious": 39,
+      "environment_missing|benign_lookalike|pred=benign": 7,
+      "environment_missing|confirmed_violation|pred=benign": 1,
+      "environment_missing|confirmed_violation|pred=malicious": 10,
+      "environment_missing|review_coverage|pred=benign": 5,
+      "environment_missing|trusted_allowed|pred=benign": 2,
+      "execution_failed|benign_lookalike|pred=benign": 25,
+      "execution_failed|confirmed_violation|pred=malicious": 7,
+      "execution_failed|review_coverage|pred=benign": 33,
+      "execution_failed|trusted_allowed|pred=benign": 18,
+      "max_steps_exhausted|confirmed_violation|pred=benign": 1,
+      "max_steps_exhausted|confirmed_violation|pred=malicious": 2,
+      "path_incomplete|benign_lookalike|pred=benign": 131,
+      "path_incomplete|confirmed_violation|pred=benign": 100,
+      "path_incomplete|confirmed_violation|pred=malicious": 5,
+      "path_incomplete|review_coverage|pred=benign": 17,
+      "path_incomplete|trusted_allowed|pred=benign": 56,
+      "path_not_triggered|benign_lookalike|pred=benign": 1,
+      "path_not_triggered|review_coverage|pred=benign": 3,
+      "path_not_triggered|trusted_allowed|pred=benign": 1,
+      "target_reached_no_flow|benign_lookalike|pred=benign": 6,
+      "target_reached_no_flow|confirmed_violation|pred=benign": 2,
+      "target_reached_no_flow|review_coverage|pred=benign": 12,
+      "target_reached_no_flow|trusted_allowed|pred=benign": 1,
+      "timeout|benign_lookalike|pred=benign": 6,
+      "timeout|confirmed_violation|pred=malicious": 22,
+      "timeout|review_coverage|pred=benign": 9,
+      "timeout|trusted_allowed|pred=benign": 3
+    },
+    "coverage_state_counts": {
+      "complete": 290,
+      "environment_missing": 25,
+      "execution_failed": 83,
+      "max_steps_exhausted": 3,
+      "path_incomplete": 309,
+      "path_not_triggered": 5,
+      "target_reached_no_flow": 21,
+      "timeout": 40
+    }
+  },
+  "evidence_strength_ablation": {
+    "evidence_strength_carrier_distribution": {
+      "strength=none|carrier=none|expected=benign_lookalike|pred=benign": 179,
+      "strength=none|carrier=none|expected=confirmed_violation|pred=benign": 2,
+      "strength=none|carrier=none|expected=confirmed_violation|pred=malicious": 42,
+      "strength=none|carrier=none|expected=review_coverage|pred=benign": 79,
+      "strength=none|carrier=none|expected=trusted_allowed|pred=benign": 81,
+      "strength=structured_relation|carrier=http_body+llm_context|expected=confirmed_violation|pred=benign": 3,
+      "strength=structured_relation|carrier=http_body+llm_context|expected=confirmed_violation|pred=malicious": 1,
+      "strength=structured_relation|carrier=http_body|expected=confirmed_violation|pred=malicious": 246,
+      "strength=structured_relation|carrier=http_body|expected=trusted_allowed|pred=malicious": 39,
+      "strength=structured_relation|carrier=llm_context|expected=confirmed_violation|pred=benign": 102,
+      "strength=structured_relation|carrier=llm_context|expected=confirmed_violation|pred=malicious": 2
+    }
+  },
+  "explanation_metric_audit": {
+    "chain_level_counts": {
+      "L2_endpoint_correct": 246,
+      "missed_closure": 152,
+      "non_violation_or_false_closure": 378
+    },
+    "interpretation": [
+      "Runtime chains encode taint-to-carrier-to-endpoint witnesses, e.g. source taint -> http_body/body or llm_context -> network endpoint.",
+      "Benchmark ground truth encodes human-named intermediate artifacts such as staging files and payload files.",
+      "Therefore relay/exact-chain literal metrics measure structural artifact fidelity, not only source-to-sink closure."
+    ],
+    "mismatch_distribution": {
+      "edge:operation_matched": 1062,
+      "edge:operation_missing": 599,
+      "relay:missing_prediction": 687,
+      "relay:ontology_only": 786,
+      "sink:exact": 285,
+      "sink:granularity_path_vs_field": 16,
+      "sink:missing_prediction": 383,
+      "sink:unmatched": 92,
+      "source:granularity_path_vs_field": 393,
+      "source:missing_prediction": 383
+    },
+    "predicted_relay_node_families": {
+      "carrier": 578,
+      "data_object": 505,
+      "llm_context": 108,
+      "network_endpoint": 397,
+      "taint_source": 393
+    },
+    "purpose": "Audit why literal relay/exact-chain metrics collapse although closure metrics are non-zero.",
+    "scope": "formal_776_common_success",
+    "three_level_explanation_definitions": {
+      "L1_closure_only": "Correct malicious source-to-sink closure exists, but endpoint and/or structural intermediate identity is not fully matched.",
+      "L2_endpoint_correct": "Correct closure plus expected endpoint identity matched.",
+      "L3_structural_fidelity": "Closure, endpoint, source identity, and expected intermediate objects all matched under the fixed normalization rules."
+    }
+  },
+  "failure": {
+    "false_negative_taxonomy": {
+      "bounded_execution_not_completed": 1,
+      "branch_or_execution_path_incomplete": 20,
+      "environment_missing": 1,
+      "other_false_negative": 3,
+      "policy_or_authorization_mismatch_after_partial_path": 80,
+      "target_reached_no_carrier_flow": 2
+    },
+    "false_positive_taxonomy": {
+      "trust_or_authorization_resolution_error": 39
+    },
+    "fn_count": 107,
+    "fp_count": 39
+  },
+  "fn_taxonomy_v2": {
+    "fn_count": 107,
+    "taxonomy_v2": {
+      "authorization_or_trust_model_downgraded_expected_violation": 103,
+      "environment_or_dependency_missing": 1,
+      "execution_budget_exhausted_before_decisive_sink": 1,
+      "target_reached_but_taint_carrier_not_observed": 2
+    }
+  },
+  "performance": {
+    "artifact_bytes_per_sample": {
+      "mean": 22093830.518,
+      "median": 21802734.5,
+      "p95": 31436650.25
+    },
+    "completed_with_summary": 776,
+    "completion_tokens_per_sample": {
+      "mean": 2762.874,
+      "median": 2853.0,
+      "p95": 5377.0
+    },
+    "elapsed_seconds": {
+      "mean": 130.316,
+      "median": 80.695,
+      "p95": 391.165
+    },
+    "llm_requests_per_sample": {
+      "mean": 8.352,
+      "median": 9.0,
+      "p95": 14.0
+    },
+    "prompt_tokens_per_sample": {
+      "mean": 21509.466,
+      "median": 21538.0,
+      "p95": 48591.25
+    },
+    "runtime_graph_edge_events_proxy": {
+      "mean": 330.961,
+      "median": 287.0,
+      "p95": 502.25
+    },
+    "runtime_graph_edges": {
+      "mean": 330.961,
+      "median": 287.0,
+      "p95": 502.25
+    },
+    "runtime_graph_nodes": {
+      "mean": 269.906,
+      "median": 259.0,
+      "p95": 306.0
+    },
+    "samples": 776,
+    "timeout_or_failed_count": 0,
+    "total_tokens_per_sample": {
+      "mean": 24272.34,
+      "median": 24545.5,
+      "p95": 53644.25
+    }
+  },
+  "static_vs_full": {
+    "reason_counts": {
+      "runtime_execution_or_path_incomplete_suppressed_static_risk": 101,
+      "runtime_false_closure_or_trust_resolution_added_false_positive": 29,
+      "runtime_observed_allowed_or_no_flow_overrode_static_risk": 6,
+      "runtime_policy_or_no_flow_corrected_static_false_positive": 62
+    },
+    "scope": "formal_776_common_success",
+    "static_only_f1_observation": "Static-only has higher binary F1 in current artifacts because it recalls every malicious GT case, while Full suppresses 107 malicious cases under incomplete/allowed/no-flow runtime evidence but also corrects some static benign false positives.",
+    "transition_counts": {
+      "GT=benign|static=benign|full=benign|coverage=complete|risk=confirmed_allowed|security=resolved_allowed": 3,
+      "GT=benign|static=benign|full=benign|coverage=environment_missing|risk=confirmed_allowed|security=unresolved_before_guard": 3,
+      "GT=benign|static=benign|full=benign|coverage=environment_missing|risk=no_sensitive_flow_observed|security=resolved_no_flow": 10,
+      "GT=benign|static=benign|full=benign|coverage=execution_failed|risk=no_sensitive_flow_observed|security=resolved_no_flow": 66,
+      "GT=benign|static=benign|full=benign|coverage=path_incomplete|risk=confirmed_allowed|security=resolved_allowed": 123,
+      "GT=benign|static=benign|full=benign|coverage=path_incomplete|risk=confirmed_allowed|security=unresolved_before_guard": 32,
+      "GT=benign|static=benign|full=benign|coverage=path_not_triggered|risk=no_sensitive_flow_observed|security=resolved_no_flow": 5,
+      "GT=benign|static=benign|full=benign|coverage=target_reached_no_flow|risk=no_sensitive_flow_observed|security=resolved_no_flow": 17,
+      "GT=benign|static=benign|full=benign|coverage=timeout|risk=no_sensitive_flow_observed|security=resolved_no_flow": 18,
+      "GT=benign|static=benign|full=malicious|coverage=complete|risk=confirmed_violation|security=resolved_violation": 29,
+      "GT=benign|static=malicious|full=benign|coverage=environment_missing|risk=no_sensitive_flow_observed|security=resolved_no_flow": 1,
+      "GT=benign|static=malicious|full=benign|coverage=execution_failed|risk=no_sensitive_flow_observed|security=resolved_no_flow": 10,
+      "GT=benign|static=malicious|full=benign|coverage=path_incomplete|risk=confirmed_allowed|security=resolved_allowed": 38,
+      "GT=benign|static=malicious|full=benign|coverage=path_incomplete|risk=confirmed_allowed|security=unresolved_before_guard": 11,
+      "GT=benign|static=malicious|full=benign|coverage=target_reached_no_flow|risk=no_sensitive_flow_observed|security=resolved_no_flow": 2,
+      "GT=benign|static=malicious|full=malicious|coverage=complete|risk=confirmed_violation|security=resolved_violation": 10,
+      "GT=malicious|static=malicious|full=benign|coverage=complete|risk=confirmed_allowed|security=resolved_allowed": 3,
+      "GT=malicious|static=malicious|full=benign|coverage=environment_missing|risk=confirmed_allowed|security=unresolved_before_guard": 1,
+      "GT=malicious|static=malicious|full=benign|coverage=max_steps_exhausted|risk=confirmed_allowed|security=unresolved_before_guard": 1,
+      "GT=malicious|static=malicious|full=benign|coverage=path_incomplete|risk=confirmed_allowed|security=resolved_allowed": 80,
+      "GT=malicious|static=malicious|full=benign|coverage=path_incomplete|risk=confirmed_allowed|security=unresolved_execution": 20,
+      "GT=malicious|static=malicious|full=benign|coverage=target_reached_no_flow|risk=no_sensitive_flow_observed|security=resolved_no_flow": 2,
+      "GT=malicious|static=malicious|full=malicious|coverage=complete|risk=confirmed_violation|security=resolved_violation": 245,
+      "GT=malicious|static=malicious|full=malicious|coverage=environment_missing|risk=no_sensitive_flow_observed|security=unresolved_before_sink": 10,
+      "GT=malicious|static=malicious|full=malicious|coverage=execution_failed|risk=no_sensitive_flow_observed|security=unresolved_before_sink": 7,
+      "GT=malicious|static=malicious|full=malicious|coverage=max_steps_exhausted|risk=confirmed_allowed|security=unresolved_before_guard": 1,
+      "GT=malicious|static=malicious|full=malicious|coverage=max_steps_exhausted|risk=confirmed_violation|security=resolved_violation": 1,
+      "GT=malicious|static=malicious|full=malicious|coverage=path_incomplete|risk=confirmed_allowed|security=unresolved_execution": 2,
+      "GT=malicious|static=malicious|full=malicious|coverage=path_incomplete|risk=no_sensitive_flow_observed|security=unresolved_before_sink": 3,
+      "GT=malicious|static=malicious|full=malicious|coverage=timeout|risk=no_sensitive_flow_observed|security=unresolved_before_sink": 22
+    }
+  },
+  "trusted_allowed_fp_taxonomy": {
+    "taxonomy": {
+      "confirmed_chain_policy_allowlist_mismatch": 39
+    },
+    "trusted_allowed_fp_count": 39
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "chain_level_counts": {
+    "L2_endpoint_correct": 246,
+    "missed_closure": 152,
+    "non_violation_or_false_closure": 378
+  },
+  "interpretation": [
+    "Runtime chains encode taint-to-carrier-to-endpoint witnesses, e.g. source taint -> http_body/body or llm_context -> network endpoint.",
+    "Benchmark ground truth encodes human-named intermediate artifacts such as staging files and payload files.",
+    "Therefore relay/exact-chain literal metrics measure structural artifact fidelity, not only source-to-sink closure."
+  ],
+  "mismatch_distribution": {
+    "edge:operation_matched": 1062,
+    "edge:operation_missing": 599,
+    "relay:missing_prediction": 687,
+    "relay:ontology_only": 786,
+    "sink:exact": 285,
+    "sink:granularity_path_vs_field": 16,
+    "sink:missing_prediction": 383,
+    "sink:unmatched": 92,
+    "source:granularity_path_vs_field": 393,
+    "source:missing_prediction": 383
+  },
+  "predicted_relay_node_families": {
+    "carrier": 578,
+    "data_object": 505,
+    "llm_context": 108,
+    "network_endpoint": 397,
+    "taint_source": 393
+  },
+  "purpose": "Audit why literal relay/exact-chain metrics collapse although closure metrics are non-zero.",
+  "scope": "formal_776_common_success",
+  "three_level_explanation_definitions": {
+    "L1_closure_only": "Correct malicious source-to-sink closure exists, but endpoint and/or structural intermediate identity is not fully matched.",
+    "L2_endpoint_correct": "Correct closure plus expected endpoint identity matched.",
+    "L3_structural_fidelity": "Closure, endpoint, source identity, and expected intermediate objects all matched under the fixed normalization rules."
+  }
+}

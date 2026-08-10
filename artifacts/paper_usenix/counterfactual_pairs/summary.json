@@ -1,0 +1,7 @@
+{
+  "category_counts": {
+    "consistent_or_mixed": 99,
+    "insensitive_to_counterfactual_label_change": 43
+  },
+  "pair_count_with_at_least_two_formal_samples": 142
+}

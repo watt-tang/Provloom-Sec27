@@ -1,0 +1,15 @@
+{
+  "evidence_strength_carrier_distribution": {
+    "strength=none|carrier=none|expected=benign_lookalike|pred=benign": 179,
+    "strength=none|carrier=none|expected=confirmed_violation|pred=benign": 2,
+    "strength=none|carrier=none|expected=confirmed_violation|pred=malicious": 42,
+    "strength=none|carrier=none|expected=review_coverage|pred=benign": 79,
+    "strength=none|carrier=none|expected=trusted_allowed|pred=benign": 81,
+    "strength=structured_relation|carrier=http_body+llm_context|expected=confirmed_violation|pred=benign": 3,
+    "strength=structured_relation|carrier=http_body+llm_context|expected=confirmed_violation|pred=malicious": 1,
+    "strength=structured_relation|carrier=http_body|expected=confirmed_violation|pred=malicious": 246,
+    "strength=structured_relation|carrier=http_body|expected=trusted_allowed|pred=malicious": 39,
+    "strength=structured_relation|carrier=llm_context|expected=confirmed_violation|pred=benign": 102,
+    "strength=structured_relation|carrier=llm_context|expected=confirmed_violation|pred=malicious": 2
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "complete_chain": {
+    "f1": 0.7620528771384136,
+    "gold": 398,
+    "precision": 1.0,
+    "predicted": 245,
+    "recall": 0.6155778894472361,
+    "tp": 245
+  },
+  "confirmed_violation_chain": {
+    "f1": 0.7203513909224011,
+    "gold": 398,
+    "precision": 0.8631578947368421,
+    "predicted": 285,
+    "recall": 0.6180904522613065,
+    "tp": 246
+  },
+  "counts": {
+    "complete_chain_gold_samples": 398,
+    "confirmed_violation_samples": 398,
+    "samples": 776
+  },
+  "edge_operation": {
+    "f1": 0.5767820773930753,
+    "gold": 1661,
+    "precision": 0.8916876574307305,
+    "predicted": 794,
+    "recall": 0.42624924744130044,
+    "tp": 708
+  },
+  "exact_chain_match": {
+    "f1": 0.0,
+    "gold": 398,
+    "precision": 0.0,
+    "predicted": 393,
+    "recall": 0.0,
+    "tp": 0
+  },
+  "matching_policy": "Conservative ontology-level string matching between GT objects and frozen ProvLoom evidence objects; not a manual edge audit.",
+  "metric_scope": "formal_776",
+  "minimal_witness": {
+    "f1": 0.2939130434782609,
+    "gold": 776,
+    "precision": 0.22178477690288714,
+    "predicted": 1524,
+    "recall": 0.43556701030927836,
+    "tp": 338
+  },
+  "relay_or_intermediate": {
+    "f1": 0.0,
+    "gold": 1473,
+    "precision": 0.0,
+    "predicted": 1187,
+    "recall": 0.0,
+    "tp": 0
+  },
+  "sink": {
+    "f1": 0.4859335038363172,
+    "gold": 776,
+    "precision": 0.7178841309823678,
+    "predicted": 397,
+    "recall": 0.36726804123711343,
+    "tp": 285
+  },
+  "source": {
+    "f1": 0.5032010243277849,
+    "gold": 776,
+    "precision": 0.5,
+    "predicted": 786,
+    "recall": 0.5064432989690721,
+    "tp": 393
+  }
+}

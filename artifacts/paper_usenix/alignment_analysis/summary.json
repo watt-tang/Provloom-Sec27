@@ -1,0 +1,20 @@
+{
+  "alignment_status_counts": {
+    "aligned": 233195,
+    "internal_unresolved": 342442,
+    "partially_aligned": 2061,
+    "relevant_unresolved": 267945
+  },
+  "alignment_type_status_counts": {
+    "action|aligned": 229478,
+    "action|internal_unresolved": 25627,
+    "action|partially_aligned": 1879,
+    "action|relevant_unresolved": 71562,
+    "entity|aligned": 3717,
+    "entity|internal_unresolved": 316815,
+    "entity|partially_aligned": 3,
+    "entity|relevant_unresolved": 195667,
+    "path|partially_aligned": 179,
+    "path|relevant_unresolved": 716
+  }
+}

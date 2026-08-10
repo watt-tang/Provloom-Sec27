@@ -1,0 +1,57 @@
+{
+  "complete_pairs_in_formal_776": 143,
+  "counterfactual_pair_count": 160,
+  "expected_policy_outcome": {
+    "benign_lookalike": 179,
+    "confirmed_violation": 398,
+    "review_coverage": 79,
+    "trusted_allowed": 120
+  },
+  "llm_mediated": {
+    "False": 460,
+    "True": 316
+  },
+  "multi_file": {
+    "False": 577,
+    "True": 199
+  },
+  "n": 776,
+  "network_or_external": {
+    "False": 197,
+    "True": 579
+  },
+  "risk_family": {
+    "Credential access and exfiltration": 67,
+    "Destructive modification / ransomware": 50,
+    "Instruction override and hidden behavior": 49,
+    "LLM-mediated disclosure": 56,
+    "Multi-stage compositional behavior": 148,
+    "Permission or privilege expansion": 49,
+    "Persistence": 49,
+    "Private data collection and upload": 57,
+    "Resource abuse": 39,
+    "Reverse shell / remote control": 49,
+    "Supply-chain or dependency abuse": 47,
+    "Unauthorized external actions": 49,
+    "Untrusted download and execute": 67
+  },
+  "split": {
+    "blind-heldout": 462,
+    "challenge-heldout": 195,
+    "development": 119
+  },
+  "writing_style_family": {
+    "FAQ": 65,
+    "data handling guide": 61,
+    "incident procedure": 64,
+    "integration guide": 65,
+    "maintenance note": 64,
+    "migration guide": 64,
+    "onboarding note": 65,
+    "operator checklist": 66,
+    "policy memo": 67,
+    "release note": 66,
+    "runbook": 64,
+    "troubleshooting page": 65
+  }
+}
