@@ -1,0 +1,53 @@
+{
+  "closure": {
+    "f1": 0.7203513909224011,
+    "gold": 398,
+    "precision": 0.8631578947368421,
+    "predicted": 285,
+    "recall": 0.6180904522613065,
+    "tp": 246
+  },
+  "contract": "literal",
+  "edge": {
+    "f1": 0.4938960585978375,
+    "gold": 1661,
+    "precision": 0.5870646766169154,
+    "predicted": 1206,
+    "recall": 0.42624924744130044,
+    "tp": 708
+  },
+  "exact_structural_chain": {
+    "f1": 0.0,
+    "gold": 776,
+    "precision": 0.0,
+    "predicted": 603,
+    "recall": 0.0,
+    "tp": 0
+  },
+  "normalization_rules_sha256": "e1ae1d3865a2f272dfadf13c0292759752ed33dc9ead1c32ded880c2d9f2569a",
+  "relay": {
+    "f1": 0.0,
+    "gold": 1473,
+    "precision": 0.0,
+    "predicted": 3580,
+    "recall": 0.0,
+    "tp": 0
+  },
+  "scope": "formal_776",
+  "sink": {
+    "f1": 0.3411131059245961,
+    "gold": 776,
+    "precision": 0.31843575418994413,
+    "predicted": 895,
+    "recall": 0.36726804123711343,
+    "tp": 285
+  },
+  "source": {
+    "f1": 0.0,
+    "gold": 776,
+    "precision": 0.0,
+    "predicted": 1819,
+    "recall": 0.0,
+    "tp": 0
+  }
+}

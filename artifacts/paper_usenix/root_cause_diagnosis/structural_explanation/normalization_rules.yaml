@@ -1,0 +1,29 @@
+schema_version: provloom-root-cause-normalization-v1
+scope: evaluation-only fixed formal_776
+object_canonicalization:
+  paths:
+    - lower-case and slash-normalize
+    - remove /workspace/skill and /workspace prefixes
+    - allow basename/full-path equivalence for file-like objects
+    - strip source field suffix such as path:FIELD only for file-like source objects
+  endpoints:
+    - normalize scheme, host case, explicit port, repeated slashes, path, and query
+    - never split URL strings on the first colon
+  taint_sources:
+    - allow taint id to source path only when runtime source registry metadata contains source_object/source_location
+operation_equivalence:
+  read: [read, access, presence_check]
+  write: [stage, write, create, write_local_review]
+  transform: [transform, derive, derives, propagate, propagates]
+  send: [deliver, send, sends, upload, call_model]
+  execute: [execute, exec]
+carrier_equivalence:
+  generic_carrier_types: [http_body, llm_context, tool_argument, socket_payload, generic payload]
+  rule: generic carriers may support closure but must not be counted as specific relay identity
+artifact_identity_rules:
+  specific relay match requires file/path/object identity evidence, not only a generic DataObject hash or carrier label
+  semantic match is global and deterministic; no sample-specific mapping is allowed
+contracts:
+  literal: exact raw string equality
+  canonical: deterministic path/URI/operation normalization only
+  semantic: schema-level equivalence with specific object identity; generic carriers do not match named relays
