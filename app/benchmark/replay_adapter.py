@@ -22,7 +22,11 @@ class BenchmarkReplayBundle:
 
 
 class BenchmarkV3ReplayAdapter:
-    """Translate public Benchmark v3 fixture execution config into ProvLoom runner inputs."""
+    """Translate ProvBench fixture execution config into ProvLoom runner inputs.
+
+    The class name is kept for compatibility with older scripts and serialized
+    run metadata; reviewer-facing documentation and defaults use ProvBench.
+    """
 
     def __init__(self, benchmark_root: str | Path) -> None:
         self.benchmark_root = Path(benchmark_root).resolve()

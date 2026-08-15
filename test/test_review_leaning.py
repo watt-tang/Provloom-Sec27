@@ -93,9 +93,9 @@ class ReviewLeaningTests(unittest.TestCase):
                     "event_id": "EV1",
                     "event_type": "llm_request",
                     "object_type": "network",
-                    "object_id": "NET:https://sec.llm.autos/v1/chat/completions",
+                    "object_id": "NET:https://llm-provider.example/v1/chat/completions",
                     "carrier_type": "llm_context",
-                    "metadata": {"provider": "trusted_llm", "destination": "https://sec.llm.autos/v1/chat/completions"},
+                    "metadata": {"provider": "trusted_llm", "destination": "https://llm-provider.example/v1/chat/completions"},
                 }
             ],
         )
@@ -203,10 +203,10 @@ class ReviewLeaningTests(unittest.TestCase):
                     "event_type": "llm_request",
                     "operation": "send",
                     "object_type": "network",
-                    "object_id": "NET:https://sec.llm.autos/v1/chat/completions",
+                    "object_id": "NET:https://llm-provider.example/v1/chat/completions",
                     "carrier_type": "llm_context",
                     "taint_ids": ["T1"],
-                    "metadata": {"provider": "trusted_llm", "destination": "https://sec.llm.autos/v1/chat/completions"},
+                    "metadata": {"provider": "trusted_llm", "destination": "https://llm-provider.example/v1/chat/completions"},
                 }
             ],
         )

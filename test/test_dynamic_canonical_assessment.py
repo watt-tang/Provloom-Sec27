@@ -207,7 +207,7 @@ class DynamicCanonicalAssessmentTests(unittest.TestCase):
             context={},
             executor=type("Executor", (), {"get_tool_catalog": lambda self, actions: []})(),
             emit_func=lambda *args, **kwargs: "",
-            llm_config={"base_url": "https://api.siliconflow.cn/v1", "api_key": "sk-test-secret", "model": "m", "provider": "siliconflow"},
+            llm_config={"base_url": "https://api.siliconflow.cn/v1", "api_key": "unit-test-secret", "model": "m", "provider": "siliconflow"},
         )
         runtime._message_taint_ids[1] = ["T001"]
         metadata = runtime._llm_context_metadata(
@@ -221,7 +221,7 @@ class DynamicCanonicalAssessmentTests(unittest.TestCase):
         self.assertFalse(metadata["plaintext_stored"])
         self.assertNotIn("PROBE_SECRET_MARKER", str(metadata))
         self.assertNotIn("system prompt", str(metadata))
-        self.assertNotIn("sk-test-secret", str(metadata))
+        self.assertNotIn("unit-test-secret", str(metadata))
 
     def test_sensitive_read_file_runtime_event_redacts_stdout_preview(self) -> None:
         with tempfile.TemporaryDirectory(prefix="provloom-runtime-redact-") as tmpdir:

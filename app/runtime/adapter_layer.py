@@ -241,7 +241,7 @@ class CredentialStateAdapter(_AdapterBase):
         account_file = base / "fake_account_profile.json"
         scopes_file = base / "fake_scopes.txt"
 
-        env_file.write_text("FAKE_API_KEY=sk-provloom-synthetic\nFAKE_ACCOUNT_ID=acct_synthetic\n", encoding="utf-8")
+        env_file.write_text("FAKE_API_KEY=provloom-synthetic-key\nFAKE_ACCOUNT_ID=acct_synthetic\n", encoding="utf-8")
         token_file.write_text(
             json.dumps(
                 {

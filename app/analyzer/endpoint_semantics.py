@@ -23,6 +23,7 @@ _LLM_PROVIDER_HOST_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("together", ("together.xyz",)),
     ("cohere", ("cohere.com",)),
     ("xai", ("x.ai",)),
+    ("generic_llm", ("llm-provider.example",)),
 )
 
 

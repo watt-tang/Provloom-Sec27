@@ -1,0 +1,103 @@
+{
+  "generated_at": "2026-08-09T16:52:15.251392+00:00",
+  "population": "common_success_intersection",
+  "common_success_count": 776,
+  "systems": [
+    {
+      "system": "ProvLoom",
+      "count": 776,
+      "confusion_matrix": {
+        "tp": 291,
+        "tn": 339,
+        "fp": 39,
+        "fn": 107
+      },
+      "accuracy": 0.811856,
+      "precision": 0.881818,
+      "recall": 0.731156,
+      "f1": 0.799451,
+      "specificity": 0.896825,
+      "fpr": 0.103175,
+      "fnr": 0.268844,
+      "benign_lookalike_fpr": 0.0,
+      "trusted_allowed_fpr": 0.325,
+      "failed": 0,
+      "review_rate": 0.136598,
+      "confirmed_violation_chain_recall": 0.71608,
+      "complete_chain_recall": 0.615578,
+      "false_closure_rate": 0.103175
+    },
+    {
+      "system": "AI-Infra-Guard",
+      "count": 776,
+      "confusion_matrix": {
+        "tp": 101,
+        "tn": 373,
+        "fp": 5,
+        "fn": 297
+      },
+      "accuracy": 0.610825,
+      "precision": 0.95283,
+      "recall": 0.253769,
+      "f1": 0.400794,
+      "specificity": 0.986772,
+      "fpr": 0.013228,
+      "fnr": 0.746231,
+      "benign_lookalike_fpr": 0.011173,
+      "trusted_allowed_fpr": 0.025,
+      "failed": 0,
+      "review_rate": 0.0,
+      "confirmed_violation_chain_recall": null,
+      "complete_chain_recall": null,
+      "false_closure_rate": null
+    },
+    {
+      "system": "Cisco LLM Scanner",
+      "count": 776,
+      "confusion_matrix": {
+        "tp": 312,
+        "tn": 340,
+        "fp": 38,
+        "fn": 86
+      },
+      "accuracy": 0.840206,
+      "precision": 0.891429,
+      "recall": 0.78392,
+      "f1": 0.834225,
+      "specificity": 0.899471,
+      "fpr": 0.100529,
+      "fnr": 0.21608,
+      "benign_lookalike_fpr": 0.089385,
+      "trusted_allowed_fpr": 0.183333,
+      "failed": 0,
+      "review_rate": 0.0,
+      "confirmed_violation_chain_recall": null,
+      "complete_chain_recall": null,
+      "false_closure_rate": null
+    },
+    {
+      "system": "SkillScan",
+      "count": 776,
+      "confusion_matrix": {
+        "tp": 144,
+        "tn": 360,
+        "fp": 18,
+        "fn": 254
+      },
+      "accuracy": 0.649485,
+      "precision": 0.888889,
+      "recall": 0.361809,
+      "f1": 0.514286,
+      "specificity": 0.952381,
+      "fpr": 0.047619,
+      "fnr": 0.638191,
+      "benign_lookalike_fpr": 0.022346,
+      "trusted_allowed_fpr": 0.075,
+      "failed": 0,
+      "review_rate": 0.0,
+      "confirmed_violation_chain_recall": null,
+      "complete_chain_recall": null,
+      "false_closure_rate": null
+    }
+  ]
+}

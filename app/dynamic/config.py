@@ -72,7 +72,7 @@ class DynamicAnalysisConfig:
     trusted_egress_allowlist: list[str] = field(default_factory=list)
     trusted_domains: list[str] = field(default_factory=lambda: ["localhost", "127.0.0.1"])
     trusted_llm_providers: list[str] = field(default_factory=lambda: ["siliconflow"])
-    trusted_llm_provider_domains: list[str] = field(default_factory=lambda: ["api.siliconflow.cn"])
+    trusted_llm_provider_domains: list[str] = field(default_factory=lambda: ["api.siliconflow.cn", "llm-provider.example"])
     allowed_tool_destinations: dict[str, list[str]] = field(default_factory=dict)
     permitted_source_to_sink_pairs: list[dict[str, str]] = field(default_factory=list)
     writable_directory_allowlist: list[str] = field(default_factory=lambda: ["runtime_output", "/tmp", "/workspace/skill"])

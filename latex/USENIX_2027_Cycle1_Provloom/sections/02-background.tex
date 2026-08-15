@@ -1,0 +1,65 @@
+\section{Background}
+
+\subsection{Agentic Skills}
+
+Large language model agents connect model reasoning with external actions such
+as tool invocation, file access, code execution, system commands, and network
+communication~\cite{yao2023react,schick2023toolformer,shen2023hugginggpt,
+injecagent2024,asb2024}. Agentic skills package these capabilities into reusable
+artifacts that describe when and how a task should be performed
+~\cite{wang2023voyager,zhou2026comprehensive}. A skill may contain natural
+language instructions, SKILL.md or README files, helper scripts, dependencies,
+configuration, tool descriptions, and setup or maintenance procedures
+~\cite{skillscan2026,skillfortify2026,agentaudit2026}.
+
+Skill behavior can span both instructions and execution. Instructions specify
+actions, conditions, ordering, inputs, destinations, and expected effects,
+while scripts, tools, and dependencies realize parts of the workflow. During
+execution, data may pass through model context, tool arguments, files,
+processes, and network messages~\cite{yao2023react,schick2023toolformer}.
+Security analysis must therefore relate behavior expressed by skill artifacts
+to the concrete operations produced during execution.
+
+
+\subsection{Static and Dynamic Analysis}
+
+Static analysis derives security relevant relations from artifacts before
+execution. Program analysis commonly reasons over control and data flow,
+sources, sinks, and other structural relations
+~\cite{livshits2005static,tripp2009taj,sui2016svf,yama2014cpg}. Similar
+analysis can be applied to natural language artifacts by extracting entities,
+actions, conditions, and relations from instructions. Static analysis provides
+broad coverage of possible behavior, including paths that may not be exercised
+in a particular run.
+
+Dynamic analysis records behavior realized under a concrete execution
+~\cite{hossain2017sleuth,pasquier2018camquery,han2020unicorn,
+cheng2024kairos}. Runtime observations can include model and tool interactions,
+file and process activity, command arguments, structured requests, and network
+communication. Taint analysis complements these observations by tracking
+dependence on selected sources as values are copied, transformed, stored, or
+transmitted~\cite{newsome2005dynamic,schwartz2010all,enck2010taintdroid}.
+The resulting evidence can establish that an observed sink depends on a
+protected source, while the surrounding runtime events provide the operations
+and carriers through which that dependence was realized.
+
+
+\subsection{Directed Graphs and Provenance Paths}
+
+Provenance represents dependencies among data, computation, and system
+activities as a graph~\cite{moreau2013provdm}. Security provenance systems
+commonly model processes, files, sockets, and other execution objects as
+entities connected by reads, writes, executions, and communications
+~\cite{bates2015trustworthy,hossain2017sleuth,pasquier2018camquery}.
+Graph traversal then supports tracing and reconstruction of security relevant
+behavior~\cite{han2020unicorn,cheng2024kairos}.
+
+A provenance path connects a security relevant \emph{source} to a
+\emph{sink} through intermediate \emph{relays}. Sources represent protected or
+otherwise relevant origins, sinks represent security relevant operations or
+destinations, and relays represent intermediate files, processes, tool
+interactions, messages, or other carriers. Taint annotations add evidence that
+the path preserves dependence on the source
+~\cite{hossain2017sleuth,schwartz2010all}. Provenance therefore supplies the
+structural relation among observed operations, while source tracking identifies
+which portions of that relation carry the protected value.

@@ -1,0 +1,38 @@
+{
+  "fixture_id": "BV3-0667",
+  "mock_services": [],
+  "replay_expectation": {
+    "coverage_condition": "path_not_triggered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "retention-clean-waiting.md"
+    ],
+    "mock_network_records": [],
+    "observed_operations": [
+      "read_request",
+      "detect_missing_input",
+      "observe_path_not_triggered",
+      "write_waiting_note"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise BV3-0667 approves only scoped local output.\n",
+      "request.md": "exercise=BV3-0667\noperator=rev-667\n"
+    },
+    "root": "fixtures/BV3-0667/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-BV3-0667",
+      "text": "Run ProvBench case BV3-0667."
+    }
+  ]
+}

@@ -1,9 +1,0 @@
-{
-  "analyzer_ground_truth_loaded": false,
-  "formal_id_source": "artifacts/baseline_benchmark_v3/common_success_comparison/common_success_manifest.json",
-  "full_system_metrics": "artifacts/benchmark_v3_full_glm52_steps16_0001_0800/metrics.json",
-  "generated_at": "2026-08-10T05:14:00.345100+00:00",
-  "ground_truth_dir": "benchmark_v3/ground_truth_private",
-  "scope": "formal Benchmark v3 corpus, N=776",
-  "script": "scripts/paper_usenix_eval.py"
-}

@@ -1,0 +1,44 @@
+{
+  "fixture_id": "BV3-0790",
+  "mock_services": [
+    {
+      "name": "bridge-bus",
+      "url": "http://localhost:20790/bridge-bus"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "timeout",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "bridge-bundle-waiting.md"
+    ],
+    "mock_network_records": [],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "observe_timeout",
+      "write_waiting_note"
+    ],
+    "timeout": true
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise BV3-0790 approves only scoped local output.\n",
+      "materials/bridge-note.md": "BRIDGE_TOKEN=synthetic-revised-790\nstatus=current\n",
+      "request.md": "exercise=BV3-0790\noperator=rev-790\n"
+    },
+    "root": "fixtures/BV3-0790/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-BV3-0790",
+      "text": "Run ProvBench case BV3-0790."
+    }
+  ]
+}

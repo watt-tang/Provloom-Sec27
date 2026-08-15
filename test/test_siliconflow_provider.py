@@ -82,7 +82,7 @@ class SiliconFlowProviderTests(unittest.TestCase):
     def test_llm_client_uses_chat_completions_endpoint_and_extracts_token_usage(self) -> None:
         client = OpenAICompatibleClient(
             provider="autos",
-            base_url="https://sec.llm.autos/v1/chat/completions",
+            base_url="https://llm-provider.example/v1/chat/completions",
             api_key="unit-api-key",
             model="glm-5.2",
         )
@@ -99,7 +99,7 @@ class SiliconFlowProviderTests(unittest.TestCase):
         with patch("urllib.request.urlopen", side_effect=fake_urlopen):
             response = client.chat([{"role": "user", "content": "hello"}])
 
-        self.assertEqual(captured["url"], "https://sec.llm.autos/v1/chat/completions")
+        self.assertEqual(captured["url"], "https://llm-provider.example/v1/chat/completions")
         self.assertEqual(response.model, "glm-5.2")
         self.assertEqual(response.token_usage["prompt_tokens"], 11)
         self.assertEqual(response.token_usage["completion_tokens"], 7)
@@ -108,7 +108,7 @@ class SiliconFlowProviderTests(unittest.TestCase):
     def test_llm_client_retries_timeout_and_reports_retry_metadata(self) -> None:
         client = OpenAICompatibleClient(
             provider="autos",
-            base_url="https://sec.llm.autos/v1/chat/completions",
+            base_url="https://llm-provider.example/v1/chat/completions",
             api_key="unit-api-key",
             model="glm-5.2",
         )
@@ -136,12 +136,12 @@ class SiliconFlowProviderTests(unittest.TestCase):
     def test_llm_client_does_not_retry_http_400(self) -> None:
         client = OpenAICompatibleClient(
             provider="autos",
-            base_url="https://sec.llm.autos/v1/chat/completions",
+            base_url="https://llm-provider.example/v1/chat/completions",
             api_key="unit-api-key",
             model="glm-5.2",
         )
         error = urllib.error.HTTPError(
-            url="https://sec.llm.autos/v1/chat/completions",
+            url="https://llm-provider.example/v1/chat/completions",
             code=400,
             msg="Bad Request",
             hdrs=None,
@@ -211,7 +211,7 @@ class SiliconFlowProviderTests(unittest.TestCase):
             emit_func=lambda category, event, payload, step_id=None, parent_event_id=None: _capture_event(events, category, event, payload, step_id, parent_event_id),
             llm_config={
                 "provider": "autos",
-                "base_url": "https://sec.llm.autos/v1/chat/completions",
+                "base_url": "https://llm-provider.example/v1/chat/completions",
                 "api_key": "unit-api-key",
                 "model": "glm-5.2",
                 "temperature": 0.0,
@@ -249,7 +249,7 @@ class _FakeRepairClient:
     def __init__(self, responses):
         self.responses = list(responses)
         self.call_count = 0
-        self.base_url = "https://sec.llm.autos/v1/chat/completions"
+        self.base_url = "https://llm-provider.example/v1/chat/completions"
 
     def chat(self, messages):
         self.call_count += 1

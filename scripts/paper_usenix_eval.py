@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Paper-facing evaluation for the ProvLoom USENIX draft.
 
-The script is evaluation-only. It reads frozen Benchmark v3 artifacts, the fixed
-776-id formal manifest, ground truth, ProvLoom summaries, runtime graphs, and
+The script is evaluation-only. It reads frozen ProvBench artifacts, ground
+truth, ProvLoom summaries, runtime graphs, and
 ablation outputs. It does not modify analyzer logic or use ground truth to tune
 the system.
 """
@@ -23,15 +23,15 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-FORMAL_IDS = ROOT / "artifacts/baseline_benchmark_v3/common_success_comparison/common_success_manifest.json"
-PROV_METRICS = ROOT / "artifacts/benchmark_v3_full_glm52_steps16_0001_0800/metrics.json"
-PROV_SUMMARY = ROOT / "artifacts/benchmark_v3_full_glm52_steps16_0001_0800/summary.json"
-BASELINE_COMPARISON = ROOT / "artifacts/baseline_benchmark_v3/common_success_comparison/comparison.json"
-BENCHMARK_MANIFEST = ROOT / "benchmark_v3/manifest.jsonl"
-GT_DIR = ROOT / "benchmark_v3/ground_truth_private"
-RUN_DIR = ROOT / "artifacts/runs"
-ABLATION_DIR = ROOT / "artifacts/benchmark_v3_ablation"
-OUT = ROOT / "artifacts/paper_usenix"
+FORMAL_IDS = ROOT / "results/baselines/common_success_comparison/common_success_manifest.json"
+PROV_METRICS = ROOT / "results/provbench/full/metrics.json"
+PROV_SUMMARY = ROOT / "results/provbench/full/summary.json"
+BASELINE_COMPARISON = ROOT / "results/baselines/common_success_comparison/comparison.json"
+BENCHMARK_MANIFEST = ROOT / "provbench/manifest.jsonl"
+GT_DIR = ROOT / "provbench/ground_truth"
+RUN_DIR = ROOT / "results/provbench/full/runs"
+ABLATION_DIR = ROOT / "results/ablation"
+OUT = ROOT / "results/paper_usenix"
 
 
 @lru_cache(maxsize=None)
@@ -612,7 +612,7 @@ def trusted_allowed_fp_taxonomy(ids: list[str], samples: dict[str, dict[str, Any
         gt = load_gt(sid)
         obs = chain_observations(sid, s)
         sinks = ";".join(obs["pred_sinks"])
-        if any("sec.llm.autos" in x or "chat/completions" in x for x in obs["pred_sinks"]):
+        if any("llm-provider.example" in x or "chat/completions" in x for x in obs["pred_sinks"]):
             tax = "trusted_llm_provider_flow_treated_as_untrusted_or_secondary_sink"
         elif obs["carrier_types"] and not gt.get("trusted_entities"):
             tax = "authorization_context_not_linked_to_runtime_sink"
@@ -790,7 +790,7 @@ def analyst_protocol() -> None:
 This protocol is not a completed human study. It is a reproducible review checklist
 for the frozen formal-776 artifacts.
 
-Review unit: one Benchmark v3 sample with ground truth, SKILL.md, ProvLoom
+Review unit: one ProvBench case with ground truth, SKILL.md, ProvLoom
 unified-analysis.json, runtime-chains.json, runtime graph, and evaluator row.
 
 Questions:
@@ -1198,7 +1198,7 @@ def case_studies(samples: dict[str, dict[str, Any]]) -> dict[str, Any]:
     for sid in ids:
         gt = load_gt(sid)
         s = samples[sid]
-        skill = (ROOT / f"benchmark_v3/samples/{sid}/SKILL.md").read_text()
+        skill = (ROOT / f"provbench/cases/{sid}/SKILL.md").read_text()
         unified = load_unified(sid)
         chains = load_runtime_chains(sid)
         cases.append({
@@ -1227,7 +1227,7 @@ def markdown_summary(results: dict[str, Any]) -> None:
     lines = ["# ProvLoom USENIX Paper Evaluation Artifacts", ""]
     lines.append(f"Generated at: {datetime.now(timezone.utc).isoformat()}")
     lines.append("")
-    lines.append("Scope: fixed formal Benchmark v3 776-case corpus.")
+    lines.append("Scope: fixed ProvBench 776-case corpus.")
     lines.append("")
     cm = results["chain_metrics"]
     lines.append("## Explanation Metrics")
@@ -1270,7 +1270,7 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     config = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "scope": "formal Benchmark v3 corpus, N=776",
+        "scope": "ProvBench corpus, N=776",
         "formal_id_source": str(FORMAL_IDS.relative_to(ROOT)),
         "full_system_metrics": str(PROV_METRICS.relative_to(ROOT)),
         "ground_truth_dir": str(GT_DIR.relative_to(ROOT)),

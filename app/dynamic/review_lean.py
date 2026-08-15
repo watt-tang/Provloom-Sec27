@@ -392,7 +392,7 @@ def _only_trusted_llm_or_no_untrusted_sink(events: list[dict[str, Any]], chains:
                 (event.get("metadata") or {}).get("destination") if isinstance(event.get("metadata"), dict) else "",
             )
         ).lower()
-        if "llm" not in text and not any(domain in text for domain in ("openai", "deepseek", "siliconflow", "sec.llm.autos")):
+        if "llm" not in text and not any(domain in text for domain in ("openai", "deepseek", "siliconflow", "llm-provider.example")):
             return False
     return True
 

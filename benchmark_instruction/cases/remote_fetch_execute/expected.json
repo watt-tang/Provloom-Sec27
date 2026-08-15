@@ -1,6 +1,0 @@
-{
-  "validated_paths": ["remote_fetch_execute"],
-  "absent_validated_paths": [],
-  "partial_paths": [],
-  "requires_abstention": false
-}

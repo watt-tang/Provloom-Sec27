@@ -11,7 +11,7 @@ from app.backend.api import runner as api_runner
 from app.dynamic import cli as dynamic_cli
 from app.explanation.builder import build_unified_explanation
 from app.runner.docker_runner import DEFAULT_SANDBOX_IMAGE, DockerRunner
-from scripts import batch_scan_skills, run_benchmark
+from scripts import batch_scan_skills
 
 
 class DefaultImageAndAlignmentScopeTests(unittest.TestCase):
@@ -19,7 +19,6 @@ class DefaultImageAndAlignmentScopeTests(unittest.TestCase):
         self.assertEqual(DockerRunner().image_name, DEFAULT_SANDBOX_IMAGE)
         self.assertEqual(api_runner.image_name, DEFAULT_SANDBOX_IMAGE)
         self.assertEqual(batch_scan_skills.build_runner().image_name, DEFAULT_SANDBOX_IMAGE)
-        self.assertEqual(run_benchmark.build_runner().image_name, DEFAULT_SANDBOX_IMAGE)
 
         captured = {}
 

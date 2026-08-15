@@ -1,0 +1,5 @@
+system,count,tp,tn,fp,fn,accuracy,precision,recall,f1,specificity,fpr,benign_lookalike_fpr,trusted_allowed_fpr,review_rate,confirmed_violation_chain_recall,complete_chain_recall,false_closure_rate
+ProvLoom,776,291,339,39,107,0.811856,0.881818,0.731156,0.799451,0.896825,0.103175,0.0,0.325,0.136598,0.71608,0.615578,0.103175
+AI-Infra-Guard,776,101,373,5,297,0.610825,0.95283,0.253769,0.400794,0.986772,0.013228,0.011173,0.025,0.0,,,
+Cisco LLM Scanner,776,312,340,38,86,0.840206,0.891429,0.78392,0.834225,0.899471,0.100529,0.089385,0.183333,0.0,,,
+SkillScan,776,144,360,18,254,0.649485,0.888889,0.361809,0.514286,0.952381,0.047619,0.022346,0.075,0.0,,,
