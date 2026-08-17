@@ -260,17 +260,17 @@ def gt(sid: str) -> dict[str, Any]:
 
 
 def unified(sid: str) -> dict[str, Any]:
-    p = RUN_DIR / f"BV3FULL-{sid}" / "unified-analysis.json"
+    p = RUN_DIR / f"PROVBENCH-FULL-{sid}" / "unified-analysis.json"
     return read_json(p) if p.exists() else {}
 
 
 def graph(sid: str) -> dict[str, Any]:
-    p = RUN_DIR / f"BV3FULL-{sid}" / "runtime-provenance-graph.json"
+    p = RUN_DIR / f"PROVBENCH-FULL-{sid}" / "runtime-provenance-graph.json"
     return read_json(p) if p.exists() else {"nodes": [], "edges": []}
 
 
 def chains(sid: str) -> list[dict[str, Any]]:
-    p = RUN_DIR / f"BV3FULL-{sid}" / "runtime-chains.json"
+    p = RUN_DIR / f"PROVBENCH-FULL-{sid}" / "runtime-chains.json"
     return read_json(p) if p.exists() else []
 
 
@@ -771,7 +771,7 @@ def freeze_inputs(ids: list[str]) -> None:
     runtime_paths = []
     static_paths = []
     for sid in ids:
-        base = RUN_DIR / f"BV3FULL-{sid}"
+        base = RUN_DIR / f"PROVBENCH-FULL-{sid}"
         runtime_paths.extend(str((base / name).relative_to(ROOT)) for name in ["runtime-chains.json", "runtime-provenance-graph.json", "unified-analysis.json"] if (base / name).exists())
         if (base / "unified-analysis.json").exists():
             static_paths.append(str((base / "unified-analysis.json").relative_to(ROOT)))

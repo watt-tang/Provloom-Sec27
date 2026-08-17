@@ -44,7 +44,7 @@ BASELINE_PYTHONS = {
     "ai_infra_guard": BASELINES_ROOT / "envs" / "ai-infra-guard" / "bin" / "python",
 }
 
-SMOKE_SET = [f"BV3-{i:04d}" for i in range(1, 21)]
+SMOKE_SET = [f"PB-{i:03d}" for i in range(1, 21)]
 
 
 def main() -> int:
@@ -199,9 +199,9 @@ def select_sample_ids(args: argparse.Namespace) -> list[str]:
             ids = rng.sample(ids, min(args.random_sample_count, len(ids)))
         return ids
     if args.end:
-        start = int(str(args.start).replace("BV3-", ""))
-        end = int(str(args.end).replace("BV3-", ""))
-        ids = [f"BV3-{i:04d}" for i in range(start, end + 1)]
+        start = int(str(args.start).replace("PB-", ""))
+        end = int(str(args.end).replace("PB-", ""))
+        ids = [f"PB-{i:03d}" for i in range(start, end + 1)]
     else:
         manifest = Path(args.benchmark_root).resolve() / "manifest.jsonl"
         ids = [json.loads(line)["sample_id"] for line in manifest.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -213,9 +213,9 @@ def select_sample_ids(args: argparse.Namespace) -> list[str]:
 
 def normalize_sample_id(value: str) -> str:
     text = str(value).strip().upper()
-    if text.startswith("BV3-"):
+    if text.startswith("PB-"):
         return text
-    return f"BV3-{int(text):04d}"
+    return f"PB-{int(text):03d}"
 
 
 def scan_one(baseline: str, sample_id: str, args: argparse.Namespace) -> dict[str, Any]:
@@ -684,7 +684,7 @@ def evaluate_only(args: argparse.Namespace, output_root: Path) -> int:
 
 def load_ground_truth(root: Path) -> dict[str, dict[str, Any]]:
     records = {}
-    for path in sorted(root.glob("BV3-*.json")):
+    for path in sorted(root.glob("PB-*.json")):
         payload = json.loads(path.read_text(encoding="utf-8"))
         records[path.stem] = payload
     if not records:

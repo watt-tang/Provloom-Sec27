@@ -35,7 +35,7 @@ from app.taint.source_registry import SourceRegistry
 SCHEMA_VERSION = "provloom-provbench-ablation-replay-v1"
 FULL_ROOT_DEFAULT = "results/provbench/full"
 VARIANTS = {"full", "static_only", "event_only", "no_alignment", "no_policy"}
-SMOKE_IDS = [f"BV3-{index:04d}" for index in range(1, 11)]
+SMOKE_IDS = [f"PB-{index:03d}" for index in range(1, 11)]
 CONSISTENCY_FIELDS = [
     "binary_prediction",
     "final_decision",
@@ -151,9 +151,9 @@ def select_sample_ids(args: argparse.Namespace) -> list[str]:
     if args.sample_ids.strip():
         ids.extend(normalize_sample_id(item) for item in args.sample_ids.split(",") if item.strip())
     elif args.start or args.end:
-        start = int(str(args.start or "1").replace("BV3-", ""))
-        end = int(str(args.end or args.start or start).replace("BV3-", ""))
-        ids.extend(f"BV3-{index:04d}" for index in range(start, end + 1))
+        start = int(str(args.start or "1").replace("PB-", ""))
+        end = int(str(args.end or args.start or start).replace("PB-", ""))
+        ids.extend(f"PB-{index:03d}" for index in range(start, end + 1))
     else:
         summary = load_json(Path(args.full_root) / "summary.json")
         ids.extend(str(row["sample_id"]) for row in summary.get("samples", []) if row.get("sample_id"))
@@ -165,9 +165,9 @@ def select_sample_ids(args: argparse.Namespace) -> list[str]:
 
 def normalize_sample_id(value: str) -> str:
     text = str(value).strip().upper()
-    if text.startswith("BV3-"):
+    if text.startswith("PB-"):
         return text
-    return f"BV3-{int(text):04d}"
+    return f"PB-{int(text):03d}"
 
 
 def run_samples(cfg: WorkerConfig, sample_ids: list[str], *, workers: int) -> list[dict[str, Any]]:

@@ -14,7 +14,7 @@ Primary input artifacts:
 - `results/paper_usenix/carrier_analysis/per_sample.csv`
 - `results/paper_usenix/root_cause_diagnosis/structural_explanation/per_sample_chain_audit.csv`
 - `results/provbench/full/summary.json`
-- `artifacts/runs/BV3FULL-*/unified-analysis.json`
+- `artifacts/runs/PROVBENCH-FULL-*/unified-analysis.json`
 
 Ground truth is used only to identify the false-negative population and expected source/sink/carrier fields. It was not passed to the analyzer in the original run.
 
@@ -114,7 +114,7 @@ Expected carrier: `local overwrite`
 
 Samples:
 
-`BV3-0010`, `BV3-0011`, `BV3-0037`, `BV3-0063`, `BV3-0076`, `BV3-0089`, `BV3-0102`, `BV3-0115`, `BV3-0128`, `BV3-0141`, `BV3-0154`, `BV3-0207`, `BV3-0220`, `BV3-0233`, `BV3-0246`, `BV3-0259`, `BV3-0272`, `BV3-0285`, `BV3-0298`, `BV3-0311`, `BV3-0324`, `BV3-0337`, `BV3-0349`, `BV3-0361`
+`PB-010`, `PB-011`, `PB-037`, `PB-063`, `PB-076`, `PB-089`, `PB-102`, `PB-115`, `PB-127`, `PB-140`, `PB-153`, `PB-206`, `PB-219`, `PB-232`, `PB-244`, `PB-257`, `PB-270`, `PB-283`, `PB-296`, `PB-309`, `PB-322`, `PB-335`, `PB-347`, `PB-359`
 
 Interpretation: The source was found, but the runtime did not align to the expected destructive local overwrite terminal. The common runtime evidence is a trusted LLM carrier rather than a destructive state change.
 
@@ -126,7 +126,7 @@ Expected carrier: `ACL append`
 
 Samples:
 
-`BV3-0009`, `BV3-0026`, `BV3-0036`, `BV3-0049`, `BV3-0062`, `BV3-0075`, `BV3-0088`, `BV3-0101`, `BV3-0114`, `BV3-0127`, `BV3-0140`, `BV3-0153`, `BV3-0206`, `BV3-0219`, `BV3-0258`, `BV3-0271`, `BV3-0284`, `BV3-0297`, `BV3-0310`, `BV3-0323`, `BV3-0336`, `BV3-0348`, `BV3-0360`
+`PB-009`, `PB-026`, `PB-036`, `PB-049`, `PB-062`, `PB-075`, `PB-088`, `PB-101`, `PB-114`, `PB-126`, `PB-139`, `PB-152`, `PB-205`, `PB-218`, `PB-256`, `PB-269`, `PB-282`, `PB-295`, `PB-308`, `PB-321`, `PB-334`, `PB-346`, `PB-358`
 
 Interpretation: The expected permission or grant-state terminal was not observed. These cases are not caused by missing source taint. The expected ACL or permission update failed to materialize as an aligned runtime sink.
 
@@ -138,7 +138,7 @@ Expected carrier: `local appendix note`
 
 Samples:
 
-`BV3-0016`, `BV3-0055`, `BV3-0068`, `BV3-0081`, `BV3-0107`, `BV3-0120`, `BV3-0133`, `BV3-0146`, `BV3-0158`, `BV3-0166`, `BV3-0172`, `BV3-0212`, `BV3-0225`, `BV3-0238`, `BV3-0251`, `BV3-0277`, `BV3-0290`, `BV3-0303`, `BV3-0316`, `BV3-0341`, `BV3-0353`
+`PB-016`, `PB-055`, `PB-068`, `PB-081`, `PB-107`, `PB-120`, `PB-132`, `PB-145`, `PB-157`, `PB-165`, `PB-171`, `PB-211`, `PB-224`, `PB-237`, `PB-249`, `PB-275`, `PB-288`, `PB-301`, `PB-314`, `PB-339`, `PB-351`
 
 Interpretation: The expected instruction or appendix artifact did not appear as a runtime sink. Runtime evidence usually confirms LLM context flow, but not the expected local instruction mutation or note insertion.
 
@@ -150,7 +150,7 @@ Expected carrier: `startup list entry`
 
 Samples:
 
-`BV3-0008`, `BV3-0035`, `BV3-0048`, `BV3-0061`, `BV3-0074`, `BV3-0087`, `BV3-0113`, `BV3-0126`, `BV3-0139`, `BV3-0152`, `BV3-0205`, `BV3-0218`, `BV3-0244`, `BV3-0257`, `BV3-0270`, `BV3-0283`, `BV3-0296`, `BV3-0322`, `BV3-0347`, `BV3-0359`
+`PB-008`, `PB-035`, `PB-048`, `PB-061`, `PB-074`, `PB-087`, `PB-113`, `PB-125`, `PB-138`, `PB-151`, `PB-204`, `PB-217`, `PB-243`, `PB-255`, `PB-268`, `PB-281`, `PB-294`, `PB-320`, `PB-345`, `PB-357`
 
 Interpretation: This is the cleanest execution-obligation group. All 20 have unresolved decisive persistence/file-write obligations. The expected startup-list or persistence target was not reached at runtime.
 
@@ -170,7 +170,7 @@ Expected carriers:
 
 Samples:
 
-`BV3-0043`, `BV3-0045`, `BV3-0060`, `BV3-0070`, `BV3-0072`, `BV3-0080`, `BV3-0095`, `BV3-0111`, `BV3-0124`, `BV3-0143`, `BV3-0209`, `BV3-0215`, `BV3-0250`, `BV3-0295`, `BV3-0300`
+`PB-043`, `PB-045`, `PB-060`, `PB-070`, `PB-072`, `PB-080`, `PB-095`, `PB-111`, `PB-124`, `PB-142`, `PB-208`, `PB-214`, `PB-248`, `PB-293`, `PB-298`
 
 Interpretation: These cases do not share the same local state surface. The shared artifact pattern is still source match plus sink mismatch. Runtime observes trusted LLM context or a nonmatching carrier, but the expected archive, post, helper-command, job-request, or request terminal is not aligned.
 

@@ -32,7 +32,7 @@
     "authoring_origin"
   ],
   "properties": {
-    "sample_id": {"type": "string", "pattern": "^BV3-[0-9]{4}$"},
+    "sample_id": {"type": "string", "pattern": "^PB-[0-9]{3}$"},
     "expected_policy_outcome": {
       "type": "string",
       "enum": ["confirmed_violation", "benign_lookalike", "trusted_allowed", "review_coverage"]

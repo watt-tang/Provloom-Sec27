@@ -1,777 +1,777 @@
 sample_id,expected_outcome,risk_family,gt_transport_carriers,predicted_carrier_types,confirmed_violation_chain,complete_chain_recovered,coverage_state,exact_chain_match
-BV3-0001,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0002,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0003,confirmed_violation,Private data collection and upload,filtered CSV packet,,False,False,timeout,False
-BV3-0004,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0005,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0006,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0007,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0008,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0009,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0010,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0011,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0012,confirmed_violation,Reverse shell / remote control,controller poll response,,False,False,timeout,False
-BV3-0013,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0014,confirmed_violation,Unauthorized external actions,action request post,,False,False,timeout,False
-BV3-0015,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0016,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0017,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0018,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0019,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0020,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0021,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0022,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0023,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0024,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0025,confirmed_violation,Persistence,startup list entry,http_body;llm_context,False,False,path_incomplete,False
-BV3-0026,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0027,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0028,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0029,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0030,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0031,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0032,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0033,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,,False,False,timeout,False
-BV3-0034,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0035,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0036,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0037,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0038,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0039,confirmed_violation,Supply-chain or dependency abuse,package archive,,False,False,timeout,False
-BV3-0040,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0041,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0042,confirmed_violation,Instruction override and hidden behavior,local appendix note,,False,False,timeout,False
-BV3-0043,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",llm_context,False,False,path_incomplete,False
-BV3-0044,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0045,confirmed_violation,Private data collection and upload,filtered CSV packet,llm_context,False,False,path_incomplete,False
-BV3-0046,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0047,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0048,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0049,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0050,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,max_steps_exhausted,False
-BV3-0051,confirmed_violation,Reverse shell / remote control,controller poll response,,False,False,target_reached_no_flow,False
-BV3-0052,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0053,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0054,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0055,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0056,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0057,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0058,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0059,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0060,confirmed_violation,Untrusted download and execute,archive and helper command,llm_context,False,False,path_incomplete,False
-BV3-0061,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0062,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0063,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0064,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0065,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0066,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0067,confirmed_violation,Resource abuse,many job requests,,False,False,timeout,False
-BV3-0068,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0069,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,environment_missing,False
-BV3-0070,confirmed_violation,Credential access and exfiltration,plain text request,http_body;llm_context,False,False,complete,False
-BV3-0071,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0072,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,llm_context,False,False,path_incomplete,False
-BV3-0073,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0074,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0075,confirmed_violation,Permission or privilege expansion,ACL append,http_body;llm_context,False,False,complete,False
-BV3-0076,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0077,confirmed_violation,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
-BV3-0078,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0079,confirmed_violation,Unauthorized external actions,action request post,,False,False,environment_missing,False
-BV3-0080,confirmed_violation,Resource abuse,many job requests,llm_context,False,False,path_incomplete,False
-BV3-0081,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0082,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0083,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0084,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0085,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,,False,False,execution_failed,False
-BV3-0086,confirmed_violation,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
-BV3-0087,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0088,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0089,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0090,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0091,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0092,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0093,confirmed_violation,Resource abuse,many job requests,llm_context,False,False,environment_missing,False
-BV3-0094,confirmed_violation,Instruction override and hidden behavior,local appendix note,,False,False,environment_missing,False
-BV3-0095,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",llm_context,False,False,path_incomplete,False
-BV3-0096,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0097,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0098,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0099,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0100,confirmed_violation,Persistence,startup list entry,llm_context,False,False,max_steps_exhausted,False
-BV3-0101,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0102,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0103,confirmed_violation,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
-BV3-0104,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0105,confirmed_violation,Unauthorized external actions,action request post,,False,False,timeout,False
-BV3-0106,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0107,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0108,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0109,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0110,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0111,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,llm_context,False,False,path_incomplete,False
-BV3-0112,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0113,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0114,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0115,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0116,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0117,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0118,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0119,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0120,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0121,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
-BV3-0122,confirmed_violation,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
-BV3-0123,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0124,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,llm_context,False,False,path_incomplete,False
-BV3-0126,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0127,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0128,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0129,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0130,confirmed_violation,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
-BV3-0131,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0132,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0133,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0134,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0135,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0136,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0137,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0138,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0139,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0140,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0141,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0142,confirmed_violation,Reverse shell / remote control,controller poll response,,False,False,target_reached_no_flow,False
-BV3-0143,confirmed_violation,Supply-chain or dependency abuse,package archive,llm_context,False,False,path_incomplete,False
-BV3-0144,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0145,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0146,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0147,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0148,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0149,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0150,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0151,confirmed_violation,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
-BV3-0152,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0153,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0154,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0155,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0156,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0157,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0158,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0159,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0160,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0161,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0162,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0163,confirmed_violation,Untrusted download and execute,archive and helper command,,False,False,timeout,False
-BV3-0164,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0165,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0166,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0167,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0168,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0169,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0170,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0171,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0172,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0173,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0174,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0175,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0176,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0177,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0178,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0179,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0180,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0181,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0182,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0183,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
-BV3-0184,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0185,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
-BV3-0186,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,environment_missing,False
-BV3-0187,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,environment_missing,False
-BV3-0188,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,environment_missing,False
-BV3-0189,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,environment_missing,False
-BV3-0190,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0191,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0192,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0193,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
-BV3-0194,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
-BV3-0195,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0196,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0197,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0198,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0199,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0200,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0201,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0202,confirmed_violation,Private data collection and upload,filtered CSV packet,,False,False,timeout,False
-BV3-0203,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,False,max_steps_exhausted,False
-BV3-0204,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0205,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0206,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0207,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0208,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0209,confirmed_violation,Supply-chain or dependency abuse,package archive,llm_context,False,False,path_incomplete,False
-BV3-0210,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0211,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0212,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0213,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0214,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0215,confirmed_violation,Private data collection and upload,filtered CSV packet,llm_context,False,False,path_incomplete,False
-BV3-0216,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0217,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0218,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0219,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0220,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0221,confirmed_violation,Reverse shell / remote control,controller poll response,,False,False,timeout,False
-BV3-0222,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0223,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0224,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0225,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0226,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
-BV3-0227,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0228,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0229,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0230,confirmed_violation,Untrusted download and execute,archive and helper command,,False,False,environment_missing,False
-BV3-0231,confirmed_violation,Persistence,startup list entry,,False,False,environment_missing,False
-BV3-0232,confirmed_violation,Permission or privilege expansion,ACL append,,False,False,environment_missing,False
-BV3-0233,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0234,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0235,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0236,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0237,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0238,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0239,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0240,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0241,confirmed_violation,Private data collection and upload,filtered CSV packet,,False,False,timeout,False
-BV3-0242,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0243,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0244,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0246,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0247,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0248,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0249,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0250,confirmed_violation,Resource abuse,many job requests,llm_context,False,False,path_incomplete,False
-BV3-0251,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0252,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0253,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0254,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0255,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0256,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0257,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0258,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0259,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0260,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0261,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0262,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0263,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0264,confirmed_violation,Instruction override and hidden behavior,local appendix note,,False,False,timeout,False
-BV3-0265,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0266,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0267,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0268,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0269,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0270,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0271,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0272,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0273,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0274,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0275,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0276,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0277,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0278,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0279,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0280,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0281,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0282,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0283,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0284,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0285,confirmed_violation,Destructive modification / ransomware,local overwrite,http_body;llm_context,False,False,complete,False
-BV3-0286,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0287,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0288,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0289,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0290,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0291,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0292,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0293,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0294,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0295,confirmed_violation,Untrusted download and execute,archive and helper command,llm_context,False,False,path_incomplete,False
-BV3-0296,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0297,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0298,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0299,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0300,confirmed_violation,Supply-chain or dependency abuse,package archive,llm_context,False,False,path_incomplete,False
-BV3-0301,confirmed_violation,Unauthorized external actions,action request post,,False,False,timeout,False
-BV3-0302,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0303,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0304,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0305,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0306,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0307,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0308,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0309,confirmed_violation,Persistence,startup list entry,,False,False,execution_failed,False
-BV3-0310,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0311,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0312,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0313,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0314,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0315,confirmed_violation,Resource abuse,many job requests,,False,False,timeout,False
-BV3-0316,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0317,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0318,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0319,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0320,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0321,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0322,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0323,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0324,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0325,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0326,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0327,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0328,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
-BV3-0329,confirmed_violation,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0330,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0331,confirmed_violation,Credential access and exfiltration,plain text request,,False,False,timeout,False
-BV3-0332,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0333,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0334,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0335,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0336,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0337,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0338,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0339,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0340,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0341,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0342,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0343,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0344,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0345,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0346,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0347,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0348,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0349,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0350,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0351,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
-BV3-0352,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
-BV3-0353,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
-BV3-0354,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0355,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0356,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0357,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0358,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0359,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
-BV3-0360,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
-BV3-0361,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
-BV3-0362,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
-BV3-0363,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0364,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0365,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0366,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0367,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0368,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0369,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0370,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
-BV3-0371,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
-BV3-0372,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0373,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0374,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0375,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0376,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0377,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
-BV3-0378,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0379,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0380,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
-BV3-0381,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0382,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0383,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0384,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0385,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0386,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0387,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0388,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0389,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0390,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0391,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0392,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
-BV3-0393,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0394,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0395,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0396,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0397,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0398,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0399,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0400,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
-BV3-0401,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
-BV3-0402,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
-BV3-0403,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
-BV3-0404,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0405,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0406,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0407,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0408,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
-BV3-0409,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
-BV3-0410,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
-BV3-0411,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
-BV3-0412,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,timeout,False
-BV3-0413,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0414,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
-BV3-0415,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
-BV3-0416,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
-BV3-0417,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0418,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0419,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0420,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0421,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_not_triggered,False
-BV3-0422,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
-BV3-0423,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
-BV3-0424,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
-BV3-0425,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0426,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0427,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
-BV3-0428,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
-BV3-0430,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0431,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0432,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0433,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0434,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
-BV3-0435,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
-BV3-0436,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
-BV3-0437,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
-BV3-0438,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,execution_failed,False
-BV3-0439,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0440,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
-BV3-0441,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
-BV3-0442,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
-BV3-0443,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0444,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0445,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0446,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0447,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
-BV3-0448,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
-BV3-0449,benign_lookalike,Unauthorized external actions,action request post,,False,False,execution_failed,False
-BV3-0450,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
-BV3-0451,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0452,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0453,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,timeout,False
-BV3-0454,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,environment_missing,False
-BV3-0455,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,environment_missing,False
-BV3-0456,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,environment_missing,False
-BV3-0457,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0458,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0459,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0460,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
-BV3-0461,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
-BV3-0462,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
-BV3-0463,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
-BV3-0464,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0465,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0466,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
-BV3-0467,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,target_reached_no_flow,False
-BV3-0468,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
-BV3-0469,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,target_reached_no_flow,False
-BV3-0470,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0471,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0472,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0473,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,target_reached_no_flow,False
-BV3-0474,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
-BV3-0475,benign_lookalike,Unauthorized external actions,action request post,,False,False,complete,False
-BV3-0476,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
-BV3-0477,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0478,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0479,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
-BV3-0480,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
-BV3-0481,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,execution_failed,False
-BV3-0482,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
-BV3-0483,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0484,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0485,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,execution_failed,False
-BV3-0486,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
-BV3-0487,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
-BV3-0488,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
-BV3-0489,benign_lookalike,Resource abuse,many job requests,,False,False,environment_missing,False
-BV3-0490,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,environment_missing,False
-BV3-0491,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0493,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,target_reached_no_flow,False
-BV3-0494,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
-BV3-0495,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,timeout,False
-BV3-0496,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0497,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0498,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0509,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0510,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0511,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0512,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
-BV3-0514,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
-BV3-0515,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
-BV3-0516,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0522,benign_lookalike,Persistence,startup list entry,,False,False,execution_failed,False
-BV3-0523,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0524,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0525,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
-BV3-0526,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
-BV3-0527,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
-BV3-0528,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
-BV3-0529,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,target_reached_no_flow,False
-BV3-0530,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0531,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
-BV3-0532,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
-BV3-0533,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,execution_failed,False
-BV3-0534,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
-BV3-0535,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0536,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0537,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0538,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,target_reached_no_flow,False
-BV3-0539,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
-BV3-0540,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
-BV3-0541,trusted_allowed,Resource abuse,many job requests,,False,False,path_incomplete,False
-BV3-0542,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,timeout,False
-BV3-0543,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0544,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
-BV3-0545,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
-BV3-0546,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,complete,False
-BV3-0547,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0548,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0549,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0550,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0551,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
-BV3-0552,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,execution_failed,False
-BV3-0553,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
-BV3-0554,trusted_allowed,Resource abuse,many job requests,http_body,True,False,complete,False
-BV3-0555,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0556,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0557,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
-BV3-0558,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
-BV3-0559,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
-BV3-0560,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0561,trusted_allowed,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0562,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0563,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0564,trusted_allowed,Reverse shell / remote control,controller poll response,http_body,True,False,complete,False
-BV3-0565,trusted_allowed,Supply-chain or dependency abuse,package archive,http_body,True,False,complete,False
-BV3-0566,trusted_allowed,Unauthorized external actions,action request post,http_body,True,False,complete,False
-BV3-0567,trusted_allowed,Resource abuse,many job requests,http_body,True,False,complete,False
-BV3-0568,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0569,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0570,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
-BV3-0571,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,execution_failed,False
-BV3-0572,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,execution_failed,False
-BV3-0573,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
-BV3-0574,trusted_allowed,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0575,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0576,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0577,trusted_allowed,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
-BV3-0578,trusted_allowed,Supply-chain or dependency abuse,package archive,http_body,True,False,complete,False
-BV3-0579,trusted_allowed,Unauthorized external actions,action request post,http_body,True,False,complete,False
-BV3-0580,trusted_allowed,Resource abuse,many job requests,http_body,True,False,complete,False
-BV3-0581,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0582,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0583,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
-BV3-0584,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,environment_missing,False
-BV3-0586,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0587,trusted_allowed,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0588,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0589,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,environment_missing,False
-BV3-0590,trusted_allowed,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
-BV3-0591,trusted_allowed,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
-BV3-0592,trusted_allowed,Unauthorized external actions,action request post,http_body,True,False,complete,False
-BV3-0593,trusted_allowed,Resource abuse,many job requests,http_body,True,False,complete,False
-BV3-0594,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0595,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
-BV3-0596,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
-BV3-0597,trusted_allowed,Private data collection and upload,filtered CSV packet,http_body,True,False,complete,False
-BV3-0598,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,http_body,True,False,complete,False
-BV3-0599,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
-BV3-0600,trusted_allowed,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0601,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0602,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0603,trusted_allowed,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
-BV3-0604,trusted_allowed,Supply-chain or dependency abuse,package archive,,False,False,execution_failed,False
-BV3-0605,trusted_allowed,Unauthorized external actions,action request post,http_body,True,False,complete,False
-BV3-0606,trusted_allowed,Resource abuse,many job requests,,False,False,execution_failed,False
-BV3-0607,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0608,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0609,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
-BV3-0610,trusted_allowed,Private data collection and upload,filtered CSV packet,http_body,True,False,complete,False
-BV3-0611,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,http_body,True,False,complete,False
-BV3-0612,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0613,trusted_allowed,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0614,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0615,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0616,trusted_allowed,Reverse shell / remote control,controller poll response,http_body,True,False,complete,False
-BV3-0617,trusted_allowed,Supply-chain or dependency abuse,package archive,,False,False,timeout,False
-BV3-0618,trusted_allowed,Unauthorized external actions,action request post,http_body,True,False,complete,False
-BV3-0619,review_coverage,Resource abuse,many job requests,,False,False,execution_failed,False
-BV3-0620,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0621,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0622,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
-BV3-0623,trusted_allowed,Private data collection and upload,filtered CSV packet,http_body,True,False,complete,False
-BV3-0624,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
-BV3-0625,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0626,trusted_allowed,Persistence,startup list entry,,False,False,environment_missing,False
-BV3-0627,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0628,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0629,trusted_allowed,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
-BV3-0630,trusted_allowed,Supply-chain or dependency abuse,package archive,http_body,True,False,complete,False
-BV3-0631,trusted_allowed,Unauthorized external actions,action request post,,False,False,execution_failed,False
-BV3-0632,review_coverage,Resource abuse,many job requests,,False,False,execution_failed,False
-BV3-0633,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0634,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0635,trusted_allowed,Credential access and exfiltration,plain text request,http_body,True,False,complete,False
-BV3-0636,trusted_allowed,Private data collection and upload,filtered CSV packet,http_body,True,False,complete,False
-BV3-0637,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,,False,False,path_not_triggered,False
-BV3-0638,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0639,trusted_allowed,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0640,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0641,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0642,trusted_allowed,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
-BV3-0643,trusted_allowed,Supply-chain or dependency abuse,package archive,http_body,True,False,complete,False
-BV3-0644,trusted_allowed,Unauthorized external actions,action request post,http_body,True,False,complete,False
-BV3-0645,review_coverage,Resource abuse,many job requests,,False,False,target_reached_no_flow,False
-BV3-0646,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0647,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0648,trusted_allowed,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
-BV3-0649,trusted_allowed,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
-BV3-0650,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
-BV3-0651,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0653,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0654,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0655,trusted_allowed,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
-BV3-0656,trusted_allowed,Supply-chain or dependency abuse,package archive,http_body,True,False,complete,False
-BV3-0657,trusted_allowed,Unauthorized external actions,action request post,,False,False,path_incomplete,False
-BV3-0658,review_coverage,Resource abuse,many job requests,,False,False,target_reached_no_flow,False
-BV3-0659,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0660,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0661,trusted_allowed,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
-BV3-0662,trusted_allowed,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
-BV3-0663,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,http_body,True,False,complete,False
-BV3-0664,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
-BV3-0665,review_coverage,Persistence,startup list entry,,False,False,execution_failed,False
-BV3-0666,review_coverage,Permission or privilege expansion,ACL append,,False,False,execution_failed,False
-BV3-0667,review_coverage,Destructive modification / ransomware,local overwrite,,False,False,environment_missing,False
-BV3-0668,review_coverage,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
-BV3-0669,review_coverage,Supply-chain or dependency abuse,package archive,,False,False,environment_missing,False
-BV3-0670,review_coverage,Unauthorized external actions,action request post,,False,False,timeout,False
-BV3-0671,review_coverage,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
-BV3-0672,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0673,trusted_allowed,Credential access and exfiltration,plain text request,http_body,True,False,complete,False
-BV3-0675,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,,False,False,execution_failed,False
-BV3-0676,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
-BV3-0677,review_coverage,Persistence,startup list entry,,False,False,path_incomplete,False
-BV3-0678,review_coverage,Permission or privilege expansion,ACL append,,False,False,execution_failed,False
-BV3-0679,review_coverage,Destructive modification / ransomware,local overwrite,,False,False,timeout,False
-BV3-0680,review_coverage,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
-BV3-0681,review_coverage,Supply-chain or dependency abuse,package archive,,False,False,execution_failed,False
-BV3-0682,review_coverage,Unauthorized external actions,action request post,,False,False,execution_failed,False
-BV3-0683,review_coverage,Instruction override and hidden behavior,local appendix note,,False,False,execution_failed,False
-BV3-0684,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
-BV3-0685,trusted_allowed,Credential access and exfiltration,plain text request,http_body,True,False,complete,False
-BV3-0686,trusted_allowed,Private data collection and upload,filtered CSV packet,http_body,True,False,complete,False
-BV3-0687,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,http_body,True,False,complete,False
-BV3-0688,trusted_allowed,Untrusted download and execute,archive and helper command,http_body,True,False,complete,False
-BV3-0689,review_coverage,Persistence,startup list entry,,False,False,execution_failed,False
-BV3-0690,review_coverage,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
-BV3-0691,review_coverage,Destructive modification / ransomware,local overwrite,,False,False,timeout,False
-BV3-0692,review_coverage,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
-BV3-0693,review_coverage,Supply-chain or dependency abuse,package archive,,False,False,timeout,False
-BV3-0694,review_coverage,Unauthorized external actions,action request post,,False,False,execution_failed,False
-BV3-0695,review_coverage,Instruction override and hidden behavior,local appendix note,,False,False,target_reached_no_flow,False
-BV3-0696,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0697,trusted_allowed,Credential access and exfiltration,plain text request,,False,False,target_reached_no_flow,False
-BV3-0698,trusted_allowed,Private data collection and upload,filtered CSV packet,,False,False,execution_failed,False
-BV3-0699,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
-BV3-0700,trusted_allowed,Untrusted download and execute,archive and helper command,http_body,True,False,complete,False
-BV3-0701,review_coverage,Persistence,startup list entry,,False,False,execution_failed,False
-BV3-0702,review_coverage,Permission or privilege expansion,ACL append,,False,False,target_reached_no_flow,False
-BV3-0703,review_coverage,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0704,review_coverage,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
-BV3-0706,review_coverage,Unauthorized external actions,action request post,,False,False,execution_failed,False
-BV3-0707,review_coverage,Instruction override and hidden behavior,local appendix note,,False,False,execution_failed,False
-BV3-0708,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0709,trusted_allowed,Credential access and exfiltration,plain text request,http_body,True,False,complete,False
-BV3-0710,review_coverage,Private data collection and upload,filtered CSV packet,,False,False,execution_failed,False
-BV3-0711,review_coverage,LLM-mediated disclosure,LLM prompt and response,,False,False,execution_failed,False
-BV3-0712,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0713,review_coverage,Persistence,startup list entry,,False,False,execution_failed,False
-BV3-0714,review_coverage,Permission or privilege expansion,ACL append,,False,False,target_reached_no_flow,False
-BV3-0715,review_coverage,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
-BV3-0716,review_coverage,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
-BV3-0717,review_coverage,Supply-chain or dependency abuse,package archive,,False,False,environment_missing,False
-BV3-0718,review_coverage,Unauthorized external actions,action request post,,False,False,execution_failed,False
-BV3-0719,review_coverage,Instruction override and hidden behavior,local appendix note,,False,False,execution_failed,False
-BV3-0720,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
-BV3-0721,trusted_allowed,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
-BV3-0722,review_coverage,Private data collection and upload,filtered CSV packet,,False,False,execution_failed,False
-BV3-0723,review_coverage,LLM-mediated disclosure,LLM prompt and response,,False,False,target_reached_no_flow,False
-BV3-0724,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0725,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0726,trusted_allowed,Credential access and exfiltration,plain text request,http_body,True,False,complete,False
-BV3-0727,review_coverage,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
-BV3-0728,review_coverage,LLM-mediated disclosure,LLM prompt and response,,False,False,execution_failed,False
-BV3-0729,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,timeout,False
-BV3-0730,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0731,trusted_allowed,Credential access and exfiltration,plain text request,http_body,True,False,complete,False
-BV3-0732,review_coverage,Private data collection and upload,filtered CSV packet,,False,False,execution_failed,False
-BV3-0733,review_coverage,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
-BV3-0734,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0735,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0736,review_coverage,Credential access and exfiltration,plain text request,,False,False,timeout,False
-BV3-0737,review_coverage,Private data collection and upload,filtered CSV packet,,False,False,execution_failed,False
-BV3-0738,review_coverage,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
-BV3-0739,review_coverage,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0740,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
-BV3-0741,review_coverage,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
-BV3-0742,review_coverage,Private data collection and upload,filtered CSV packet,,False,False,environment_missing,False
-BV3-0743,review_coverage,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
-BV3-0744,review_coverage,Untrusted download and execute,archive and helper command,,False,False,target_reached_no_flow,False
-BV3-0745,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,complete,False
-BV3-0746,review_coverage,Credential access and exfiltration,plain text request,,False,False,path_not_triggered,False
-BV3-0747,review_coverage,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
-BV3-0748,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0749,review_coverage,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
-BV3-0750,review_coverage,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0751,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
-BV3-0752,review_coverage,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
-BV3-0753,review_coverage,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
-BV3-0754,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0755,review_coverage,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
-BV3-0756,review_coverage,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
-BV3-0757,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
-BV3-0758,review_coverage,Credential access and exfiltration,plain text request,,False,False,timeout,False
-BV3-0759,review_coverage,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
-BV3-0760,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,environment_missing,False
-BV3-0761,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
-BV3-0762,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0763,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0764,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0765,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
-BV3-0766,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0767,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,False,complete,False
-BV3-0768,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0769,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0770,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
-BV3-0771,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0772,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0773,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0774,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,False,complete,False
-BV3-0775,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0776,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
-BV3-0777,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0778,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0779,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,False,complete,False
-BV3-0780,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0781,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,False,complete,False
-BV3-0782,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0783,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0784,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,False,complete,False
-BV3-0785,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
-BV3-0786,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,target_reached_no_flow,False
-BV3-0787,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_not_triggered,False
-BV3-0788,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
-BV3-0789,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
-BV3-0790,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0791,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,target_reached_no_flow,False
-BV3-0792,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,target_reached_no_flow,False
-BV3-0793,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,target_reached_no_flow,False
-BV3-0794,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
-BV3-0795,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
-BV3-0796,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,environment_missing,False
-BV3-0797,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_not_triggered,False
-BV3-0798,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
-BV3-0799,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
-BV3-0800,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,target_reached_no_flow,False
+PB-001,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-002,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-003,confirmed_violation,Private data collection and upload,filtered CSV packet,,False,False,timeout,False
+PB-004,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-005,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-006,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-007,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-008,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-009,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-010,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-011,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-012,confirmed_violation,Reverse shell / remote control,controller poll response,,False,False,timeout,False
+PB-013,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-014,confirmed_violation,Unauthorized external actions,action request post,,False,False,timeout,False
+PB-015,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-016,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-017,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-018,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-019,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-020,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-021,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-022,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-023,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-024,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-025,confirmed_violation,Persistence,startup list entry,http_body;llm_context,False,False,path_incomplete,False
+PB-026,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-027,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-028,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-029,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-030,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-031,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-032,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-033,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,,False,False,timeout,False
+PB-034,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-035,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-036,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-037,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-038,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-039,confirmed_violation,Supply-chain or dependency abuse,package archive,,False,False,timeout,False
+PB-040,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-041,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-042,confirmed_violation,Instruction override and hidden behavior,local appendix note,,False,False,timeout,False
+PB-043,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",llm_context,False,False,path_incomplete,False
+PB-044,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-045,confirmed_violation,Private data collection and upload,filtered CSV packet,llm_context,False,False,path_incomplete,False
+PB-046,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-047,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-048,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-049,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-050,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,max_steps_exhausted,False
+PB-051,confirmed_violation,Reverse shell / remote control,controller poll response,,False,False,target_reached_no_flow,False
+PB-052,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-053,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-054,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-055,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-056,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-057,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-058,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-059,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-060,confirmed_violation,Untrusted download and execute,archive and helper command,llm_context,False,False,path_incomplete,False
+PB-061,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-062,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-063,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-064,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-065,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-066,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-067,confirmed_violation,Resource abuse,many job requests,,False,False,timeout,False
+PB-068,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-069,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,environment_missing,False
+PB-070,confirmed_violation,Credential access and exfiltration,plain text request,http_body;llm_context,False,False,complete,False
+PB-071,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-072,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,llm_context,False,False,path_incomplete,False
+PB-073,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-074,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-075,confirmed_violation,Permission or privilege expansion,ACL append,http_body;llm_context,False,False,complete,False
+PB-076,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-077,confirmed_violation,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
+PB-078,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-079,confirmed_violation,Unauthorized external actions,action request post,,False,False,environment_missing,False
+PB-080,confirmed_violation,Resource abuse,many job requests,llm_context,False,False,path_incomplete,False
+PB-081,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-082,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-083,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-084,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-085,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,,False,False,execution_failed,False
+PB-086,confirmed_violation,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
+PB-087,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-088,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-089,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-090,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-091,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-092,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-093,confirmed_violation,Resource abuse,many job requests,llm_context,False,False,environment_missing,False
+PB-094,confirmed_violation,Instruction override and hidden behavior,local appendix note,,False,False,environment_missing,False
+PB-095,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",llm_context,False,False,path_incomplete,False
+PB-096,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-097,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-098,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-099,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-100,confirmed_violation,Persistence,startup list entry,llm_context,False,False,max_steps_exhausted,False
+PB-101,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-102,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-103,confirmed_violation,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
+PB-104,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-105,confirmed_violation,Unauthorized external actions,action request post,,False,False,timeout,False
+PB-106,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-107,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-108,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-109,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-110,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-111,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,llm_context,False,False,path_incomplete,False
+PB-112,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-113,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-114,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-115,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-116,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-117,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-118,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-119,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-120,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-121,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
+PB-122,confirmed_violation,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
+PB-123,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-124,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,llm_context,False,False,path_incomplete,False
+PB-125,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-126,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-127,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-128,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-129,confirmed_violation,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
+PB-130,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-131,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-132,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-133,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-134,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-135,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-136,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-137,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-138,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-139,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-140,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-141,confirmed_violation,Reverse shell / remote control,controller poll response,,False,False,target_reached_no_flow,False
+PB-142,confirmed_violation,Supply-chain or dependency abuse,package archive,llm_context,False,False,path_incomplete,False
+PB-143,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-144,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-145,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-146,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-147,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-148,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-149,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-150,confirmed_violation,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
+PB-151,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-152,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-153,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-154,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-155,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-156,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-157,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-158,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-159,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-160,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-161,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-162,confirmed_violation,Untrusted download and execute,archive and helper command,,False,False,timeout,False
+PB-163,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-164,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-165,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-166,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-167,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-168,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-169,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-170,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-171,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-172,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-173,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-174,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-175,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-176,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-177,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-178,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-179,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-180,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-181,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-182,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
+PB-183,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-184,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
+PB-185,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,environment_missing,False
+PB-186,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,environment_missing,False
+PB-187,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,environment_missing,False
+PB-188,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,environment_missing,False
+PB-189,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-190,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-191,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-192,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
+PB-193,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
+PB-194,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-195,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-196,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-197,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-198,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-199,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-200,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-201,confirmed_violation,Private data collection and upload,filtered CSV packet,,False,False,timeout,False
+PB-202,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,False,max_steps_exhausted,False
+PB-203,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-204,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-205,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-206,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-207,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-208,confirmed_violation,Supply-chain or dependency abuse,package archive,llm_context,False,False,path_incomplete,False
+PB-209,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-210,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-211,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-212,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-213,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-214,confirmed_violation,Private data collection and upload,filtered CSV packet,llm_context,False,False,path_incomplete,False
+PB-215,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-216,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-217,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-218,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-219,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-220,confirmed_violation,Reverse shell / remote control,controller poll response,,False,False,timeout,False
+PB-221,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-222,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-223,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-224,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-225,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
+PB-226,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-227,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-228,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-229,confirmed_violation,Untrusted download and execute,archive and helper command,,False,False,environment_missing,False
+PB-230,confirmed_violation,Persistence,startup list entry,,False,False,environment_missing,False
+PB-231,confirmed_violation,Permission or privilege expansion,ACL append,,False,False,environment_missing,False
+PB-232,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-233,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-234,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-235,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-236,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-237,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-238,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-239,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-240,confirmed_violation,Private data collection and upload,filtered CSV packet,,False,False,timeout,False
+PB-241,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-242,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-243,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-244,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-245,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-246,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-247,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-248,confirmed_violation,Resource abuse,many job requests,llm_context,False,False,path_incomplete,False
+PB-249,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-250,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-251,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-252,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-253,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-254,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-255,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-256,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-257,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-258,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-259,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-260,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-261,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-262,confirmed_violation,Instruction override and hidden behavior,local appendix note,,False,False,timeout,False
+PB-263,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-264,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-265,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-266,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-267,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-268,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-269,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-270,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-271,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-272,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-273,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-274,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-275,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-276,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-277,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-278,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-279,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-280,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-281,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-282,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-283,confirmed_violation,Destructive modification / ransomware,local overwrite,http_body;llm_context,False,False,complete,False
+PB-284,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-285,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-286,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-287,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-288,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-289,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-290,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-291,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-292,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-293,confirmed_violation,Untrusted download and execute,archive and helper command,llm_context,False,False,path_incomplete,False
+PB-294,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-295,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-296,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-297,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-298,confirmed_violation,Supply-chain or dependency abuse,package archive,llm_context,False,False,path_incomplete,False
+PB-299,confirmed_violation,Unauthorized external actions,action request post,,False,False,timeout,False
+PB-300,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-301,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-302,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-303,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-304,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-305,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-306,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-307,confirmed_violation,Persistence,startup list entry,,False,False,execution_failed,False
+PB-308,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-309,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-310,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-311,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-312,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-313,confirmed_violation,Resource abuse,many job requests,,False,False,timeout,False
+PB-314,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-315,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-316,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-317,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-318,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-319,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-320,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-321,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-322,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-323,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-324,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-325,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-326,confirmed_violation,Resource abuse,many job requests,http_body,True,True,complete,False
+PB-327,confirmed_violation,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-328,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-329,confirmed_violation,Credential access and exfiltration,plain text request,,False,False,timeout,False
+PB-330,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-331,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-332,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-333,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-334,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-335,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-336,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-337,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-338,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-339,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-340,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-341,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-342,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-343,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-344,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-345,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-346,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-347,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-348,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-349,confirmed_violation,Supply-chain or dependency abuse,package archive,http_body,True,True,complete,False
+PB-350,confirmed_violation,Unauthorized external actions,action request post,http_body,True,True,complete,False
+PB-351,confirmed_violation,Instruction override and hidden behavior,local appendix note,llm_context,False,False,path_incomplete,False
+PB-352,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-353,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-354,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-355,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-356,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-357,confirmed_violation,Persistence,startup list entry,llm_context,False,False,path_incomplete,False
+PB-358,confirmed_violation,Permission or privilege expansion,ACL append,llm_context,False,False,path_incomplete,False
+PB-359,confirmed_violation,Destructive modification / ransomware,local overwrite,llm_context,False,False,path_incomplete,False
+PB-360,confirmed_violation,Reverse shell / remote control,controller poll response,http_body,True,True,complete,False
+PB-361,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-362,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-363,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-364,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-365,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-366,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-367,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-368,confirmed_violation,Private data collection and upload,filtered CSV packet,http_body,True,True,complete,False
+PB-369,confirmed_violation,LLM-mediated disclosure,LLM prompt and response,http_body,True,True,complete,False
+PB-370,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-371,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-372,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-373,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-374,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-375,confirmed_violation,Credential access and exfiltration,plain text request,http_body,True,True,complete,False
+PB-376,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-377,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-378,confirmed_violation,Untrusted download and execute,archive and helper command,http_body,True,True,complete,False
+PB-379,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-380,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-381,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-382,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-383,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-384,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-385,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-386,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-387,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-388,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-389,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-390,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
+PB-391,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-392,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-393,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-394,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-395,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-396,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-397,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-398,confirmed_violation,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,True,complete,False
+PB-399,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
+PB-400,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
+PB-401,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
+PB-402,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-403,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-404,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-405,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-406,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
+PB-407,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
+PB-408,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
+PB-409,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
+PB-410,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,timeout,False
+PB-411,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-412,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
+PB-413,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
+PB-414,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
+PB-415,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-416,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-417,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-418,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-419,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_not_triggered,False
+PB-420,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
+PB-421,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
+PB-422,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
+PB-423,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-424,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-425,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
+PB-426,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
+PB-427,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-428,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-429,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-430,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-431,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
+PB-432,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
+PB-433,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
+PB-434,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
+PB-435,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,execution_failed,False
+PB-436,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-437,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
+PB-438,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
+PB-439,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
+PB-440,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-441,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-442,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-443,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-444,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
+PB-445,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
+PB-446,benign_lookalike,Unauthorized external actions,action request post,,False,False,execution_failed,False
+PB-447,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
+PB-448,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-449,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-450,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,timeout,False
+PB-451,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,environment_missing,False
+PB-452,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,environment_missing,False
+PB-453,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,environment_missing,False
+PB-454,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-455,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-456,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-457,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
+PB-458,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
+PB-459,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
+PB-460,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
+PB-461,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-462,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-463,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
+PB-464,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,target_reached_no_flow,False
+PB-465,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
+PB-466,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,target_reached_no_flow,False
+PB-467,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-468,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-469,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-470,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,target_reached_no_flow,False
+PB-471,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
+PB-472,benign_lookalike,Unauthorized external actions,action request post,,False,False,complete,False
+PB-473,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
+PB-474,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-475,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-476,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
+PB-477,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
+PB-478,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,execution_failed,False
+PB-479,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
+PB-480,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-481,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-482,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,execution_failed,False
+PB-483,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
+PB-484,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
+PB-485,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
+PB-486,benign_lookalike,Resource abuse,many job requests,,False,False,environment_missing,False
+PB-487,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,environment_missing,False
+PB-488,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-489,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,target_reached_no_flow,False
+PB-490,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
+PB-491,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,timeout,False
+PB-492,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-493,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-494,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-495,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-496,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-497,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-498,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
+PB-499,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
+PB-500,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
+PB-501,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-502,benign_lookalike,Persistence,startup list entry,,False,False,execution_failed,False
+PB-503,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-504,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-505,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
+PB-506,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
+PB-507,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
+PB-508,benign_lookalike,Resource abuse,many job requests,,False,False,path_incomplete,False
+PB-509,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,target_reached_no_flow,False
+PB-510,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-511,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
+PB-512,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
+PB-513,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,execution_failed,False
+PB-514,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
+PB-515,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-516,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-517,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-518,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,target_reached_no_flow,False
+PB-519,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
+PB-520,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
+PB-521,trusted_allowed,Resource abuse,many job requests,,False,False,path_incomplete,False
+PB-522,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,timeout,False
+PB-523,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-524,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
+PB-525,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
+PB-526,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,complete,False
+PB-527,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-528,benign_lookalike,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-529,benign_lookalike,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-530,benign_lookalike,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-531,benign_lookalike,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
+PB-532,benign_lookalike,Supply-chain or dependency abuse,package archive,,False,False,execution_failed,False
+PB-533,benign_lookalike,Unauthorized external actions,action request post,,False,False,path_incomplete,False
+PB-534,trusted_allowed,Resource abuse,many job requests,http_body,True,False,complete,False
+PB-535,benign_lookalike,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-536,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-537,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
+PB-538,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
+PB-539,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
+PB-540,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-541,trusted_allowed,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-542,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-543,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-544,trusted_allowed,Reverse shell / remote control,controller poll response,http_body,True,False,complete,False
+PB-545,trusted_allowed,Supply-chain or dependency abuse,package archive,http_body,True,False,complete,False
+PB-546,trusted_allowed,Unauthorized external actions,action request post,http_body,True,False,complete,False
+PB-547,trusted_allowed,Resource abuse,many job requests,http_body,True,False,complete,False
+PB-548,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-549,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-550,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
+PB-551,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,execution_failed,False
+PB-552,benign_lookalike,LLM-mediated disclosure,LLM prompt and response,,False,False,execution_failed,False
+PB-553,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
+PB-554,trusted_allowed,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-555,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-556,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-557,trusted_allowed,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
+PB-558,trusted_allowed,Supply-chain or dependency abuse,package archive,http_body,True,False,complete,False
+PB-559,trusted_allowed,Unauthorized external actions,action request post,http_body,True,False,complete,False
+PB-560,trusted_allowed,Resource abuse,many job requests,http_body,True,False,complete,False
+PB-561,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-562,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-563,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
+PB-564,benign_lookalike,Private data collection and upload,filtered CSV packet,,False,False,environment_missing,False
+PB-565,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-566,trusted_allowed,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-567,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-568,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,environment_missing,False
+PB-569,trusted_allowed,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
+PB-570,trusted_allowed,Supply-chain or dependency abuse,package archive,,False,False,path_incomplete,False
+PB-571,trusted_allowed,Unauthorized external actions,action request post,http_body,True,False,complete,False
+PB-572,trusted_allowed,Resource abuse,many job requests,http_body,True,False,complete,False
+PB-573,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-574,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
+PB-575,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
+PB-576,trusted_allowed,Private data collection and upload,filtered CSV packet,http_body,True,False,complete,False
+PB-577,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,http_body,True,False,complete,False
+PB-578,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
+PB-579,trusted_allowed,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-580,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-581,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-582,trusted_allowed,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
+PB-583,trusted_allowed,Supply-chain or dependency abuse,package archive,,False,False,execution_failed,False
+PB-584,trusted_allowed,Unauthorized external actions,action request post,http_body,True,False,complete,False
+PB-585,trusted_allowed,Resource abuse,many job requests,,False,False,execution_failed,False
+PB-586,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-587,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-588,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
+PB-589,trusted_allowed,Private data collection and upload,filtered CSV packet,http_body,True,False,complete,False
+PB-590,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,http_body,True,False,complete,False
+PB-591,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-592,trusted_allowed,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-593,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-594,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-595,trusted_allowed,Reverse shell / remote control,controller poll response,http_body,True,False,complete,False
+PB-596,trusted_allowed,Supply-chain or dependency abuse,package archive,,False,False,timeout,False
+PB-597,trusted_allowed,Unauthorized external actions,action request post,http_body,True,False,complete,False
+PB-598,review_coverage,Resource abuse,many job requests,,False,False,execution_failed,False
+PB-599,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-600,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-601,benign_lookalike,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
+PB-602,trusted_allowed,Private data collection and upload,filtered CSV packet,http_body,True,False,complete,False
+PB-603,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
+PB-604,benign_lookalike,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-605,trusted_allowed,Persistence,startup list entry,,False,False,environment_missing,False
+PB-606,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-607,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-608,trusted_allowed,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
+PB-609,trusted_allowed,Supply-chain or dependency abuse,package archive,http_body,True,False,complete,False
+PB-610,trusted_allowed,Unauthorized external actions,action request post,,False,False,execution_failed,False
+PB-611,review_coverage,Resource abuse,many job requests,,False,False,execution_failed,False
+PB-612,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-613,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-614,trusted_allowed,Credential access and exfiltration,plain text request,http_body,True,False,complete,False
+PB-615,trusted_allowed,Private data collection and upload,filtered CSV packet,http_body,True,False,complete,False
+PB-616,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,,False,False,path_not_triggered,False
+PB-617,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-618,trusted_allowed,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-619,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-620,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-621,trusted_allowed,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
+PB-622,trusted_allowed,Supply-chain or dependency abuse,package archive,http_body,True,False,complete,False
+PB-623,trusted_allowed,Unauthorized external actions,action request post,http_body,True,False,complete,False
+PB-624,review_coverage,Resource abuse,many job requests,,False,False,target_reached_no_flow,False
+PB-625,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-626,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-627,trusted_allowed,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
+PB-628,trusted_allowed,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
+PB-629,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
+PB-630,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-631,trusted_allowed,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-632,trusted_allowed,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-633,trusted_allowed,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
+PB-634,trusted_allowed,Supply-chain or dependency abuse,package archive,http_body,True,False,complete,False
+PB-635,trusted_allowed,Unauthorized external actions,action request post,,False,False,path_incomplete,False
+PB-636,review_coverage,Resource abuse,many job requests,,False,False,target_reached_no_flow,False
+PB-637,trusted_allowed,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-638,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-639,trusted_allowed,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
+PB-640,trusted_allowed,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
+PB-641,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,http_body,True,False,complete,False
+PB-642,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
+PB-643,review_coverage,Persistence,startup list entry,,False,False,execution_failed,False
+PB-644,review_coverage,Permission or privilege expansion,ACL append,,False,False,execution_failed,False
+PB-645,review_coverage,Destructive modification / ransomware,local overwrite,,False,False,environment_missing,False
+PB-646,review_coverage,Reverse shell / remote control,controller poll response,,False,False,path_incomplete,False
+PB-647,review_coverage,Supply-chain or dependency abuse,package archive,,False,False,environment_missing,False
+PB-648,review_coverage,Unauthorized external actions,action request post,,False,False,timeout,False
+PB-649,review_coverage,Instruction override and hidden behavior,local appendix note,,False,False,path_incomplete,False
+PB-650,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-651,trusted_allowed,Credential access and exfiltration,plain text request,http_body,True,False,complete,False
+PB-652,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,,False,False,execution_failed,False
+PB-653,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
+PB-654,review_coverage,Persistence,startup list entry,,False,False,path_incomplete,False
+PB-655,review_coverage,Permission or privilege expansion,ACL append,,False,False,execution_failed,False
+PB-656,review_coverage,Destructive modification / ransomware,local overwrite,,False,False,timeout,False
+PB-657,review_coverage,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
+PB-658,review_coverage,Supply-chain or dependency abuse,package archive,,False,False,execution_failed,False
+PB-659,review_coverage,Unauthorized external actions,action request post,,False,False,execution_failed,False
+PB-660,review_coverage,Instruction override and hidden behavior,local appendix note,,False,False,execution_failed,False
+PB-661,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
+PB-662,trusted_allowed,Credential access and exfiltration,plain text request,http_body,True,False,complete,False
+PB-663,trusted_allowed,Private data collection and upload,filtered CSV packet,http_body,True,False,complete,False
+PB-664,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,http_body,True,False,complete,False
+PB-665,trusted_allowed,Untrusted download and execute,archive and helper command,http_body,True,False,complete,False
+PB-666,review_coverage,Persistence,startup list entry,,False,False,execution_failed,False
+PB-667,review_coverage,Permission or privilege expansion,ACL append,,False,False,path_incomplete,False
+PB-668,review_coverage,Destructive modification / ransomware,local overwrite,,False,False,timeout,False
+PB-669,review_coverage,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
+PB-670,review_coverage,Supply-chain or dependency abuse,package archive,,False,False,timeout,False
+PB-671,review_coverage,Unauthorized external actions,action request post,,False,False,execution_failed,False
+PB-672,review_coverage,Instruction override and hidden behavior,local appendix note,,False,False,target_reached_no_flow,False
+PB-673,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-674,trusted_allowed,Credential access and exfiltration,plain text request,,False,False,target_reached_no_flow,False
+PB-675,trusted_allowed,Private data collection and upload,filtered CSV packet,,False,False,execution_failed,False
+PB-676,trusted_allowed,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
+PB-677,trusted_allowed,Untrusted download and execute,archive and helper command,http_body,True,False,complete,False
+PB-678,review_coverage,Persistence,startup list entry,,False,False,execution_failed,False
+PB-679,review_coverage,Permission or privilege expansion,ACL append,,False,False,target_reached_no_flow,False
+PB-680,review_coverage,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-681,review_coverage,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
+PB-682,review_coverage,Unauthorized external actions,action request post,,False,False,execution_failed,False
+PB-683,review_coverage,Instruction override and hidden behavior,local appendix note,,False,False,execution_failed,False
+PB-684,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-685,trusted_allowed,Credential access and exfiltration,plain text request,http_body,True,False,complete,False
+PB-686,review_coverage,Private data collection and upload,filtered CSV packet,,False,False,execution_failed,False
+PB-687,review_coverage,LLM-mediated disclosure,LLM prompt and response,,False,False,execution_failed,False
+PB-688,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-689,review_coverage,Persistence,startup list entry,,False,False,execution_failed,False
+PB-690,review_coverage,Permission or privilege expansion,ACL append,,False,False,target_reached_no_flow,False
+PB-691,review_coverage,Destructive modification / ransomware,local overwrite,,False,False,path_incomplete,False
+PB-692,review_coverage,Reverse shell / remote control,controller poll response,,False,False,execution_failed,False
+PB-693,review_coverage,Supply-chain or dependency abuse,package archive,,False,False,environment_missing,False
+PB-694,review_coverage,Unauthorized external actions,action request post,,False,False,execution_failed,False
+PB-695,review_coverage,Instruction override and hidden behavior,local appendix note,,False,False,execution_failed,False
+PB-696,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
+PB-697,trusted_allowed,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
+PB-698,review_coverage,Private data collection and upload,filtered CSV packet,,False,False,execution_failed,False
+PB-699,review_coverage,LLM-mediated disclosure,LLM prompt and response,,False,False,target_reached_no_flow,False
+PB-700,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-701,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-702,trusted_allowed,Credential access and exfiltration,plain text request,http_body,True,False,complete,False
+PB-703,review_coverage,Private data collection and upload,filtered CSV packet,,False,False,path_incomplete,False
+PB-704,review_coverage,LLM-mediated disclosure,LLM prompt and response,,False,False,execution_failed,False
+PB-705,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,timeout,False
+PB-706,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-707,trusted_allowed,Credential access and exfiltration,plain text request,http_body,True,False,complete,False
+PB-708,review_coverage,Private data collection and upload,filtered CSV packet,,False,False,execution_failed,False
+PB-709,review_coverage,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
+PB-710,trusted_allowed,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-711,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-712,review_coverage,Credential access and exfiltration,plain text request,,False,False,timeout,False
+PB-713,review_coverage,Private data collection and upload,filtered CSV packet,,False,False,execution_failed,False
+PB-714,review_coverage,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
+PB-715,review_coverage,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-716,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
+PB-717,review_coverage,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
+PB-718,review_coverage,Private data collection and upload,filtered CSV packet,,False,False,environment_missing,False
+PB-719,review_coverage,LLM-mediated disclosure,LLM prompt and response,,False,False,path_incomplete,False
+PB-720,review_coverage,Untrusted download and execute,archive and helper command,,False,False,target_reached_no_flow,False
+PB-721,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,complete,False
+PB-722,review_coverage,Credential access and exfiltration,plain text request,,False,False,path_not_triggered,False
+PB-723,review_coverage,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
+PB-724,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-725,review_coverage,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
+PB-726,review_coverage,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-727,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
+PB-728,review_coverage,Credential access and exfiltration,plain text request,,False,False,execution_failed,False
+PB-729,review_coverage,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
+PB-730,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-731,review_coverage,Credential access and exfiltration,plain text request,,False,False,path_incomplete,False
+PB-732,review_coverage,Untrusted download and execute,archive and helper command,,False,False,execution_failed,False
+PB-733,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
+PB-734,review_coverage,Credential access and exfiltration,plain text request,,False,False,timeout,False
+PB-735,review_coverage,Untrusted download and execute,archive and helper command,,False,False,path_incomplete,False
+PB-736,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,environment_missing,False
+PB-737,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
+PB-738,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-739,benign_lookalike,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-740,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-741,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
+PB-742,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-743,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,False,complete,False
+PB-744,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-745,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-746,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
+PB-747,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-748,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-749,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-750,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,False,complete,False
+PB-751,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-752,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
+PB-753,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-754,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-755,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,False,complete,False
+PB-756,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-757,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,False,complete,False
+PB-758,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-759,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-760,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",http_body,True,False,complete,False
+PB-761,trusted_allowed,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
+PB-762,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,target_reached_no_flow,False
+PB-763,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_not_triggered,False
+PB-764,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
+PB-765,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
+PB-766,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-767,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,target_reached_no_flow,False
+PB-768,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,target_reached_no_flow,False
+PB-769,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,target_reached_no_flow,False
+PB-770,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,timeout,False
+PB-771,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
+PB-772,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,environment_missing,False
+PB-773,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_not_triggered,False
+PB-774,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,execution_failed,False
+PB-775,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,path_incomplete,False
+PB-776,review_coverage,Multi-stage compositional behavior,"LLM prompt, archive, and post",,False,False,target_reached_no_flow,False

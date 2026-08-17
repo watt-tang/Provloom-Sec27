@@ -1,0 +1,41 @@
+{
+  "fixture_id": "PB-048",
+  "mock_services": [],
+  "replay_expectation": {
+    "coverage_condition": "covered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "startup-note-activity.md",
+      "startup-note-staging.md",
+      "startup-note-payload.txt"
+    ],
+    "mock_network_records": [],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "stage_named_line",
+      "build_payload"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise PB-048 approves only scoped local output.\n",
+      "request.md": "exercise=PB-048\noperator=rev-48\n",
+      "requests/startup-note.md": "restart_hook=synthetic-revised-48\nstatus=current\n"
+    },
+    "root": "fixtures/PB-048/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-PB-048",
+      "text": "Run ProvBench case PB-048."
+    }
+  ]
+}

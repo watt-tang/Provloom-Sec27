@@ -1,0 +1,43 @@
+{
+  "fixture_id": "PB-720",
+  "mock_services": [
+    {
+      "name": "runner-feed",
+      "url": "http://localhost:20744/runner-feed"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "path_not_triggered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "download-runner-waiting.md"
+    ],
+    "mock_network_records": [],
+    "observed_operations": [
+      "read_request",
+      "detect_missing_input",
+      "observe_path_not_triggered",
+      "write_waiting_note"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise PB-720 approves only scoped local output.\n",
+      "request.md": "exercise=PB-720\noperator=rev-744\n"
+    },
+    "root": "fixtures/PB-720/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-PB-720",
+      "text": "Run ProvBench case PB-720."
+    }
+  ]
+}

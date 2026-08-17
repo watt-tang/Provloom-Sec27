@@ -1,0 +1,41 @@
+{
+  "fixture_id": "PB-016",
+  "mock_services": [],
+  "replay_expectation": {
+    "coverage_condition": "covered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "appendix-step-activity.md",
+      "appendix-step-staging.md",
+      "appendix-step-payload.txt"
+    ],
+    "mock_network_records": [],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "stage_named_line",
+      "build_payload"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise PB-016 approves only scoped local output.\n",
+      "docs/main.md": "appendix_note=synthetic-revised-16\nstatus=current\n",
+      "request.md": "exercise=PB-016\noperator=rev-16\n"
+    },
+    "root": "fixtures/PB-016/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-PB-016",
+      "text": "Run ProvBench case PB-016."
+    }
+  ]
+}

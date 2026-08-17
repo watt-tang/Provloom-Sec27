@@ -121,21 +121,21 @@ def load_gt(sid: str) -> dict[str, Any]:
 
 
 def load_unified(sid: str) -> dict[str, Any] | None:
-    path = RUN_DIR / f"BV3FULL-{sid}" / "unified-analysis.json"
+    path = RUN_DIR / f"PROVBENCH-FULL-{sid}" / "unified-analysis.json"
     if not path.exists():
         return None
     return read_json(path)
 
 
 def load_runtime_chains(sid: str) -> list[dict[str, Any]]:
-    path = RUN_DIR / f"BV3FULL-{sid}" / "runtime-chains.json"
+    path = RUN_DIR / f"PROVBENCH-FULL-{sid}" / "runtime-chains.json"
     if not path.exists():
         return []
     return read_json(path)
 
 
 def load_runtime_graph(sid: str) -> dict[str, Any] | None:
-    path = RUN_DIR / f"BV3FULL-{sid}" / "runtime-provenance-graph.json"
+    path = RUN_DIR / f"PROVBENCH-FULL-{sid}" / "runtime-provenance-graph.json"
     if not path.exists():
         return None
     return read_json(path)
@@ -1129,7 +1129,7 @@ def efficiency(ids: list[str]) -> dict[str, Any]:
             node_counts.append(len(g.get("nodes", [])))
             edge_counts.append(len(g.get("edges", [])))
             event_counts.append(sum((g.get("summary") or {}).get("edge_types", {}).values()))
-        d = RUN_DIR / f"BV3FULL-{sid}"
+        d = RUN_DIR / f"PROVBENCH-FULL-{sid}"
         if d.exists():
             total_size = 0
             for p in d.iterdir():
@@ -1193,7 +1193,7 @@ def group_analyses(ids: list[str], manifest: dict[str, dict[str, Any]], samples:
 
 def case_studies(samples: dict[str, dict[str, Any]]) -> dict[str, Any]:
     fn_sid = next(sid for sid, s in samples.items() if s.get("expected_policy_outcome") == "confirmed_violation" and s.get("predicted_label") != "malicious")
-    ids = ["BV3-0001", "BV3-0401", fn_sid]
+    ids = ["PB-001", "PB-399", fn_sid]
     cases = []
     for sid in ids:
         gt = load_gt(sid)
@@ -1203,7 +1203,7 @@ def case_studies(samples: dict[str, dict[str, Any]]) -> dict[str, Any]:
         chains = load_runtime_chains(sid)
         cases.append({
             "sample_id": sid,
-            "role": "true_positive_closed_chain" if sid == "BV3-0001" else ("benign_lookalike" if sid == "BV3-0401" else "false_negative_or_need_review"),
+            "role": "true_positive_closed_chain" if sid == "PB-001" else ("benign_lookalike" if sid == "PB-399" else "false_negative_or_need_review"),
             "expected_outcome": s.get("expected_policy_outcome"),
             "predicted_label": s.get("predicted_label"),
             "risk_family": s.get("risk_family"),

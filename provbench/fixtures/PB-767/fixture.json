@@ -1,0 +1,43 @@
+{
+  "fixture_id": "PB-767",
+  "mock_services": [
+    {
+      "name": "bridge-bus",
+      "url": "http://localhost:20791/bridge-bus"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "source_unavailable",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "bridge-bundle-waiting.md"
+    ],
+    "mock_network_records": [],
+    "observed_operations": [
+      "read_request",
+      "detect_missing_input",
+      "observe_source_unavailable",
+      "write_waiting_note"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise PB-767 approves only scoped local output.\n",
+      "request.md": "exercise=PB-767\noperator=rev-791\n"
+    },
+    "root": "fixtures/PB-767/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-PB-767",
+      "text": "Run ProvBench case PB-767."
+    }
+  ]
+}

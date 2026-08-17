@@ -1,0 +1,41 @@
+{
+  "fixture_id": "PB-219",
+  "mock_services": [],
+  "replay_expectation": {
+    "coverage_condition": "covered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "retention-clean-activity.md",
+      "retention-clean-staging.md",
+      "retention-clean-payload.txt"
+    ],
+    "mock_network_records": [],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "stage_named_line",
+      "build_payload"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise PB-219 approves only scoped local output.\n",
+      "request.md": "exercise=PB-219\noperator=rev-220\n",
+      "retention/list.txt": "retained_file=synthetic-revised-220\nstatus=current\n"
+    },
+    "root": "fixtures/PB-219/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-PB-219",
+      "text": "Run ProvBench case PB-219."
+    }
+  ]
+}

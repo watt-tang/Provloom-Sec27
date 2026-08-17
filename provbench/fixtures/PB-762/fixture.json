@@ -1,0 +1,43 @@
+{
+  "fixture_id": "PB-762",
+  "mock_services": [
+    {
+      "name": "bridge-bus",
+      "url": "http://localhost:20786/bridge-bus"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "path_not_triggered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "bridge-bundle-waiting.md"
+    ],
+    "mock_network_records": [],
+    "observed_operations": [
+      "read_request",
+      "detect_missing_input",
+      "observe_path_not_triggered",
+      "write_waiting_note"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise PB-762 approves only scoped local output.\n",
+      "request.md": "exercise=PB-762\noperator=rev-786\n"
+    },
+    "root": "fixtures/PB-762/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-PB-762",
+      "text": "Run ProvBench case PB-762."
+    }
+  ]
+}

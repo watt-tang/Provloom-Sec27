@@ -160,9 +160,9 @@
   },
   "case_studies": {
     "case_ids": [
-      "BV3-0001",
-      "BV3-0401",
-      "BV3-0008"
+      "PB-001",
+      "PB-399",
+      "PB-008"
     ]
   },
   "chain_metrics": {

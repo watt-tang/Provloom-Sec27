@@ -16,13 +16,11 @@ ablation summaries, and reproducibility scripts.
   provenance construction, policy evaluation, and adjudication.
 - `provbench/`: final ProvBench cases, fixtures, ground truth, manifest, schema,
   and validators.
-- `scripts/`: evaluation, baseline, ablation, figure, and validation scripts.
+- `scripts/`: evaluation, baseline, ablation, and validation scripts.
 - `results/`: frozen paper-facing summaries for ProvBench, baselines, ablations,
   evidence/closure analysis, cost, and error analysis.
 - `docs/`: artifact notes that are useful for reviewers.
 - `docker/`: sandbox runtime support.
-- `latex/USENIX_2027_Cycle1_Provloom/`: paper source used as the artifact truth
-  source.
 
 ## Environment Setup
 
@@ -66,7 +64,7 @@ Smoke-test one case:
 python3 scripts/run_provbench_full_scan.py \
   --benchmark-root provbench \
   --output-root results/provbench/full_smoke \
-  --sample-ids BV3-0001
+  --sample-ids PB-001
 ```
 
 Re-evaluate the frozen full-system summary:
@@ -78,8 +76,7 @@ python3 scripts/run_provbench_full_scan.py \
   --ground-truth-dir provbench/ground_truth
 ```
 
-The internal `BV3-*` case IDs are retained only for compatibility with frozen
-artifacts and scripts; the benchmark name is ProvBench.
+ProvBench cases are named `PB-001` through `PB-776`.
 
 ## Running Ablations
 

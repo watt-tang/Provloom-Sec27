@@ -598,7 +598,7 @@ class UnifiedPipelineTests(unittest.TestCase):
             "policy_violations": [],
         }
 
-        unified = build_unified_explanation(skill_id="BV3-A", static_result=static_payload, dynamic_result=runtime).to_dict()
+        unified = build_unified_explanation(skill_id="PB-A", static_result=static_payload, dynamic_result=runtime).to_dict()
         renamed = build_unified_explanation(skill_id="not-a-sample-id", static_result=static_payload, dynamic_result=runtime).to_dict()
         markdown = generate_unified_markdown(unified)
 

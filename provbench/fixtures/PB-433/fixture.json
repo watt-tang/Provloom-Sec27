@@ -1,0 +1,45 @@
+{
+  "fixture_id": "PB-433",
+  "mock_services": [
+    {
+      "name": "desk-change",
+      "url": "http://localhost:20436/desk-change"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "covered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "desk-change-readiness.md",
+      "desk-change-owner-note.md"
+    ],
+    "mock_network_records": [],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "presence_status_only",
+      "write_owner_note"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise PB-433 approves only scoped local output.\n",
+      "request.md": "exercise=PB-433\noperator=rev-436\n",
+      "requests/desk-change.md": "action_request=synthetic-revised-436\nstatus=current\n"
+    },
+    "root": "fixtures/PB-433/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-PB-433",
+      "text": "Run ProvBench case PB-433."
+    }
+  ]
+}

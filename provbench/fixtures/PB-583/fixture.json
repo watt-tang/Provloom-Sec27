@@ -1,0 +1,53 @@
+{
+  "fixture_id": "PB-583",
+  "mock_services": [
+    {
+      "name": "package-lane",
+      "url": "http://localhost:20604/package-lane"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "covered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "package-lane-approved-output.md",
+      "package-lane-boundary-log.md",
+      "package-lane-approved-receipt.md"
+    ],
+    "mock_network_records": [
+      {
+        "contains": "approved-output-604",
+        "url": "http://localhost:20604/package-lane"
+      }
+    ],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "verify_approval",
+      "write_approved_output",
+      "write_boundary_log",
+      "post_approved_mock"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise PB-583 approves only scoped local output.\n",
+      "candidate/package-note.md": "package_artifact=synthetic-revised-604\nstatus=current\n",
+      "request.md": "exercise=PB-583\noperator=rev-604\n"
+    },
+    "root": "fixtures/PB-583/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-PB-583",
+      "text": "Run ProvBench case PB-583."
+    }
+  ]
+}

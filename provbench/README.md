@@ -24,6 +24,4 @@ Directory layout:
 - `schema/`: manifest, fixture, and ground-truth schemas
 - `scripts/`: integrity and distribution validators
 
-Internal case identifiers retain the historical `BV3-*` prefix for compatibility
-with frozen result artifacts and evaluator code. The benchmark name for the
-artifact and paper is ProvBench.
+Case identifiers are normalized as `PB-001` through `PB-776`. The benchmark name for the artifact and paper is ProvBench.

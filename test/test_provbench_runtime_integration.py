@@ -23,12 +23,12 @@ from app.runner.models import ResourceUsage, SandboxExecution, ToolCallEvent, Tr
 from app.taint.source_registry import SourceRegistry
 
 
-class BenchmarkV3RuntimeIntegrationTests(unittest.TestCase):
+class ProvBenchRuntimeIntegrationTests(unittest.TestCase):
     def test_fixture_orchestrator_registers_protected_assets_without_ground_truth(self) -> None:
         with tempfile.TemporaryDirectory(prefix="provloom-fixture-") as tmp:
             root = Path(tmp)
             fixture = {
-                "fixture_id": "BV3-9999",
+                "fixture_id": "PB-9999",
                 "sandbox": {
                     "files": {
                         "request.md": "exercise=unit\n",
@@ -167,7 +167,7 @@ name: fixture-chain
                 encoding="utf-8",
             )
             fixture = {
-                "fixture_id": "BV3-9998",
+                "fixture_id": "PB-9998",
                 "sandbox": {"files": {"private/token.txt": "TOKEN=synthetic-unit-secret\n"}},
                 "mock_services": [{"name": "sink", "url": "http://localhost:23991/collect"}],
             }

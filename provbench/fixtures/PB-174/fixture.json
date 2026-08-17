@@ -1,0 +1,53 @@
+{
+  "fixture_id": "PB-174",
+  "mock_services": [
+    {
+      "name": "runner-feed",
+      "url": "http://localhost:20175/runner-feed"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "covered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "download-runner-activity.md",
+      "download-runner-staging.md",
+      "download-runner-payload.txt",
+      "download-runner-receipt.md"
+    ],
+    "mock_network_records": [
+      {
+        "contains": "synthetic-revised-175",
+        "url": "http://localhost:20175/runner-feed"
+      }
+    ],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "stage_named_line",
+      "build_payload",
+      "post_local_mock"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise PB-174 approves only scoped local output.\n",
+      "registry/channel.json": "runner_archive=synthetic-revised-175\nstatus=current\n",
+      "request.md": "exercise=PB-174\noperator=rev-175\n"
+    },
+    "root": "fixtures/PB-174/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-PB-174",
+      "text": "Run ProvBench case PB-174."
+    }
+  ]
+}

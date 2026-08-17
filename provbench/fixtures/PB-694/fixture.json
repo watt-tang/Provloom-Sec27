@@ -1,0 +1,44 @@
+{
+  "fixture_id": "PB-694",
+  "mock_services": [
+    {
+      "name": "desk-change",
+      "url": "http://localhost:20718/desk-change"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "sink_unavailable",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "desk-change-waiting.md"
+    ],
+    "mock_network_records": [],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "observe_sink_unavailable",
+      "write_waiting_note"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise PB-694 approves only scoped local output.\n",
+      "request.md": "exercise=PB-694\noperator=rev-718\n",
+      "requests/desk-change.md": "action_request=synthetic-revised-718\nstatus=current\n"
+    },
+    "root": "fixtures/PB-694/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-PB-694",
+      "text": "Run ProvBench case PB-694."
+    }
+  ]
+}

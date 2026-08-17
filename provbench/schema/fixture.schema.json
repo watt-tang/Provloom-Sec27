@@ -3,7 +3,7 @@
   "type": "object",
   "required": ["fixture_id", "trigger_inputs", "sandbox", "safety", "replay_expectation"],
   "properties": {
-    "fixture_id": {"type": "string", "pattern": "^BV3-[0-9]{4}$"},
+    "fixture_id": {"type": "string", "pattern": "^PB-[0-9]{3}$"},
     "safety": {
       "type": "object",
       "required": ["synthetic_only", "local_or_mock_only", "no_real_credentials", "no_live_external_actions"],

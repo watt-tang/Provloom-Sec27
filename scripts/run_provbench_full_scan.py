@@ -138,10 +138,10 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run resumable full-system ProvLoom scans over ProvBench samples.")
     parser.add_argument("--benchmark-root", default="provbench")
     parser.add_argument("--output-root", default="results/provbench/full_manual")
-    parser.add_argument("--run-prefix", default="BV3FULL")
-    parser.add_argument("--sample-ids", default="", help="Comma-separated internal case ids, e.g. BV3-0001,BV3-0002.")
+    parser.add_argument("--run-prefix", default="PROVBENCH-FULL")
+    parser.add_argument("--sample-ids", default="", help="Comma-separated internal case ids, e.g. PB-001,PB-002.")
     parser.add_argument("--sample-file", default="", help="Text file with one sample id per line.")
-    parser.add_argument("--start", default="", help="Start id or number, e.g. BV3-0001 or 1.")
+    parser.add_argument("--start", default="", help="Start id or number, e.g. PB-001 or 1.")
     parser.add_argument("--end", default="", help="End id or number, inclusive.")
     parser.add_argument("--split", default="", help="Optional manifest split filter.")
     parser.add_argument("--limit", type=int, default=0)
@@ -194,9 +194,9 @@ def select_rows(adapter: BenchmarkV3ReplayAdapter, args: argparse.Namespace) -> 
 
 def normalize_sample_id(value: str) -> str:
     raw = str(value).strip()
-    if raw.upper().startswith("BV3-"):
+    if raw.upper().startswith("PB-"):
         return raw.upper()
-    return f"BV3-{int(raw):04d}"
+    return f"PB-{int(raw):03d}"
 
 
 def load_prior_rows(summary_path: Path) -> dict[str, dict[str, Any]]:
@@ -241,12 +241,12 @@ def load_ground_truth_records(root: Path) -> dict[str, dict[str, Any]]:
     if not root.exists():
         raise SystemExit(f"Ground truth directory does not exist: {root}")
     records: dict[str, dict[str, Any]] = {}
-    for path in sorted(root.glob("BV3-*.json")):
+    for path in sorted(root.glob("PB-*.json")):
         payload = json.loads(path.read_text(encoding="utf-8"))
         sample_id = str(payload.get("sample_id") or path.stem)
         records[sample_id] = payload
     if not records:
-        raise SystemExit(f"No BV3-*.json ground truth files found in: {root}")
+        raise SystemExit(f"No PB-*.json ground truth files found in: {root}")
     return records
 
 
@@ -568,7 +568,7 @@ def load_labels(adapter: BenchmarkV3ReplayAdapter, args: argparse.Namespace) -> 
                 labels[str(sample_id)] = normalized
     if args.ground_truth_dir:
         root = Path(args.ground_truth_dir)
-        for path in root.glob("BV3-*.json"):
+        for path in root.glob("PB-*.json"):
             payload = json.loads(path.read_text(encoding="utf-8"))
             label = normalize_label(payload.get("label") or payload.get("ground_truth") or payload.get("is_malicious"))
             if label:

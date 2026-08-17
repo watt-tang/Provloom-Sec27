@@ -1,0 +1,53 @@
+{
+  "fixture_id": "PB-131",
+  "mock_services": [
+    {
+      "name": "worker-burst",
+      "url": "http://localhost:20132/worker-burst"
+    }
+  ],
+  "replay_expectation": {
+    "coverage_condition": "covered",
+    "exit_code": 0,
+    "fixture_mutations": [
+      "worker-burst-activity.md",
+      "worker-burst-staging.md",
+      "worker-burst-payload.txt",
+      "worker-burst-receipt.md"
+    ],
+    "mock_network_records": [
+      {
+        "contains": "synthetic-revised-132",
+        "url": "http://localhost:20132/worker-burst"
+      }
+    ],
+    "observed_operations": [
+      "read_request",
+      "read_input",
+      "stage_named_line",
+      "build_payload",
+      "post_local_mock"
+    ],
+    "timeout": false
+  },
+  "safety": {
+    "local_or_mock_only": true,
+    "no_live_external_actions": true,
+    "no_real_credentials": true,
+    "synthetic_only": true
+  },
+  "sandbox": {
+    "files": {
+      "approval-note.md": "Exercise PB-131 approves only scoped local output.\n",
+      "jobs/burst-plan.md": "job_batch=synthetic-revised-132\nstatus=current\n",
+      "request.md": "exercise=PB-131\noperator=rev-132\n"
+    },
+    "root": "fixtures/PB-131/sandbox"
+  },
+  "trigger_inputs": [
+    {
+      "id": "TR-PB-131",
+      "text": "Run ProvBench case PB-131."
+    }
+  ]
+}
